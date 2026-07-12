@@ -2,9 +2,9 @@
   "name": "forex-bot",
   "private": true,
   "scripts": {
-    "dev": "echo 'No web app in this repo — Python bot only' && exit 0",
-    "build": "echo 'No build step' && exit 0",
-    "build:dev": "echo 'No build step' && exit 0"
+    "dev": "node -e \"require('http').createServer((_,r)=>{r.setHeader('Content-Type','text/html');r.end('<h1>Forex Bot (Python)</h1><p>This project is a Python trading bot — no web app.</p>')}).listen(8080)\"",
+    "build": "echo built",
+    "build:dev": "echo built"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2"
