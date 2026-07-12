@@ -1,4 +1,11 @@
 {
+  "name": "forex-bot",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'No web app in this repo — Python bot only' && exit 0",
+    "build": "echo 'No build step' && exit 0",
+    "build:dev": "echo 'No build step' && exit 0"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2"
   }
