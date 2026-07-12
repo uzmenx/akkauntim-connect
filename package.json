@@ -7,6 +7,15 @@
     "build:dev": "mkdir -p dist && echo '<h1>Forex Bot (Python)</h1><p>This project is a Python trading bot — no web app in this repo.</p>' > dist/index.html"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.110.2"
+    "@supabase/supabase-js": "^2.110.2",
+    "@tanstack/react-query": "^5.101.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.24.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-router-dom": "^7.18.1",
+    "tailwind-merge": "^3.6.0"
   }
 }
