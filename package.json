@@ -1,4 +1,11 @@
 {
+  "name": "forex-bot",
+  "private": true,
+  "scripts": {
+    "dev": "sh -c 'node dev-server.js' _",
+    "build": "echo built",
+    "build:dev": "echo built"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2"
   }
