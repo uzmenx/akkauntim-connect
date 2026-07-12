@@ -2,7 +2,7 @@
   "name": "forex-bot",
   "private": true,
   "scripts": {
-    "dev": "node -e \"require('http').createServer((_,r)=>{r.setHeader('Content-Type','text/html');r.end('<h1>Forex Bot (Python)</h1><p>This project is a Python trading bot — no web app.</p>')}).listen(8080)\"",
+    "dev": "sh -c 'node dev-server.js' _",
     "build": "echo built",
     "build:dev": "echo built"
   },
