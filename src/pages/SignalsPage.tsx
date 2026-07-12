@@ -1,0 +1,119 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/Card";
+import { fmtNum, timeAgo } from "@/lib/utils";
+import type { AISignal } from "@/lib/types";
+import { Brain, Check, X, Loader2, CircleMinus } from "lucide-react";
+import { EmptyLine } from "./DashboardPage";
+
+export function SignalsPage() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["ai_signals"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ai_signals")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      return (data ?? []) as AISignal[];
+    },
+    refetchInterval: 8000,
+  });
+
+  if (isLoading) {
+    return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
+  }
+
+  if (!data?.length) {
+    return (
+      <Card>
+        <EmptyLine text="AI hali signal chiqarmadi. Bot ishga tushishi bilan bu yerda paydo bo'ladi." />
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {data.map((s) => (
+        <SignalCard key={s.id} s={s} />
+      ))}
+    </div>
+  );
+}
+
+function SignalCard({ s }: { s: AISignal }) {
+  const sig = s.signal?.toUpperCase();
+  const tone =
+    sig === "BUY" ? "success" : sig === "SELL" ? "danger" : "muted";
+  const badge =
+    tone === "success"
+      ? "bg-success/20 text-success"
+      : tone === "danger"
+      ? "bg-danger/20 text-danger"
+      : "bg-white/10 text-fg-muted";
+  const StatusIcon = s.executed ? Check : s.rejection_reason ? X : CircleMinus;
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-strong to-brand text-white shadow-lg shadow-brand-strong/30">
+            <Brain size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-base font-bold">{s.symbol}</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider ${badge}`}>
+                {sig}
+              </span>
+            </div>
+            <p className="text-[11px] text-fg-dim">{timeAgo(s.created_at)} oldin</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="tabular text-xl font-black">{s.confidence}%</p>
+          <p className="text-[10px] uppercase tracking-wider text-fg-dim">confidence</p>
+        </div>
+      </div>
+
+      <div className="mt-3">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/30">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-brand to-brand-soft"
+            style={{ width: `${Math.min(100, Math.max(0, s.confidence))}%` }}
+          />
+        </div>
+      </div>
+
+      {s.reasoning && (
+        <p className="mt-3 rounded-2xl bg-black/20 p-3 text-xs leading-relaxed text-fg-muted">
+          {s.reasoning}
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
+          SL {fmtNum(s.stop_loss_pips, 0)} pip
+        </span>
+        <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
+          TP {fmtNum(s.take_profit_pips, 0)} pip
+        </span>
+        <span
+          className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
+            s.executed
+              ? "bg-success/20 text-success"
+              : s.rejection_reason
+              ? "bg-danger/20 text-danger"
+              : "bg-white/10 text-fg-dim"
+          }`}
+        >
+          <StatusIcon size={12} />
+          {s.executed ? "Bajarildi" : s.rejection_reason ? "Rad etildi" : "HOLD"}
+        </span>
+      </div>
+
+      {s.rejection_reason && (
+        <p className="mt-2 text-[11px] text-danger">Sabab: {s.rejection_reason}</p>
+      )}
+    </Card>
+  );
+}

@@ -1,10 +1,12 @@
 {
-  "name": "forex-bot",
+  "name": "traderpanel",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "sh -c 'node dev-server.js' _",
-    "build": "mkdir -p dist && echo '<h1>Forex Bot (Python)</h1><p>This project is a Python trading bot — no web app in this repo.</p>' > dist/index.html",
-    "build:dev": "mkdir -p dist && echo '<h1>Forex Bot (Python)</h1><p>This project is a Python trading bot — no web app in this repo.</p>' > dist/index.html"
+    "dev": "vite --host 0.0.0.0 --port 8080",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "preview": "vite preview --host 0.0.0.0 --port 8080"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",
@@ -13,18 +15,18 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "lucide-react": "^0.462.0",
-    "react": "^18",
-    "react-dom": "^18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-router-dom": "^7.18.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.2",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.0.3",
-    "tailwindcss": "^4",
-    "typescript": "^7.0.2",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^5.6.0",
     "vite": "^8.1.4"
   }
 }
