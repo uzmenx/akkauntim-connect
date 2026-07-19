@@ -4,6 +4,7 @@ import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory } from "@/lib/types";
 import {
   Play, Pause, Settings, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown,
+  ArrowDownLeft, ArrowUpRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState } from "react";
@@ -90,7 +91,7 @@ export function DashboardPage() {
   const currency = status.data?.account_currency ?? "USD";
 
   return (
-    <div className="flex flex-col items-center min-h-screen w-full bg-[#1e1a1d] font-sans pb-24 overflow-x-hidden">
+    <div className="flex flex-col items-center min-h-screen w-full font-sans pb-[max(env(safe-area-inset-bottom),2rem)] overflow-x-hidden">
       
       {/* Background Gradient to simulate the bottom green glow */}
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/40 to-transparent pointer-events-none" />
@@ -135,7 +136,7 @@ export function DashboardPage() {
           </div>
 
           {/* Last Transaction / High Profit Box */}
-          <div className="bg-[#1e2336]/80 rounded-[28px] p-4 mb-4 backdrop-blur-xl border border-white/5 relative overflow-hidden group hover:bg-[#1e2336]/90 transition-all">
+          <div className="bg-[#10192e]/90 rounded-[28px] p-4 mb-4 backdrop-blur-xl border border-white/10 relative overflow-hidden group hover:bg-[#10192e] transition-all shadow-lg">
             <div className="flex justify-between items-center mb-2">
               <span className="text-[10px] text-white/50 font-medium">Last transaction</span>
               <Link to="/history" className="text-[10px] text-white/70 hover:text-white underline decoration-white/30 transition-all">
@@ -146,9 +147,9 @@ export function DashboardPage() {
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 p-0.5 shadow-lg">
-                  <div className="w-full h-full bg-[#1e2336] rounded-full flex items-center justify-center relative overflow-hidden">
+                  <div className="w-full h-full bg-[#10192e] rounded-full flex items-center justify-center relative overflow-hidden">
                      <span className="text-xs font-bold text-white relative z-10">{bestTrade ? (bestTrade.side === 'BUY' ? 'B' : 'S') : 'Pro'}</span>
-                     <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
+                     <div className="absolute inset-0 bg-white/5 backdrop-blur-sm rounded-full" />
                   </div>
                 </div>
                 <div>
@@ -161,21 +162,23 @@ export function DashboardPage() {
           </div>
 
           {/* 4 Action Buttons Row */}
-          <div className="flex gap-2.5 mt-2">
-            <Link to="/settings" className="flex-shrink-0 w-14 h-14 rounded-full bg-[#2a2d46] hover:bg-[#353856] flex items-center justify-center text-white/80 transition-all shadow-inner border border-white/5 group">
-              <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+          <div className="flex gap-2 mt-2 w-full items-center justify-between">
+            <Link to="/settings" className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Settings">
+              <Settings size={18} className="sm:w-5 sm:h-5 group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
-            <Link to="/signals" className="flex-shrink-0 w-14 h-14 rounded-full bg-[#2a2d46] hover:bg-[#353856] flex items-center justify-center text-white/80 transition-all shadow-inner border border-white/5 group">
-              <ArrowUpDown size={20} className="group-hover:scale-110 transition-transform" />
+            <Link to="/signals" className="flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Signals">
+              <ArrowUpDown size={18} className="sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
             </Link>
 
-            <button onClick={toggleFilter} className="flex-1 h-14 rounded-full bg-[#2a2d46] hover:bg-[#353856] flex items-center justify-center text-sm font-bold text-white/90 transition-all shadow-inner border border-white/5 group">
-              {filterMode === "all" ? "Receive" : filterMode === "profit" ? "Foyda" : "Zarar"} <TrendingDown size={14} className="ml-1 opacity-70 group-hover:translate-y-1 transition-transform" />
+            <button onClick={toggleFilter} className="flex-1 h-12 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-white/90 transition-all border border-white/10 shadow-md">
+              <span>{filterMode === "all" ? "Receive" : filterMode === "profit" ? "Foyda" : "Zarar"}</span>
+              <ArrowDownLeft size={14} className="sm:w-4 sm:h-4 opacity-75" />
             </button>
 
-            <button onClick={() => setShowPrompt(true)} className="flex-1 h-14 rounded-full bg-gradient-to-b from-[#2b6eff] to-[#0f4bd2] hover:opacity-90 flex items-center justify-center text-sm font-bold text-white transition-all shadow-xl shadow-blue-500/20 border border-blue-400/30 group">
-              Send <TrendingUp size={14} className="ml-1 opacity-80 group-hover:-translate-y-1 transition-transform" />
+            <button onClick={() => setShowPrompt(true)} className="flex-1 h-12 sm:h-14 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center gap-1 text-xs sm:text-sm font-bold text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30">
+              <span>Send</span>
+              <ArrowUpRight size={14} className="sm:w-4 sm:h-4 opacity-80" />
             </button>
           </div>
         </div>
@@ -186,29 +189,42 @@ export function DashboardPage() {
           
           {filteredPositions && filteredPositions.length > 0 ? (
             filteredPositions.map(p => (
-              <div key={p.id} className="h-16 w-full rounded-2xl bg-white/80 backdrop-blur-sm shadow-sm flex items-center px-4 hover:scale-[1.02] transition-transform cursor-pointer border border-white/10">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mr-3 shadow-inner ${p.side === 'BUY' ? 'bg-emerald-400' : 'bg-rose-400'}`}>
+              <div key={p.id} className="h-16 w-full rounded-2xl bg-[#10192e]/60 backdrop-blur-md shadow-lg flex items-center px-4 hover:scale-[1.02] transition-transform cursor-pointer border border-white/10">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mr-3 shadow-md ${p.side === 'BUY' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'}`}>
                   {p.side === 'BUY' ? 'B' : 'S'}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-black text-slate-800">{p.symbol}</p>
-                  <p className="text-[10px] font-medium text-slate-500">{p.volume} lot at {fmtNum(p.open_price, 5)}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-white truncate">{p.symbol}</p>
+                  <p className="text-[10px] font-medium text-white/50 truncate">{p.volume} lot at {fmtNum(p.open_price, 5)}</p>
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-bold ${Number(p.profit) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                <div className="text-right shrink-0">
+                  <p className={`text-sm font-bold ${Number(p.profit) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {Number(p.profit) >= 0 ? "+" : ""}{fmtMoney(Number(p.profit))}
                   </p>
-                  <p className="text-[10px] font-medium text-slate-400">{timeAgo(p.opened_at)}</p>
+                  <p className="text-[10px] font-medium text-white/40">{timeAgo(p.opened_at)}</p>
                 </div>
               </div>
             ))
           ) : (
-            // Dummy skeletons simulating the image
+            // High fidelity pulsing skeletons simulating the card structure
             [1, 2, 3, 4, 5, 6].map((i) => (
               <div 
                 key={i} 
-                className="h-[46px] w-full rounded-full bg-white/70 backdrop-blur-md shadow-sm border border-white/20 animate-pulse hover:bg-white/80 transition-colors cursor-default"
-              />
+                className="h-16 w-full rounded-2xl bg-[#10192e]/30 border border-white/5 animate-pulse flex items-center px-4"
+              >
+                {/* Left circle skeleton */}
+                <div className="w-10 h-10 rounded-xl bg-white/5 mr-3 shrink-0" />
+                {/* Middle details skeleton */}
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-16 bg-white/10 rounded-full" />
+                  <div className="h-2 w-24 bg-white/5 rounded-full" />
+                </div>
+                {/* Right profit skeleton */}
+                <div className="space-y-2 flex flex-col items-end">
+                  <div className="h-3 w-14 bg-white/10 rounded-full" />
+                  <div className="h-2 w-10 bg-white/5 rounded-full" />
+                </div>
+              </div>
             ))
           )}
         </div>

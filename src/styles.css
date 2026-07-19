@@ -22,12 +22,19 @@
   --color-warning: oklch(0.82 0.16 85);
 }
 
-html, body, #root {
+html {
   height: 100%;
+}
+
+body, #root {
+  min-height: 100%;
+}
+
+html, body, #root {
   background: linear-gradient(180deg,
     var(--color-bg-deep) 0%,
     var(--color-bg) 40%,
-    var(--color-bg-soft) 100%);
+    var(--color-bg-soft) 100%) no-repeat fixed;
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

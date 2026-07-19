@@ -7,6 +7,7 @@ from risk_manager import validate_trade
 from smc_structure import SMCStructure
 from pattern_detector import HarmonicPatternDetector, extract_pivots_from_data
 from news_detector import NewsDetector
+from supabase_sync import run_sync
 
 # ===== 1. MT5 ga ulanish =====
 if not mt5.initialize():
@@ -124,9 +125,13 @@ print("\n=== RISK TEKSHIRUVI ===")
 print(f"Natija: {message}")
 
 if approved:
-    print(f"✅ SAVDO TASDIQLANDI")
+    print(f"OK: SAVDO TASDIQLANDI")
     print(f"Tavsiya etilgan lot hajmi: {lot_size}")
 else:
-    print(f"❌ SAVDO RAD ETILDI: {message}")
+    print(f"XATO: SAVDO RAD ETILDI: {message}")
+
+# ===== 9. Supabase ga ma'lumotlarni sinxronlash =====
+print("\n=== SUPABASE SINXRONIZATSIYA ===")
+run_sync()
 
 mt5.shutdown()
