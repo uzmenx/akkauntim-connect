@@ -1,7 +1,7 @@
 import type { BotSettings, BotStatus, Position, AISignal, TradeHistory } from "./types";
 
 const MOCK_STATUS_KEY = "guest_bot_status";
-const MOCK_POSITIONS_KEY = "guest_positions";
+const MOCK_POSITIONS_KEY = "guest_positions_v2";
 const MOCK_HISTORY_KEY = "guest_history";
 const MOCK_SIGNALS_KEY = "guest_signals";
 const MOCK_SETTINGS_KEY = "guest_bot_settings";
@@ -21,34 +21,28 @@ const defaultStatus = (): BotStatus => ({
   updated_at: new Date().toISOString(),
 });
 
-const defaultPositions = (): Position[] => [
-  {
-    id: "mock-pos-1",
-    ticket: 12345678,
-    symbol: "EURUSD",
-    side: "BUY",
-    volume: 1.5,
-    open_price: 1.08500,
-    current_price: 1.08780,
-    stop_loss: 1.08200,
-    take_profit: 1.09200,
-    profit: 420.50,
-    opened_at: new Date(Date.now() - 3600000).toISOString(),
-  },
-  {
-    id: "mock-pos-2",
-    ticket: 87654321,
-    symbol: "XAUUSD",
-    side: "SELL",
-    volume: 2.0,
-    open_price: 2350.50,
-    current_price: 2348.36,
-    stop_loss: 2360.00,
-    take_profit: 2330.00,
-    profit: 428.00,
-    opened_at: new Date(Date.now() - 10800000).toISOString(),
-  }
-];
+const defaultPositions = (): Position[] => {
+  const symbols = ["EURUSD", "XAUUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY"];
+  return Array.from({ length: 20 }).map((_, i) => {
+    const isBuy = i % 2 === 0;
+    const symbol = symbols[i % symbols.length];
+    const openPrice = symbol.includes("JPY") ? 150.0 + i : (symbol.includes("XAU") ? 2300.0 + i : 1.0500 + i * 0.01);
+    const profit = isBuy ? (Math.random() * 500) : -(Math.random() * 200);
+    return {
+      id: `mock-pos-${i + 1}`,
+      ticket: 10000000 + i,
+      symbol,
+      side: isBuy ? "BUY" : "SELL",
+      volume: Number((Math.random() * 2 + 0.1).toFixed(2)),
+      open_price: openPrice,
+      current_price: openPrice + (isBuy ? 0.0050 : -0.0050),
+      stop_loss: openPrice - 0.0200,
+      take_profit: openPrice + 0.0400,
+      profit: Number(profit.toFixed(2)),
+      opened_at: new Date(Date.now() - ((i + 1) * 3600000)).toISOString(),
+    };
+  });
+};
 
 const defaultHistory = (): TradeHistory[] => [
   {

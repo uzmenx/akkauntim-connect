@@ -33,17 +33,45 @@ def analyze_and_trade(symbol, tf_major_str, tf_minor_str, tf_major, tf_minor, se
     df_m5 = pd.DataFrame(rates_m5)
     df_m5['time'] = pd.to_datetime(df_m5['time'], unit='s')
 
-    # ===== 3. SMC Tahlili =====
-    smc_detector = SMCStructure()
-    smc_detector.run(df_h1['high'].tolist(), df_h1['low'].tolist(), df_h1['close'].tolist())
-    smc_result = smc_detector.latest_context()
+    # ===== 3. SMC Tahlili va Tarixiy Zonalar (Iterativ Xotira) =====
+    from smc_engine import analyze_market_structure
+    from zone_manager import ZoneManager
 
-    smc_summary = "SMC ko'rsatkichlari aniqlanmadi yoki yetarli ma'lumot yo'q."
-    if smc_result:
-        smc_summary = f"Trend: {smc_result.get('trend', 'N/A')}\n"
-        smc_summary += f"Oxirgi High: {smc_result.get('high_val', 'N/A')} | Oxirgi Low: {smc_result.get('low_val', 'N/A')}\n"
-        if smc_result.get('events'):
-            smc_summary += f"Oxirgi SMC hodisalari: {', '.join(smc_result['events'])}"
+    smc_result = analyze_market_structure(df_h1, {
+        "ob_validity_bars": 10000,
+        "fvg_filter": True,
+        "fvg_filter_type": "Defensive"
+    })
+    
+    current_price = smc_result.get("current_price", 0.0)
+    current_high = float(df_h1['high'].iloc[-1])
+    current_low = float(df_h1['low'].iloc[-1])
+
+    # Iterativ xotira tizimi
+    zm = ZoneManager("smc_zones.db")
+    zm.save_zones(symbol, tf_major_str, smc_result)
+    zm.update_mitigations(symbol, tf_major_str, current_high, current_low)
+    nearby_zones = zm.get_nearby_zones(symbol, tf_major_str, current_price, threshold_pct=0.5)
+
+    smc_summary = f"Joriy narx: {current_price}\n"
+    trend = smc_result.get("trend", {})
+    smc_summary += f"Major Trend: {trend.get('external', 'N/A')} | Minor Trend: {trend.get('internal', 'N/A')}\n"
+    
+    last_bos = smc_result.get("last_bos")
+    last_choch = smc_result.get("last_choch")
+    if last_bos:
+        smc_summary += f"Oxirgi BoS: {last_bos.get('type', '')} ({last_bos.get('price', '')})\n"
+    if last_choch:
+        smc_summary += f"Oxirgi ChoCh: {last_choch.get('type', '')} ({last_choch.get('price', '')})\n"
+
+    # AI uchun yaqin atrofdagi tarixiy zonalar
+    if nearby_zones:
+        smc_summary += f"\nDIQQAT! Joriy narx ({current_price}) quyidagi TARIXIY ZONALARGA yaqinlashmoqda:\n"
+        for z in nearby_zones:
+            z_type = "Order Block" if z["zone_type"] == "ob" else "FVG"
+            smc_summary += f" - {z['direction'].upper()} {z_type}: {z['bottom_price']} -> {z['top_price']} (Masofa: {z['distance_pct']}%, Status: FRESH)\n"
+    else:
+        smc_summary += "\nJoriy narx atrofida kuchli tarixiy zonalar yo'q.\n"
 
     # ===== 4. Harmonic Pattern Tahlili =====
     pivots = extract_pivots_from_data(df_h1, depth=5)

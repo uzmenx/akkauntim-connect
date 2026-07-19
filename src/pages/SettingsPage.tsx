@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { guestMock } from "@/lib/guestMock";
@@ -7,6 +7,19 @@ import { Button } from "@/components/ui/Button";
 import { Loader2, Save, Sparkles, Settings2, Sliders, Play, Code, X, Check, ListPlus, Pencil, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { BotSettings, BotStatus } from "@/lib/types";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+
+const MAJOR_TIMEFRAME_OPTIONS = [
+  { value: "H4", label: "H4 (4 soat)" },
+  { value: "H1", label: "H1 (1 soat)" },
+  { value: "M30", label: "M30 (30 daqiqa)" },
+];
+
+const MINOR_TIMEFRAME_OPTIONS = [
+  { value: "M15", label: "M15 (15 daqiqa)" },
+  { value: "M5", label: "M5 (5 daqiqa)" },
+  { value: "M1", label: "M1 (1 daqiqa)" },
+];
 
 const ASSET_CATEGORIES: Record<string, string[]> = {
   Forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURCHF", "EURAUD"],
@@ -173,6 +186,15 @@ export function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  const saveRef = useRef(save);
+  useEffect(() => {
+    saveRef.current = save;
+  }, [save]);
+
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("settingsState", { detail: { busy, saved } }));
+  }, [busy, saved]);
+
   useEffect(() => {
     const handleReset = async () => {
       if (window.confirm("Haqiqatan ham barcha sozlamalarni standart holatga qaytarmoqchimisiz?")) {
@@ -211,8 +233,17 @@ export function SettingsPage() {
         }
       }
     };
+    
+    const handleSave = () => {
+      saveRef.current();
+    };
+
     window.addEventListener('resetSettings', handleReset);
-    return () => window.removeEventListener('resetSettings', handleReset);
+    window.addEventListener('saveSettings', handleSave);
+    return () => {
+      window.removeEventListener('resetSettings', handleReset);
+      window.removeEventListener('saveSettings', handleSave);
+    };
   }, [user, qc]);
 
   if (isLoading || statusQuery.isLoading) return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
@@ -220,7 +251,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-4 pb-10">
       {/* 1. Market Settings */}
-      <Card className="glass relative overflow-hidden p-5">
+      <Card className="glass relative z-10 p-5">
         <div className="flex items-center gap-2 mb-4 text-brand">
           <Settings2 size={18} />
           <h3 className="font-bold text-sm tracking-wide uppercase">Bozor va Timeframe</h3>
@@ -250,27 +281,19 @@ export function SettingsPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-2 block text-xs font-semibold text-fg-muted">Major Timeframe</label>
-              <select
+              <CustomSelect
                 value={form.timeframe_major ?? "H1"}
-                onChange={(e) => setForm((f) => ({ ...f, timeframe_major: e.target.value }))}
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm text-fg outline-none focus:border-brand/60"
-              >
-                <option value="H4">H4 (4 soat)</option>
-                <option value="H1">H1 (1 soat)</option>
-                <option value="M30">M30 (30 daqiqa)</option>
-              </select>
+                onChange={(val) => setForm((f) => ({ ...f, timeframe_major: val }))}
+                options={MAJOR_TIMEFRAME_OPTIONS}
+              />
             </div>
             <div>
               <label className="mb-2 block text-xs font-semibold text-fg-muted">Minor Timeframe</label>
-              <select
+              <CustomSelect
                 value={form.timeframe_minor ?? "M5"}
-                onChange={(e) => setForm((f) => ({ ...f, timeframe_minor: e.target.value }))}
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm text-fg outline-none focus:border-brand/60"
-              >
-                <option value="M15">M15 (15 daqiqa)</option>
-                <option value="M5">M5 (5 daqiqa)</option>
-                <option value="M1">M1 (1 daqiqa)</option>
-              </select>
+                onChange={(val) => setForm((f) => ({ ...f, timeframe_minor: val }))}
+                options={MINOR_TIMEFRAME_OPTIONS}
+              />
             </div>
           </div>
         </div>

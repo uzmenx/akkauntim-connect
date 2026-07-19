@@ -10,15 +10,32 @@ import requests
 import pandas as pd
 from datetime import datetime, timezone
 import dateutil.parser
+import json
+import os
+import time
 
 class NewsDetector:
     def __init__(self, target_currencies=None):
         self.target_currencies = target_currencies or ["USD", "EUR", "GBP", "JPY"]
         self.calendar_url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+        self.cache_file = "news_cache.json"
+        self.cache_duration = 43200  # 12 soat (sekundlarda)
         self.events = []
     
     def fetch_calendar(self):
         """Fetches the latest economic calendar events for this week"""
+        # 1. Kesh faylni tekshiramiz
+        if os.path.exists(self.cache_file):
+            file_age = time.time() - os.path.getmtime(self.cache_file)
+            if file_age < self.cache_duration:
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        self.events = json.load(f)
+                    return True
+                except Exception as e:
+                    print(f"Error reading news cache: {e}")
+        
+        # 2. Agar kesh eski bo'lsa yoki yo'q bo'lsa API dan tortamiz
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -28,9 +45,25 @@ class NewsDetector:
             
             data = response.json()
             self.events = data
+            
+            # 3. Muvaffaqiyatli tortilsa keshga yozib qo'yamiz
+            try:
+                with open(self.cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f)
+            except Exception as e:
+                print(f"Error writing news cache: {e}")
+                
             return True
         except Exception as e:
             print(f"Error fetching news calendar: {e}")
+            # Agar API 429 xatolik bersa (limitga tushsa), lekin eski kesh bo'lsa
+            if os.path.exists(self.cache_file):
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        self.events = json.load(f)
+                    return True
+                except:
+                    pass
             return False
 
     def get_news_history(self, hours_back=24):

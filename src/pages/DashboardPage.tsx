@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { VerticalCarousel } from "@/components/ui/VerticalCarousel";
 
 const MoneyCoinDuoIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -161,12 +162,12 @@ export function DashboardPage() {
   const pct = limit > 0 ? (remaining / limit) * 100 : 0;
 
   return (
-    <div className="flex flex-col items-center min-h-screen w-full font-sans pb-[max(env(safe-area-inset-bottom),2rem)] overflow-x-hidden">
+    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden">
       
       {/* Background Gradient to simulate the bottom green glow */}
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/40 to-transparent pointer-events-none" />
 
-      <div className="w-full max-w-md px-4 pt-6 pb-6 relative z-10">
+      <div className="w-full max-w-md px-4 pt-4 sm:pt-6 pb-4 sm:pb-6 relative z-10 flex flex-col h-full">
         
         {/* Main Blue Card */}
         <div className="w-full bg-gradient-to-b from-[#0a4ed6] to-[#041a5a] rounded-[30px] sm:rounded-[40px] p-4 sm:p-6 shadow-2xl relative overflow-hidden border border-white/10">
@@ -291,28 +292,12 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Open Positions Skeletons List */}
-        <div className="mt-8 space-y-3">
+        {/* Open Positions */}
+        <div className="mt-6 flex-1 flex flex-col min-h-0 relative">
           <h3 className="text-xs font-bold text-white/60 mb-4 ml-2">OCHIQ POZITSIYALAR</h3>
           
           {filteredPositions && filteredPositions.length > 0 ? (
-            filteredPositions.map(p => (
-              <div key={p.id} className="h-16 w-full rounded-2xl bg-[#10192e]/60 backdrop-blur-md shadow-lg flex items-center px-4 hover:scale-[1.02] transition-transform cursor-pointer border border-white/10">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold mr-3 shadow-md ${p.side === 'BUY' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'}`}>
-                  {p.side === 'BUY' ? 'B' : 'S'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-white truncate">{p.symbol}</p>
-                  <p className="text-[10px] font-medium text-white/50 truncate">{p.volume} lot at {fmtNum(p.open_price, 5)}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-sm font-bold ${Number(p.profit) >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {Number(p.profit) >= 0 ? "+" : ""}{fmtMoney(Number(p.profit))}
-                  </p>
-                  <p className="text-[10px] font-medium text-white/40">{timeAgo(p.opened_at)}</p>
-                </div>
-              </div>
-            ))
+            <VerticalCarousel items={filteredPositions} />
           ) : (
             // High fidelity pulsing skeletons simulating the card structure
             [1, 2, 3, 4, 5, 6].map((i) => (

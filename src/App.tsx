@@ -7,10 +7,11 @@ import { SignalsPage } from "@/pages/SignalsPage";
 import { HistoryPage } from "@/pages/HistoryPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
-import { Loader2, ChevronLeft, RotateCcw } from "lucide-react";
-import { useEffect } from "react";
+import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 const titles: Record<string, string> = {
   "/": "Dashboard",
@@ -26,6 +27,18 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [settingsState, setSettingsState] = useState({ busy: false, saved: false });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setSettingsState(customEvent.detail);
+      }
+    };
+    window.addEventListener("settingsState", handler);
+    return () => window.removeEventListener("settingsState", handler);
+  }, []);
 
   // Global Realtime listener
   useEffect(() => {
@@ -67,7 +80,7 @@ export default function App() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col pb-[max(env(safe-area-inset-bottom),1.5rem)]">
       {!isDashboard && (
-        <header className="flex items-center justify-between px-5 py-4 pt-[max(env(safe-area-inset-top),1rem)]">
+        <header className="sticky top-0 z-40 flex items-center justify-between px-5 py-4 pt-[max(env(safe-area-inset-top),1rem)] bg-bg-deep/85 backdrop-blur-lg border-b border-white/5">
           <div className="flex items-center gap-3">
             <button 
               onClick={() => navigate(-1)} 
@@ -79,13 +92,35 @@ export default function App() {
             <h1 className="text-base font-bold text-white">{title}</h1>
           </div>
           {location.pathname === "/settings" && (
-            <button 
-              onClick={() => window.dispatchEvent(new Event('resetSettings'))}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold border border-red-500/20 active:scale-95"
-            >
-              <RotateCcw size={14} />
-              <span>Reset</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => window.dispatchEvent(new Event('saveSettings'))}
+                disabled={settingsState.busy}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer border",
+                  settingsState.saved 
+                    ? "bg-green-500/10 text-green-400 border-green-500/20"
+                    : "bg-brand/10 text-brand border-brand/20 hover:bg-brand/20"
+                )}
+              >
+                {settingsState.busy ? (
+                  <Loader2 className="animate-spin" size={14} />
+                ) : settingsState.saved ? (
+                  <Check size={14} />
+                ) : (
+                  <Save size={14} />
+                )}
+                <span>{settingsState.saved ? "Saqlandi" : "Saqlash"}</span>
+              </button>
+
+              <button 
+                onClick={() => window.dispatchEvent(new Event('resetSettings'))}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold border border-red-500/20 active:scale-95 cursor-pointer"
+              >
+                <RotateCcw size={14} />
+                <span>Reset</span>
+              </button>
+            </div>
           )}
         </header>
       )}

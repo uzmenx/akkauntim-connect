@@ -283,6 +283,29 @@ def get_cot_trend(pair: str) -> dict:
     except Exception as e:
         return {"cot_trend": "Unknown", "note": f"COT yuklashda xatolik: {e}"}
 
+def get_aggregated_news_summary(currency_pair: str, event_name: str, lookback_months: int = 120) -> str:
+    """
+    AI ga yuborish uchun tarixiy yangiliklarning matematika xulosasini generatsiya qiladi.
+    120 oy = 10 yillik tarix.
+    """
+    impact = analyze_historical_impact(currency_pair, event_name, lookback_months)
+    if impact.get("insufficient_data"):
+        return f"Tarixiy xotira (Memory Bank): {event_name} bo'yicha yetarli tarixiy ma'lumot topilmadi."
+        
+    beats = impact.get("when_actual_beats_forecast")
+    misses = impact.get("when_actual_misses_forecast")
+    
+    text = f"Tarixiy xotira (Memory Bank): Oxirgi yillarda {event_name} bo'yicha jami {impact['sample_size']} ta hodisa tahlil qilindi.\n"
+    
+    if beats:
+        text += f"- Agar Actual > Forecast (Kutilganidan yaxshi) bo'lsa: {beats['direction']} reaksiya ({beats['confidence']*100:.0f}% ishonchlilik bilan), narx o'rtacha {beats['avg_move_1h_pct']:.2f}% o'zgargan.\n"
+    if misses:
+        text += f"- Agar Actual < Forecast (Kutilganidan yomon) bo'lsa: {misses['direction']} reaksiya ({misses['confidence']*100:.0f}% ishonchlilik bilan), narx o'rtacha {misses['avg_move_1h_pct']:.2f}% o'zgargan.\n"
+        
+    text += f"O'rtacha volatillik sakrashi (ATR ga nisbatan): {impact['avg_volatility_spike']} barobar."
+    
+    return text
+
 if __name__ == "__main__":
     init_db()
     print("Database initialized.")
