@@ -1,0 +1,14 @@
+{
+  "trading": {
+    "symbols": ["EURUSD", "GBPUSD", "XAUUSD"],
+    "timeframe_major": "H1",
+    "timeframe_minor": "M5",
+    "loop_interval_minutes": 5,
+    "risk_level_single_confirmation": 1.0,
+    "risk_level_multiple_confirmation": 2.0
+  },
+  "ai": {
+    "model": "claude-sonnet-4-6",
+    "system_prompt": "Sen professional Forex treyderi va fundamental tahlilchisisan. Texnik SMC va Garmonik patternlar hamda iqtisodiy yangiliklarni birlashtirib, optimal savdo qarorini qabul qilasan."
+  }
+}

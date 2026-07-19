@@ -1,60 +1,397 @@
 import MetaTrader5 as mt5
 import pandas as pd
 import os
+import json
+import sqlite3
+import hashlib
+from datetime import datetime
 import anthropic
 
-# ===== 1. MT5 ga ulanish =====
-if not mt5.initialize():
-    print("MT5 ulanishda xatolik:", mt5.last_error())
-    quit()
+from smc_engine import analyze_market_structure
+from harmonic_engine import analyze_harmonic_patterns
+from news_trade_scheduler import get_news_signal
+from voting_engine import aggregate_signals
 
-symbol = "EURUSD"
+def load_env():
+    if os.path.exists(".env"):
+        with open(".env", "r") as f:
+            for line in f:
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    os.environ[k.strip()] = v.strip().strip('"').strip("'")
 
-# ===== 2. Narx ma'lumotlarini olish =====
-rates_h1 = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 0, 50)
-rates_m5 = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 50)
+def load_config():
+    if os.path.exists('config.json'):
+        with open('config.json', 'r') as f:
+            return json.load(f)
+    return {
+        "trading": {
+            "timeframe_major": "H1",
+            "timeframe_minor": "M5",
+        },
+        "ai": {
+            "model": "claude-3-5-sonnet-20241022",
+        }
+    }
 
-df_h1 = pd.DataFrame(rates_h1)
-df_h1['time'] = pd.to_datetime(df_h1['time'], unit='s')
+def init_db():
+    conn = sqlite3.connect('decisions_log.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_decisions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            pair TEXT,
+            timeframe TEXT,
+            context_json TEXT,
+            prompt TEXT,
+            ai_response TEXT,
+            final_decision TEXT,
+            risk_pct REAL
+        )
+    ''')
+    conn.commit()
+    
+    # Cache ustunini qo'shish
+    try:
+        cursor.execute("ALTER TABLE ai_decisions ADD COLUMN context_hash TEXT")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass # Allaqachon mavjud
+        
+    conn.close()
 
-df_m5 = pd.DataFrame(rates_m5)
-df_m5['time'] = pd.to_datetime(df_m5['time'], unit='s')
+def log_decision(pair, timeframe, context, prompt, ai_response, final_decision, risk_pct, context_hash=None):
+    init_db()
+    conn = sqlite3.connect('decisions_log.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO ai_decisions (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        datetime.now().isoformat(),
+        pair,
+        timeframe,
+        json.dumps(context, ensure_ascii=False),
+        prompt,
+        json.dumps(ai_response, ensure_ascii=False) if isinstance(ai_response, dict) else str(ai_response),
+        final_decision,
+        risk_pct,
+        context_hash
+    ))
+    conn.commit()
+    conn.close()
 
-mt5.shutdown()
+def get_market_data(symbol, timeframe, n_bars=100):
+    tf_map = {
+        "H1": mt5.TIMEFRAME_H1,
+        "M5": mt5.TIMEFRAME_M5,
+        "M15": mt5.TIMEFRAME_M15,
+    }
+    mt5_tf = tf_map.get(timeframe, mt5.TIMEFRAME_H1)
+    rates = mt5.copy_rates_from_pos(symbol, mt5_tf, 0, n_bars)
+    if rates is None or len(rates) == 0:
+        return pd.DataFrame()
+    df = pd.DataFrame(rates)
+    df['time'] = pd.to_datetime(df['time'], unit='s')
+    return df
 
-# ===== 3. Ma'lumotni AI uchun matn formatiga aylantirish =====
-h1_text = df_h1[['time', 'open', 'high', 'low', 'close']].tail(20).to_string(index=False)
-m5_text = df_m5[['time', 'open', 'high', 'low', 'close']].tail(20).to_string(index=False)
+def extract_smc_signal(smc_result):
+    if not smc_result:
+        return {"signal": "HOLD", "confidence": 0}
+    trend = smc_result.get("trend", {})
+    int_trend = trend.get("internal", "No Trend")
+    if int_trend == "Up Trend":
+        return {"signal": "BUY", "confidence": 75}
+    elif int_trend == "Down Trend":
+        return {"signal": "SELL", "confidence": 75}
+    return {"signal": "HOLD", "confidence": 0}
 
-prompt = f"""Sen professional forex tahlilchisisan. Quyida {symbol} juftligining narx ma'lumotlari berilgan.
+def extract_pattern_signal(pattern_result):
+    if not pattern_result:
+        return {"signal": "HOLD", "confidence": 0}
+    sig = pattern_result.get("signal", "NEUTRAL")
+    if sig == "BUY":
+        return {"signal": "BUY", "confidence": 75}
+    elif sig == "SELL":
+        return {"signal": "SELL", "confidence": 75}
+    return {"signal": "HOLD", "confidence": 0}
 
-H1 (1 soatlik) so'nggi 20 ta sham:
-{h1_text}
+def extract_news_signal(news_result):
+    if not news_result:
+        return {"signal": "HOLD", "confidence": 0}
+    rec = news_result.get("recommendation", "neutral")
+    if rec == "prepare_long":
+        return {"signal": "BUY", "confidence": 80}
+    elif rec == "prepare_short":
+        return {"signal": "SELL", "confidence": 80}
+    return {"signal": "HOLD", "confidence": 0}
 
-M5 (5 daqiqalik) so'nggi 20 ta sham:
-{m5_text}
+def build_decision_context(pair: str, timeframe: str) -> dict:
+    df_major = get_market_data(pair, timeframe, 150)
+    current_price = 0.0
+    if not df_major.empty:
+        current_price = float(df_major.iloc[-1]['close'])
+        
+    smc_result = None
+    pattern_result = None
+    if not df_major.empty:
+        smc_result = analyze_market_structure(df_major)
+        pattern_result = analyze_harmonic_patterns(df_major)
+        
+    news_result = get_news_signal(pair)
+    
+    smc_data = extract_smc_signal(smc_result)
+    pattern_data = extract_pattern_signal(pattern_result)
+    news_data = extract_news_signal(news_result)
+    
+    voting_result = aggregate_signals(smc_data, pattern_data, news_data)
+    
+    return {
+        "pair": pair,
+        "timeframe": timeframe,
+        "current_price": current_price,
+        "smc_structure": smc_result if smc_result else {},
+        "harmonic_pattern": pattern_result if pattern_result else {},
+        "news_context": news_result if news_result else {},
+        "voting_result": {
+            "direction": voting_result.get("signal", "HOLD"),
+            "risk_pct": voting_result.get("risk_pct", 0.0),
+            "agreeing_strategies": voting_result.get("agreed_strategies", []),
+            "confidence_scores": {
+                "SMC": smc_data["confidence"],
+                "Pattern": pattern_data["confidence"],
+                "News": news_data["confidence"]
+            }
+        }
+    }
 
-Shu ma'lumotlar asosida JAVOBNI FAQAT quyidagi JSON formatida ber, boshqa hech qanday matn qo'shma:
+def build_claude_prompt(context: dict) -> str:
+    pair = context.get('pair', 'Unknown')
+    price = context.get('current_price', 0.0)
+    
+    smc = context.get('smc_structure', {})
+    trend = smc.get('trend', {})
+    smc_summary = f"Trend (Internal): {trend.get('internal', 'N/A')}, Trend (External): {trend.get('external', 'N/A')}"
+    last_bos = smc.get('last_bos', {})
+    if last_bos:
+        smc_summary += f"\\nOxirgi BoS: {last_bos.get('type', '')} at {last_bos.get('price', '')}"
+        
+    pat = context.get('harmonic_pattern', {})
+    pat_summary = f"Pattern signal: {pat.get('signal', 'NEUTRAL')}"
+    if pat.get('patterns'):
+        pat_summary += f", Patterns: {', '.join([p['name'] for p in pat.get('patterns', [])])}"
+        
+    news = context.get('news_context', {})
+    next_event = news.get('next_event') or {}
+    hist_bias = news.get('historical_bias') or {}
+    news_summary = f"Keyingi yangilik: {next_event.get('name', 'None')} ({next_event.get('minutes_to_release', 'N/A')} daqiqa qoldi)"
+    if hist_bias:
+        news_summary += f"\\nTarixiy Bias: {hist_bias.get('direction', 'Neutral')} (Ishonch: {hist_bias.get('confidence', 0)})"
+        
+    vote = context.get('voting_result', {})
+    
+    risk_info = context.get('risk_manager', {})
+    risk_summary = ""
+    if risk_info:
+        risk_summary = f"\n\n=== RISK BOSHQRUV ===\nKunlik zarar: {risk_info.get('daily_drawdown_pct', 0)}% (Limit: {risk_info.get('daily_limit_pct', 10)}%)"
+        
+    prompt = f"""Quyida {pair} juftligi uchun olingan savdo va iqtisodiy ma'lumotlar berilgan.
 
+Joriy narx: {price}
+
+=== TEXNIK SMC TAHLILI ===
+{smc_summary}
+
+=== HARMONIC PATTERN DETECTOR ===
+{pat_summary}
+
+=== YANGILIKLAR KONTEKSTI ===
+{news_summary}
+
+=== VOTING ENGINE NATIJASI ===
+Yo'nalish (Direction): {vote.get('direction')}
+Risk foizi: {vote.get('risk_pct')}%
+Kelishgan strategiyalar: {', '.join(vote.get('agreeing_strategies', []))}{risk_summary}
+
+DIQQAT:
+Voting Engine allaqachon risk% va yo'nalishni hisoblab bergan. Sening vazifang buni qayta hisoblash EMAS — balki quyidagi savolga javob berish: shu kontekstda bu savdoni HOZIR ochish xavfsizmi, yoki kutish/rad etish kerakmi?
+
+Quyidagi qat'iy qoidalarga rioya qil:
+1. Yaqinlashayotgan yangilik: Agar yuqori yoki o'rta ta'sirli yangilik chiqishiga 60 daqiqadan KAM vaqt qolgan bo'lsa, savdoni WAIT yoki REJECT qil. Agar 60 daqiqadan ko'p vaqt bo'lsa (masalan 120 daqiqa), buni xavfsiz deb hisobla va boshqa ziddiyatlar bo'lmasa EXECUTE qil.
+2. Risk boshqaruvi limitlari: Agar joriy kunlik zarar (drawdown) va ochilayotgan savdoning risk% yig'indisi kunlik limitdan oshib ketadigan bo'lsa (ya'ni joriy_zarar - risk_pct <= limit_pct, masalan -8% - 4% = -12%, bu esa -10% lik limitdan o'tib ketgan), savdoni darhol REJECT qilishing SHART. Kunlik limit buzilmasligi eng oliy ustuvorlikdir.
+3. SMC va fundamental ziddiyatlar bo'lsa REJECT qil.
+
+Agar yuqoridagi qoidalarga ko'ra shartlar mos bo'lsa EXECUTE qaytar.
+Yo'nalish ({vote.get('direction')}) va risk% ni aslo o'zgartirma.
+
+JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn yozma:
 {{
-  "signal": "BUY" yoki "SELL" yoki "HOLD",
-  "confidence": 0 dan 100 gacha son,
-  "reasoning": "qisqacha sabab, 1-2 gap",
-  "stop_loss_pips": son,
-  "take_profit_pips": son
+    "final_decision": "EXECUTE" yoki "REJECT" yoki "WAIT",
+    "reasoning": "Sening qisqa izohing (o'zbek tilida)",
+    "risk_pct": {vote.get('risk_pct')},
+    "direction": "{vote.get('direction')}",
+    "warnings": ["xavf 1", "xavf 2"],
+    "wait_until": "agar WAIT bo'lsa, qachongacha kutish kerakligi (yoki null)"
 }}
 """
+    return prompt
 
-# ===== 4. Claude API ga so'rov yuborish =====
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+def get_state_hash(context: dict) -> str:
+    """SMC, Pattern va News tuzilmalaridan iborat o'zgarmas holat xeshini (hash) yaratadi. Narx e'tiborga olinmaydi."""
+    state = {
+        "vote": context.get('voting_result', {}).get('direction'),
+        "vote_risk": context.get('voting_result', {}).get('risk_pct'),
+        "smc_trend": context.get('smc_structure', {}).get('trend'),
+        "smc_events": context.get('smc_structure', {}).get('events'),
+        "pat_signal": context.get('harmonic_pattern', {}).get('signal'),
+        "news_status": context.get('news_context', {}).get('status'),
+        "news_event": context.get('news_context', {}).get('next_event', {}).get('name')
+    }
+    state_str = json.dumps(state, sort_keys=True)
+    return hashlib.md5(state_str.encode('utf-8')).hexdigest()
 
-response = client.messages.create(
-    model="claude-sonnet-4-6",
-    max_tokens=500,
-    messages=[
-        {"role": "user", "content": prompt}
-    ]
-)
+def get_ai_decision(context: dict, mock_response=None) -> dict:
+    vote_direction = context.get('voting_result', {}).get('direction', 'HOLD')
+    vote_risk = context.get('voting_result', {}).get('risk_pct', 0.0)
+    
+    if vote_direction == "HOLD" or vote_risk == 0.0:
+        return {
+            "final_decision": "REJECT",
+            "reasoning": "Voting Engine HOLD karorini berganligi sababli AI chaqirilmadi.",
+            "risk_pct": 0.0,
+            "direction": "HOLD",
+            "warnings": [],
+            "wait_until": None
+        }
+        
+    # Kesh tizimi (Cost Optimization)
+    current_hash = get_state_hash(context)
+    pair = context.get('pair', 'Unknown')
+    
+    # O'tgan xeshni tekshirish
+    try:
+        init_db()
+        conn = sqlite3.connect('decisions_log.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT context_hash, ai_response FROM ai_decisions WHERE pair = ? ORDER BY id DESC LIMIT 1", (pair,))
+        row = cursor.fetchone()
+        conn.close()
+        
+        if row and row[0] == current_hash and row[1]:
+            # Xesh mos keldi, oldingi API javobidan foydalanamiz
+            old_response = row[1]
+            try:
+                decision = json.loads(old_response)
+                decision["reasoning"] = "(CACHED) " + decision.get("reasoning", "")
+                return decision
+            except Exception as e:
+                pass # Parse xato bo'lsa yangitdan AI chaqiramiz
+    except Exception as e:
+        print(f"Cache o'qishda xatolik: {e}")
+        
+    prompt = build_claude_prompt(context)
+    
+    if mock_response is not None:
+        ai_text = mock_response
+    else:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            return {
+                "final_decision": "REJECT",
+                "reasoning": "ANTHROPIC_API_KEY topilmadi.",
+                "risk_pct": vote_risk,
+                "direction": vote_direction,
+                "warnings": ["API Key yo'q"],
+                "wait_until": None
+            }
+            
+        config = load_config()
+        model = config.get("ai", {}).get("model", "claude-3-5-sonnet-20241022")
+        
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            response = client.messages.create(
+                model=model,
+                max_tokens=500,
+                system="Sen xavfsizlik filtri sifatidagi yordamchi AIsan. Faqat berilgan JSON formatida javob berasan, boshqa hech narsa yozmaysan.",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            ai_text = response.content[0].text.strip()
+        except Exception as e:
+            return {
+                "final_decision": "REJECT",
+                "reasoning": f"AI API xatoligi: {str(e)}",
+                "risk_pct": vote_risk,
+                "direction": vote_direction,
+                "warnings": ["API xatolik"],
+                "wait_until": None
+            }
 
-print("=== AI JAVOBI ===")
-print(response.content[0].text)
+    if ai_text.startswith("```"):
+        ai_text = ai_text.split("```")[1]
+        if ai_text.startswith("json"):
+            ai_text = ai_text[4:]
+            
+    try:
+        decision = json.loads(ai_text.strip())
+        
+        if decision.get('direction') != vote_direction or decision.get('risk_pct') != vote_risk:
+            decision['final_decision'] = "REJECT"
+            decision['warnings'] = decision.get('warnings', []) + ["Claude risk_pct yoki direction ni o'zgartirishga urindi, savdo rad etildi."]
+            decision['direction'] = vote_direction
+            decision['risk_pct'] = vote_risk
+            
+        # Logging
+        log_decision(
+            context.get('pair'), 
+            context.get('timeframe'),
+            context,
+            prompt,
+            decision,
+            decision.get('final_decision'),
+            vote_risk,
+            context_hash=current_hash
+        )
+        return decision
+        
+    except Exception as e:
+        err_res = {
+            "final_decision": "REJECT",
+            "reasoning": "AI javobini o'qib bo'lmadi, xavfsizlik uchun rad etildi.",
+            "risk_pct": vote_risk,
+            "direction": vote_direction,
+            "warnings": [f"JSON Parse xato: {str(e)}"],
+            "wait_until": None
+        }
+        log_decision(
+            context.get('pair'), 
+            context.get('timeframe'),
+            context,
+            prompt,
+            ai_text,
+            "REJECT",
+            vote_risk,
+            context_hash=current_hash
+        )
+        return err_res
+
+def make_trading_decision(pair: str, timeframe: str) -> dict:
+    load_env()
+    init_db()
+    
+    if not mt5.initialize():
+        print("MT5 ulanishda xatolik:", mt5.last_error())
+        # Agar MT5 ishlamasa, fallback: HOLD qaytaradi, lekin biz testlar uchun davom etishimiz mumkin bo'lsa yaxshi
+        
+    context = build_decision_context(pair, timeframe)
+    decision = get_ai_decision(context)
+    
+    mt5.shutdown()
+    return decision
+
+if __name__ == "__main__":
+    print("--- Testing ai_analysis.py ---")
+    res = make_trading_decision("EURUSD", "H1")
+    import json
+    print(json.dumps(res, indent=2, ensure_ascii=False))

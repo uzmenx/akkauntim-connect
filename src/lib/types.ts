@@ -6,6 +6,16 @@ export type BotSettings = {
   max_daily_loss: number;
   min_confidence: number;
   max_lot_size: number;
+  timeframe_major?: string;
+  timeframe_minor?: string;
+  ai_model?: string;
+  system_prompt?: string;
+  risk_level_single_confirmation?: number;
+  risk_level_multiple_confirmation?: number;
+  mt5_login?: string;
+  mt5_password?: string;
+  mt5_server?: string;
+  mt5_terminal_path?: string;
   updated_at: string;
 };
 

@@ -31,12 +31,12 @@ def check_confidence(confidence):
     return True, "OK"
 
 
-def calculate_lot_size(symbol, stop_loss_pips):
+def calculate_lot_size(symbol, stop_loss_pips, risk_pct=RISK_PER_TRADE):
     """Risk foiziga asoslanib lot hajmini hisoblaydi"""
     account_info = mt5.account_info()
     balance = account_info.balance
 
-    risk_amount = balance * RISK_PER_TRADE
+    risk_amount = balance * risk_pct
 
     symbol_info = mt5.symbol_info(symbol)
     if symbol_info is None:
@@ -62,7 +62,7 @@ def calculate_lot_size(symbol, stop_loss_pips):
     return lot_size, "OK"
 
 
-def validate_trade(symbol, signal, confidence, stop_loss_pips):
+def validate_trade(symbol, signal, confidence, stop_loss_pips, risk_pct=RISK_PER_TRADE):
     """
     Barcha risk tekshiruvlarini birlashtiradi.
     Qaytaradi: (ruxsat_bermi: bool, xabar: str, lot_size: float yoki None)
@@ -78,7 +78,7 @@ def validate_trade(symbol, signal, confidence, stop_loss_pips):
     if signal == "HOLD":
         return False, "Signal HOLD — savdo qilinmaydi", None
 
-    lot_size, msg = calculate_lot_size(symbol, stop_loss_pips)
+    lot_size, msg = calculate_lot_size(symbol, stop_loss_pips, risk_pct=risk_pct)
     if lot_size is None:
         return False, msg, None
 
