@@ -1,98 +1,104 @@
-import os
-import MetaTrader5 as mt5
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import datetime
+"""
+Python bot -> Lovable Cloud sync via Edge Function.
 
-# Env faylni yuklash
+Bot service_role key olmaydi. Buning o'rniga HTTPS orqali `bot-sync` edge
+funksiyasiga POST qilamiz. Shared secret `BOT_SYNC_SECRET` env orqali.
+
+Environment variables:
+  SUPABASE_URL           - Cloud project URL (from Lovable Cloud .env)
+  BOT_SYNC_SECRET        - shared secret set in Cloud project
+  MT5_LOGIN              - the MT5 account number this bot instance controls
+                           (must match the login the user signed up with in the panel)
+"""
+import os
+import datetime
+import requests
+import MetaTrader5 as mt5
+from dotenv import load_dotenv
+
 load_dotenv()
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_PUBLISHABLE_KEY")  # Yoki SERVICE_ROLE_KEY agar RLS bo'lsa
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL")
+BOT_SYNC_SECRET = os.environ.get("BOT_SYNC_SECRET", "")
+MT5_LOGIN = os.environ.get("MT5_LOGIN", "")
 
-# Supabase klientini yaratish
-try:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-except Exception as e:
-    print("Supabase client ulanishda xato:", e)
-    supabase = None
+ENDPOINT = f"{SUPABASE_URL}/functions/v1/bot-sync" if SUPABASE_URL else None
 
-# Tizimda qaysi user_id ga yozish kerakligini bilish qiyin bo'lsa, xozircha bitta sabit ID ishlatamiz.
-# Yoki Frontend Auth o'chirib qo'yilgan bo'lsa, "00000000-0000-0000-0000-000000000000" ni ishlatamiz
-USER_ID = "00000000-0000-0000-0000-000000000000"
 
-def sync_bot_status(is_running=True, message="Bot is running"):
-    if not supabase: return
+def _post(payload: dict) -> bool:
+    if not ENDPOINT or not BOT_SYNC_SECRET or not MT5_LOGIN:
+        print("supabase_sync: SUPABASE_URL / BOT_SYNC_SECRET / MT5_LOGIN kerak")
+        return False
+    payload = {"mt5_login": MT5_LOGIN, **payload}
+    try:
+        r = requests.post(
+            ENDPOINT,
+            json=payload,
+            headers={"x-bot-secret": BOT_SYNC_SECRET, "Content-Type": "application/json"},
+            timeout=15,
+        )
+        if r.status_code >= 300:
+            print(f"XATO: bot-sync {r.status_code}: {r.text}")
+            return False
+        return True
+    except Exception as e:
+        print(f"XATO: bot-sync POST: {e}")
+        return False
+
+
+def sync_bot_status(is_running: bool = True, message: str = "Bot is running") -> None:
     if not mt5.initialize():
         print("sync_bot_status: MT5 ga ulanib bo'lmadi")
         return
-
-    account_info = mt5.account_info()
-    if account_info is None:
-        print("sync_bot_status: Hisob ma'lumotlarini olib bo'lmadi")
+    info = mt5.account_info()
+    if info is None:
+        print("sync_bot_status: hisob ma'lumotlari yo'q")
         return
+    ok = _post({
+        "status": {
+            "is_running": is_running,
+            "message": message,
+            "account_equity": info.equity,
+            "account_balance": info.balance,
+            "account_currency": info.currency,
+        }
+    })
+    if ok:
+        print(f"OK: bot_status sinxronlandi (balans={info.balance})")
 
-    equity = account_info.equity
-    balance = account_info.balance
-    currency = account_info.currency
 
-    data = {
-        "user_id": USER_ID,
-        "is_running": is_running,
-        "message": message,
-        "account_equity": equity,
-        "account_balance": balance,
-        "account_currency": currency
-    }
-
-    try:
-        supabase.table("bot_status").upsert(data).execute()
-        print(f"OK: Bot Status sinxronlandi: Balans=${balance}")
-    except Exception as e:
-        print(f"XATO: Supabase ga bot_status yozishda xatolik: {e}")
-
-def sync_positions():
-    if not supabase: return
+def sync_positions() -> None:
     if not mt5.initialize():
         return
-
-    positions = mt5.positions_get()
-    
-    # Eskilarini o'chirishga harakat qilamiz
-    try:
-        supabase.table("positions").delete().eq("user_id", USER_ID).execute()
-    except Exception:
-        pass 
-
-    if positions is None or len(positions) == 0:
-        return
-
-    new_data = []
-    for pos in positions:
-        side = "BUY" if pos.type == mt5.ORDER_TYPE_BUY else "SELL"
-        dt = datetime.datetime.fromtimestamp(pos.time).isoformat()
-        
-        new_data.append({
-            "id": pos.ticket,
-            "user_id": USER_ID,
-            "symbol": pos.symbol,
-            "side": side,
-            "volume": pos.volume,
-            "open_price": pos.price_open,
-            "profit": pos.profit,
-            "opened_at": dt
+    positions = mt5.positions_get() or []
+    rows = []
+    for p in positions:
+        rows.append({
+            "id": int(p.ticket),
+            "symbol": p.symbol,
+            "side": "BUY" if p.type == mt5.ORDER_TYPE_BUY else "SELL",
+            "volume": float(p.volume),
+            "open_price": float(p.price_open),
+            "profit": float(p.profit),
+            "opened_at": datetime.datetime.fromtimestamp(p.time).isoformat(),
         })
+    if _post({"positions": rows}):
+        print(f"OK: {len(rows)} ta pozitsiya sinxronlandi")
 
-    if new_data:
-        try:
-            supabase.table("positions").upsert(new_data).execute()
-            print(f"OK: Ochiq pozitsiyalar sinxronlandi ({len(new_data)} ta)")
-        except Exception as e:
-            print(f"XATO: Supabase ga positions yozishda xatolik: {e}")
 
-def run_sync():
+def log_ai_signal(symbol: str, signal: str, confidence: int, reasoning: str = "",
+                  stop_loss_pips: float | None = None, take_profit_pips: float | None = None) -> None:
+    _post({"ai_signal": {
+        "symbol": symbol, "signal": signal, "confidence": confidence,
+        "reasoning": reasoning,
+        "stop_loss_pips": stop_loss_pips, "take_profit_pips": take_profit_pips,
+    }})
+
+
+def run_sync() -> None:
     sync_bot_status()
     sync_positions()
+
 
 if __name__ == "__main__":
     run_sync()
