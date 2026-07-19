@@ -68,6 +68,11 @@ export type Database = {
           mt5_password: string | null
           mt5_server: string | null
           mt5_terminal_path: string | null
+          prompt_identity: string | null
+          prompt_output: string | null
+          prompt_strategy: string | null
+          prompt_temporary: string | null
+          prompt_temporary_expires_at: string | null
           risk_level_multiple_confirmation: number
           risk_level_single_confirmation: number
           risk_per_trade: number
@@ -89,6 +94,11 @@ export type Database = {
           mt5_password?: string | null
           mt5_server?: string | null
           mt5_terminal_path?: string | null
+          prompt_identity?: string | null
+          prompt_output?: string | null
+          prompt_strategy?: string | null
+          prompt_temporary?: string | null
+          prompt_temporary_expires_at?: string | null
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
@@ -110,6 +120,11 @@ export type Database = {
           mt5_password?: string | null
           mt5_server?: string | null
           mt5_terminal_path?: string | null
+          prompt_identity?: string | null
+          prompt_output?: string | null
+          prompt_strategy?: string | null
+          prompt_temporary?: string | null
+          prompt_temporary_expires_at?: string | null
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
@@ -133,6 +148,8 @@ export type Database = {
           is_running: boolean
           last_heartbeat: string | null
           message: string | null
+          claude_limit: number | null
+          claude_used: number | null
           updated_at: string
           user_id: string
         }
@@ -146,6 +163,8 @@ export type Database = {
           is_running?: boolean
           last_heartbeat?: string | null
           message?: string | null
+          claude_limit?: number | null
+          claude_used?: number | null
           updated_at?: string
           user_id: string
         }
@@ -159,6 +178,8 @@ export type Database = {
           is_running?: boolean
           last_heartbeat?: string | null
           message?: string | null
+          claude_limit?: number | null
+          claude_used?: number | null
           updated_at?: string
           user_id?: string
         }

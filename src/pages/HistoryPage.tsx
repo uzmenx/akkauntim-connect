@@ -6,11 +6,19 @@ import type { TradeHistory } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { guestMock } from "@/lib/guestMock";
 
 export function HistoryPage() {
+  const { user } = useAuth();
+  const isGuest = user?.id === "guest";
+
   const { data, isLoading } = useQuery({
-    queryKey: ["trade_history"],
+    queryKey: ["trade_history", user?.id],
     queryFn: async () => {
+      if (isGuest) {
+        return guestMock.getHistory();
+      }
       const { data } = await supabase
         .from("trade_history")
         .select("*")
@@ -18,7 +26,6 @@ export function HistoryPage() {
         .limit(100);
       return (data ?? []) as TradeHistory[];
     },
-    refetchInterval: 15000,
   });
 
   const stats = useMemo(() => {

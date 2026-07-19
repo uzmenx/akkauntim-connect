@@ -14,6 +14,7 @@ const SHARED = Deno.env.get("BOT_SYNC_SECRET") ?? "";
 
 type Body = {
   mt5_login: string;
+  add_claude_cost?: number;
   status?: {
     is_running?: boolean;
     message?: string;
@@ -38,17 +39,18 @@ type Body = {
     stop_loss_pips?: number;
     take_profit_pips?: number;
   };
-  closed_trade?: {
+  closed_trades?: Array<{
     id: number;
+    ticket: number;
     symbol: string;
     side: string;
     volume: number;
     open_price: number;
     close_price: number;
     profit: number;
-    opened_at?: string;
-    closed_at?: string;
-  };
+    opened_at: string;
+    closed_at: string;
+  }>;
 };
 
 function json(status: number, body: unknown) {
@@ -70,10 +72,10 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json(400, { error: "invalid_json" }); }
   if (!body.mt5_login) return json(400, { error: "mt5_login_required" });
 
-  // Look up user_id by mt5_login
+  // Look up full settings by mt5_login
   const { data: settings, error: lookupErr } = await supabase
     .from("bot_settings")
-    .select("user_id")
+    .select("*")
     .eq("mt5_login", String(body.mt5_login))
     .maybeSingle();
 
@@ -83,12 +85,42 @@ Deno.serve(async (req) => {
   const user_id = settings.user_id;
   const results: Record<string, unknown> = {};
 
-  if (body.status) {
-    const { error } = await supabase.from("bot_status").upsert(
-      { user_id, ...body.status, updated_at: new Date().toISOString() },
-      { onConflict: "user_id" }
-    );
-    results.status = error ? { error: error.message } : "ok";
+  if (body.status || body.add_claude_cost !== undefined) {
+    const costToAdd = Number(body.add_claude_cost ?? 0);
+    
+    // Check if status row exists
+    const { data: existingStatus } = await supabase
+      .from("bot_status")
+      .select("claude_used")
+      .eq("user_id", user_id)
+      .maybeSingle();
+
+    if (existingStatus) {
+      const newUsed = Number(existingStatus.claude_used ?? 0) + costToAdd;
+      const updatePayload: Record<string, any> = {
+        claude_used: newUsed,
+        updated_at: new Date().toISOString()
+      };
+      if (body.status) {
+        Object.assign(updatePayload, body.status);
+      }
+      const { error } = await supabase
+        .from("bot_status")
+        .update(updatePayload)
+        .eq("user_id", user_id);
+      results.status = error ? { error: error.message } : "ok";
+    } else {
+      const insertPayload = {
+        user_id,
+        claude_used: costToAdd,
+        ...(body.status ?? {}),
+        updated_at: new Date().toISOString()
+      };
+      const { error } = await supabase
+        .from("bot_status")
+        .insert(insertPayload);
+      results.status = error ? { error: error.message } : "ok";
+    }
   }
 
   if (body.positions) {
@@ -107,10 +139,11 @@ Deno.serve(async (req) => {
     results.ai_signal = error ? { error: error.message } : "ok";
   }
 
-  if (body.closed_trade) {
-    const { error } = await supabase.from("trade_history").insert({ user_id, ...body.closed_trade });
-    results.closed_trade = error ? { error: error.message } : "ok";
+  if (body.closed_trades && body.closed_trades.length > 0) {
+    const rows = body.closed_trades.map((t) => ({ ...t, user_id }));
+    const { error } = await supabase.from("trade_history").upsert(rows, { onConflict: "user_id, ticket" });
+    results.closed_trades = error ? { error: error.message } : `ok:${rows.length}`;
   }
 
-  return json(200, { ok: true, user_id, results });
+  return json(200, { ok: true, user_id, results, settings });
 });

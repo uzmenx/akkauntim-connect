@@ -2,21 +2,28 @@
 
 ALLOW_SINGLE_STRATEGY_TRADE = False
 
-def aggregate_signals(smc_data: dict, pattern_data: dict, news_data: dict) -> dict:
+def aggregate_signals(smc_data: dict, pattern_data: dict, news_data: dict, settings: dict = None) -> dict:
     """
     Uchta strategiyaning natijalarini oladi va umumiy risk/signal hisoblaydi.
     Kutilayotgan format: {"signal": "BUY"|"SELL"|"HOLD", "confidence": 0-100}
     """
+    if settings is None:
+        settings = {}
+        
+    conf_smc = settings.get("strategy_weight_smc", 60)
+    conf_pattern = settings.get("strategy_weight_pattern", 60)
+    conf_news = settings.get("strategy_weight_news", 60)
+    
     valid_signals = []
     
-    # 1. 60% dan past ishonch va HOLD larni filtrlash
-    if smc_data.get("signal") in ["BUY", "SELL"] and smc_data.get("confidence", 0) >= 60:
+    # 1. Белгиланган threshold'dan past ishonch va HOLD larni filtrlash
+    if smc_data.get("signal") in ["BUY", "SELL"] and smc_data.get("confidence", 0) >= conf_smc:
         valid_signals.append(("SMC", smc_data["signal"]))
         
-    if pattern_data.get("signal") in ["BUY", "SELL"] and pattern_data.get("confidence", 0) >= 60:
+    if pattern_data.get("signal") in ["BUY", "SELL"] and pattern_data.get("confidence", 0) >= conf_pattern:
         valid_signals.append(("Pattern", pattern_data["signal"]))
         
-    if news_data.get("signal") in ["BUY", "SELL"] and news_data.get("confidence", 0) >= 60:
+    if news_data.get("signal") in ["BUY", "SELL"] and news_data.get("confidence", 0) >= conf_news:
         valid_signals.append(("News", news_data["signal"]))
         
     # 2. Yo'nalishlarni guruhlash

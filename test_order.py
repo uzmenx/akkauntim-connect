@@ -7,7 +7,7 @@ if not mt5.initialize():
 
 # QO'LDA BELGILANGAN TEST QIYMATLARI (AI'siz, faqat modulni sinash uchun)
 success, message, info = place_order(
-    symbol="EURUSD",
+    symbol="BTCUSD",
     signal="BUY",
     lot_size=0.01,          # eng kichik hajm — faqat test uchun
     stop_loss_pips=20,
@@ -17,5 +17,7 @@ success, message, info = place_order(
 print("Natija:", message)
 if success:
     print("Order ma'lumoti:", info)
+    from supabase_sync import run_sync
+    run_sync()
 
 mt5.shutdown()

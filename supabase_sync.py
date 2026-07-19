@@ -46,6 +46,27 @@ def _post(payload: dict) -> bool:
         return False
 
 
+def fetch_bot_settings() -> dict:
+    """Frontend sozlamalarini (symbols, timeframe_major) yuklab olish."""
+    if not ENDPOINT or not BOT_SYNC_SECRET or not MT5_LOGIN:
+        return {}
+    payload = {"mt5_login": MT5_LOGIN, "ping": True}
+    try:
+        r = requests.post(
+            ENDPOINT,
+            json=payload,
+            headers={"x-bot-secret": BOT_SYNC_SECRET, "Content-Type": "application/json"},
+            timeout=10,
+        )
+        if r.status_code < 300:
+            data = r.json()
+            return data.get("settings") or {}
+        return {}
+    except Exception as e:
+        print(f"XATO: fetch_bot_settings: {e}")
+        return {}
+
+
 def sync_bot_status(is_running: bool = True, message: str = "Bot is running") -> None:
     if not mt5.initialize():
         print("sync_bot_status: MT5 ga ulanib bo'lmadi")
@@ -86,6 +107,41 @@ def sync_positions() -> None:
         print(f"OK: {len(rows)} ta pozitsiya sinxronlandi")
 
 
+def sync_trade_history() -> None:
+    if not mt5.initialize():
+        return
+    # Oxirgi 3 kunlik yopilgan savdolarni olish
+    now = datetime.datetime.now(datetime.timezone.utc)
+    from_date = now - datetime.timedelta(days=3)
+    deals = mt5.history_deals_get(from_date, now)
+    
+    if deals is None or len(deals) == 0:
+        return
+
+    closed_rows = []
+    for d in deals:
+        # DEAL_ENTRY_OUT (1) yoki DEAL_ENTRY_INOUT (2) bo'lsa pozitsiya yopilgan degani
+        if d.entry in [1, 2] and d.symbol:
+            # Agar yopish amaliyoti SELL bo'lsa, demak ochiq pozitsiya BUY bo'lgan
+            side = "BUY" if d.type == mt5.DEAL_TYPE_SELL else "SELL"
+            closed_rows.append({
+                "id": d.ticket,          # Unikal ID sifatida deal ticket
+                "ticket": d.position_id, # Asosiy pozitsiya ID si
+                "symbol": d.symbol,
+                "side": side,
+                "volume": float(d.volume),
+                "open_price": 0.0,       # Aniq olish uchun position tarixi kerak, xozircha 0
+                "close_price": float(d.price),
+                "profit": float(d.profit),
+                "opened_at": datetime.datetime.fromtimestamp(d.time).isoformat(), # Aslida deal.time, opened_at ga vaqtinchalik yozildi
+                "closed_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
+            })
+            
+    if closed_rows:
+        if _post({"closed_trades": closed_rows}):
+            print(f"OK: {len(closed_rows)} ta yopilgan savdo (history) sinxronlandi")
+
+
 def log_ai_signal(symbol: str, signal: str, confidence: int, reasoning: str = "",
                   stop_loss_pips: float | None = None, take_profit_pips: float | None = None) -> None:
     _post({"ai_signal": {
@@ -95,9 +151,15 @@ def log_ai_signal(symbol: str, signal: str, confidence: int, reasoning: str = ""
     }})
 
 
+def log_claude_cost(cost: float) -> None:
+    if _post({"add_claude_cost": cost}):
+        print(f"OK: Claude cost loglandi (${cost:.6f})")
+
+
 def run_sync() -> None:
     sync_bot_status()
     sync_positions()
+    sync_trade_history()
 
 
 if __name__ == "__main__":

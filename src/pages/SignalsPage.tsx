@@ -5,11 +5,19 @@ import { fmtNum, timeAgo } from "@/lib/utils";
 import type { AISignal } from "@/lib/types";
 import { Brain, Check, X, Loader2, CircleMinus } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
+import { useAuth } from "@/hooks/useAuth";
+import { guestMock } from "@/lib/guestMock";
 
 export function SignalsPage() {
+  const { user } = useAuth();
+  const isGuest = user?.id === "guest";
+
   const { data, isLoading } = useQuery({
-    queryKey: ["ai_signals"],
+    queryKey: ["ai_signals", user?.id],
     queryFn: async () => {
+      if (isGuest) {
+        return guestMock.getSignals();
+      }
       const { data } = await supabase
         .from("ai_signals")
         .select("*")

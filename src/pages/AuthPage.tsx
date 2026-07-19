@@ -2,18 +2,20 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { LineChart, Loader2, KeyRound, Server, User } from "lucide-react";
-import { mt5LoginToEmail } from "@/hooks/useAuth";
+import { Bot, Loader2, KeyRound, Server, User, UserCheck } from "lucide-react";
+import { mt5LoginToEmail, useAuth } from "@/hooks/useAuth";
 
 type Mode = "signin" | "signup";
 
 export function AuthPage() {
+  const { loginAsGuest } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [server, setServer] = useState("MetaQuotes-Demo");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,10 +70,10 @@ export function AuthPage() {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-10">
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <div className="grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-600 shadow-2xl shadow-blue-500/40">
-          <LineChart className="text-white" size={30} strokeWidth={2.4} />
+        <div className="h-16 w-16 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a4ed6] to-[#041a5a] shadow-2xl shadow-blue-500/40 border border-white/10 flex items-center justify-center">
+          <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
         </div>
-        <h1 className="text-3xl font-black tracking-tight text-white">TraderPanel AI</h1>
+        <h1 className="text-3xl font-black tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200">Akcume Trading AI Bot</h1>
         <p className="max-w-xs text-xs text-white/50">
           {mode === "signup"
             ? "MT5 hisobingizni ro'yxatdan o'tkazing — faqat siz o'zingiznikini ko'rasiz."
@@ -126,9 +128,18 @@ export function AuthPage() {
             <div className="rounded-xl bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-rose-400">{err}</div>
           )}
 
-          <Button type="submit" size="lg" className="mt-2 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg" disabled={busy}>
+          <Button type="submit" size="lg" className="mt-2 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg animate-pulse" disabled={busy}>
             {busy ? <Loader2 className="animate-spin" size={18} /> : mode === "signup" ? "Ro'yxatdan o'tish" : "Kirish"}
           </Button>
+
+          <button
+            type="button"
+            onClick={() => loginAsGuest()}
+            className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 active:scale-[0.98] text-white/90 hover:text-white font-semibold py-3 rounded-xl transition-all shadow-md mt-1"
+          >
+            <UserCheck size={16} className="text-blue-400" />
+            <span>Mehmon bo'lib kirish</span>
+          </button>
 
           <button
             type="button"

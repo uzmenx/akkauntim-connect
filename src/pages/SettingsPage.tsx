@@ -1,26 +1,73 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { guestMock } from "@/lib/guestMock";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Loader2, Save, Sparkles, Settings2, Sliders, Play, Code } from "lucide-react";
+import { Loader2, Save, Sparkles, Settings2, Sliders, Play, Code, X, Check, ListPlus, Pencil, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import type { BotSettings } from "@/lib/types";
+import type { BotSettings, BotStatus } from "@/lib/types";
+
+const ASSET_CATEGORIES: Record<string, string[]> = {
+  Forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURCHF", "EURAUD"],
+  Crypto: ["BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD", "ADAUSD", "DOGEUSD", "BNBUSD", "LTCUSD", "LINKUSD"],
+  Indices: ["US30", "SPX500", "NAS100", "GER40", "UK100", "JPN225"],
+  Metals: ["XAUUSD", "XAGUSD"],
+};
 
 export function SettingsPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const isGuest = user?.id === "guest";
+  
   const { data, isLoading } = useQuery({
     queryKey: ["bot_settings", user?.id],
     queryFn: async () => {
+      if (isGuest) {
+        return guestMock.getSettings();
+      }
       const { data } = await supabase.from("bot_settings").select("*").maybeSingle();
       return data as BotSettings | null;
     },
   });
 
+  const statusQuery = useQuery({
+    queryKey: ["bot_status_settings", user?.id],
+    queryFn: async () => {
+      if (isGuest) {
+        return guestMock.getBotStatus();
+      }
+      const { data } = await supabase.from("bot_status").select("*").maybeSingle();
+      return data as BotStatus | null;
+    },
+  });
+
   const [form, setForm] = useState<Partial<BotSettings>>({});
+  const [claudeLimit, setClaudeLimit] = useState<number>(20.0);
+  const [claudeUsed, setClaudeUsed] = useState<number>(0.0);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Symbol Modal State
+  const [isSymbolModalOpen, setIsSymbolModalOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("Forex");
+  const [toastMsg, setToastMsg] = useState("");
+
+  const toggleSymbol = (sym: string) => {
+    setForm((f) => {
+      const current = f.symbols || [];
+      if (current.includes(sym)) {
+        return { ...f, symbols: current.filter(s => s !== sym) };
+      } else {
+        if (current.length >= 3) {
+          setToastMsg("Maksimal 3 ta juftlik tanlash mumkin!");
+          setTimeout(() => setToastMsg(""), 3000);
+          return f;
+        }
+        return { ...f, symbols: [...current, sym] };
+      }
+    });
+  };
 
   useEffect(() => {
     if (data) {
@@ -35,19 +82,32 @@ export function SettingsPage() {
         timeframe_major: "H1",
         timeframe_minor: "M5",
         ai_model: "claude-3-5-sonnet-20241022",
-        system_prompt: "Sen professional Forex treyderi va fundamental tahlilchisisan. Texnik SMC va Garmonik patternlar hamda iqtisodiy yangiliklarni birlashtirib, optimal savdo qarorini qabul qilasan.",
+        prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
+        prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
+        prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
         risk_level_single_confirmation: 0.01,
-        risk_level_multiple_confirmation: 0.02
+        risk_level_multiple_confirmation: 0.02,
+        strategy_weight_smc: 60,
+        strategy_weight_pattern: 60,
+        strategy_weight_news: 60
       });
     }
   }, [data]);
 
+  useEffect(() => {
+    if (statusQuery.data) {
+      setClaudeLimit(Number(statusQuery.data.claude_limit ?? 20.0));
+      setClaudeUsed(Number(statusQuery.data.claude_used ?? 0.0));
+    }
+  }, [statusQuery.data]);
+
   async function save() {
     if (!user) return;
     setBusy(true); setSaved(false);
-    await supabase.from("bot_settings").upsert(
-      {
-        user_id: user.id,
+    
+    // Save Settings & status
+    if (isGuest) {
+      guestMock.saveSettings({
         symbols: form.symbols ?? ["EURUSD"],
         risk_per_trade: Number(form.risk_per_trade ?? 0.02),
         max_daily_loss: Number(form.max_daily_loss ?? 0.10),
@@ -56,20 +116,106 @@ export function SettingsPage() {
         timeframe_major: form.timeframe_major ?? "H1",
         timeframe_minor: form.timeframe_minor ?? "M5",
         ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
-        system_prompt: form.system_prompt ?? "",
+        prompt_identity: form.prompt_identity ?? "",
+        prompt_strategy: form.prompt_strategy ?? "",
+        prompt_output: form.prompt_output ?? "",
         risk_level_single_confirmation: Number(form.risk_level_single_confirmation ?? 0.01),
-        risk_level_multiple_confirmation: Number(form.risk_level_multiple_confirmation ?? 0.02)
-      },
-      { onConflict: "user_id" },
-    );
+        risk_level_multiple_confirmation: Number(form.risk_level_multiple_confirmation ?? 0.02),
+        strategy_weight_smc: Number(form.strategy_weight_smc ?? 60),
+        strategy_weight_pattern: Number(form.strategy_weight_pattern ?? 60),
+        strategy_weight_news: Number(form.strategy_weight_news ?? 60)
+      });
+
+      guestMock.saveBotStatus({
+        claude_limit: Number(claudeLimit),
+        claude_used: Number(claudeUsed)
+      });
+    } else {
+      await supabase.from("bot_settings").upsert(
+        {
+          user_id: user.id,
+          symbols: form.symbols ?? ["EURUSD"],
+          risk_per_trade: Number(form.risk_per_trade ?? 0.02),
+          max_daily_loss: Number(form.max_daily_loss ?? 0.10),
+          min_confidence: Number(form.min_confidence ?? 50),
+          max_lot_size: Number(form.max_lot_size ?? 5.0),
+          timeframe_major: form.timeframe_major ?? "H1",
+          timeframe_minor: form.timeframe_minor ?? "M5",
+          ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
+          prompt_identity: form.prompt_identity ?? "",
+          prompt_strategy: form.prompt_strategy ?? "",
+          prompt_output: form.prompt_output ?? "",
+          risk_level_single_confirmation: Number(form.risk_level_single_confirmation ?? 0.01),
+          risk_level_multiple_confirmation: Number(form.risk_level_multiple_confirmation ?? 0.02),
+          strategy_weight_smc: Number(form.strategy_weight_smc ?? 60),
+          strategy_weight_pattern: Number(form.strategy_weight_pattern ?? 60),
+          strategy_weight_news: Number(form.strategy_weight_news ?? 60)
+        },
+        { onConflict: "user_id" },
+      );
+
+      // Save Claude status limit update
+      await supabase.from("bot_status").upsert(
+        {
+          user_id: user.id,
+          claude_limit: Number(claudeLimit),
+          claude_used: Number(claudeUsed)
+        },
+        { onConflict: "user_id" }
+      );
+    }
+
     await qc.invalidateQueries({ queryKey: ["bot_settings"] });
+    await qc.invalidateQueries({ queryKey: ["bot_status"] });
+    await qc.invalidateQueries({ queryKey: ["bot_status_settings"] });
+    
     setBusy(false); setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
-  if (isLoading) return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
+  useEffect(() => {
+    const handleReset = async () => {
+      if (window.confirm("Haqiqatan ham barcha sozlamalarni standart holatga qaytarmoqchimisiz?")) {
+        const defaults = {
+          symbols: ["EURUSD", "GBPUSD", "XAUUSD"],
+          risk_per_trade: 0.02,
+          max_daily_loss: 0.10,
+          min_confidence: 50,
+          max_lot_size: 5.0,
+          timeframe_major: "H1",
+          timeframe_minor: "M5",
+          ai_model: "claude-3-5-sonnet-20241022",
+          prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
+          prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
+          prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
+          risk_level_single_confirmation: 0.01,
+          risk_level_multiple_confirmation: 0.02,
+          strategy_weight_smc: 60,
+          strategy_weight_pattern: 60,
+          strategy_weight_news: 60
+        };
+        setForm(defaults);
+        if (user) {
+          setBusy(true); setSaved(false);
+          if (isGuest) {
+            guestMock.saveSettings(defaults);
+          } else {
+            await supabase.from("bot_settings").upsert(
+              { user_id: user.id, ...defaults },
+              { onConflict: "user_id" }
+            );
+          }
+          await qc.invalidateQueries({ queryKey: ["bot_settings"] });
+          setBusy(false); setSaved(true);
+          setTimeout(() => setSaved(false), 2000);
+        }
+      }
+    };
+    window.addEventListener('resetSettings', handleReset);
+    return () => window.removeEventListener('resetSettings', handleReset);
+  }, [user, qc]);
 
-  const symbolsStr = (form.symbols ?? []).join(", ");
+  if (isLoading || statusQuery.isLoading) return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
 
   return (
     <div className="space-y-4 pb-10">
@@ -82,18 +228,23 @@ export function SettingsPage() {
         
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-xs font-semibold text-fg-muted">Faol savdo juftliklari</label>
-            <input
-              value={symbolsStr}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  symbols: e.target.value.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean),
-                }))
-              }
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-fg outline-none focus:border-brand/60 transition-all"
-              placeholder="EURUSD, GBPUSD, XAUUSD"
-            />
+            <label className="mb-2 block text-xs font-semibold text-fg-muted">Faol savdo juftliklari (Maks: 3)</label>
+            <div 
+              onClick={() => setIsSymbolModalOpen(true)}
+              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-fg cursor-pointer hover:bg-white/5 transition-all flex items-center justify-between"
+            >
+              <div className="flex-1 truncate">
+                {(form.symbols?.length || 0) > 0 
+                  ? form.symbols?.join(", ") 
+                  : <span className="text-fg-muted">Juftliklarni tanlang...</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full">
+                  {form.symbols?.length || 0}/3
+                </span>
+                <ListPlus size={16} className="text-brand opacity-80" />
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -127,31 +278,28 @@ export function SettingsPage() {
 
       {/* 2. Advanced AI Configuration */}
       <Card className="glass p-5">
-        <div className="flex items-center gap-2 mb-4 text-brand">
-          <Sparkles size={18} />
+        <div className="flex items-center gap-2 mb-4 text-amber-500">
+          <TriangleAlert size={18} />
           <h3 className="font-bold text-sm tracking-wide uppercase">AI Neyrotizim Sozlamalari</h3>
         </div>
 
         <div className="space-y-4">
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-fg-muted">AI Model</label>
-            <select
-              value={form.ai_model ?? "claude-3-5-sonnet-20241022"}
-              onChange={(e) => setForm((f) => ({ ...f, ai_model: e.target.value }))}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-3 text-sm text-fg outline-none focus:border-brand/60"
-            >
-              <option value="claude-3-5-sonnet-20241022">Claude 3.5 Sonnet (Tavsiya etiladi)</option>
-              <option value="claude-3-5-haiku-20241022">Claude 3.5 Haiku</option>
-            </select>
-          </div>
 
-          <div>
-            <label className="mb-2 block text-xs font-semibold text-fg-muted">AI Tahlil Tizimi Prompti</label>
-            <textarea
-              rows={4}
-              value={form.system_prompt ?? ""}
-              onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-xs text-fg outline-none focus:border-brand/60 font-mono transition-all"
+          <div className="space-y-4">
+            <PromptEditor 
+              label="1. Identity va Rol (Bot o'zini kim deb bilishi kerak?)" 
+              value={form.prompt_identity ?? ""} 
+              onChange={(v) => setForm(f => ({ ...f, prompt_identity: v }))} 
+            />
+            <PromptEditor 
+              label="2. Strategiya va Qoidalar (SMC, Harmonic, Yangiliklar)" 
+              value={form.prompt_strategy ?? ""} 
+              onChange={(v) => setForm(f => ({ ...f, prompt_strategy: v }))} 
+            />
+            <PromptEditor 
+              label="3. Natija Formati va Cheklovlar (JSON output)" 
+              value={form.prompt_output ?? ""} 
+              onChange={(v) => setForm(f => ({ ...f, prompt_output: v }))} 
             />
           </div>
         </div>
@@ -159,8 +307,8 @@ export function SettingsPage() {
 
       {/* 3. Risk Management */}
       <Card className="glass p-5">
-        <div className="flex items-center gap-2 mb-4 text-brand">
-          <Sliders size={18} />
+        <div className="flex items-center gap-2 mb-4 text-amber-500">
+          <TriangleAlert size={18} />
           <h3 className="font-bold text-sm tracking-wide uppercase">Riskni Boshqarish</h3>
         </div>
 
@@ -196,20 +344,148 @@ export function SettingsPage() {
         </div>
       </Card>
 
+      {/* 4. Strategy Confidence */}
+      <Card className="glass p-5">
+        <div className="flex items-center gap-2 mb-4 text-emerald-500">
+          <Sliders size={18} />
+          <h3 className="font-bold text-sm tracking-wide uppercase">Strategiya Ishonch Darajasi</h3>
+        </div>
+        <p className="text-xs text-fg-muted mb-4">
+          Qaysi strategiya necha foiz ishonch bilan signal berganida qabul qilinishini belgilang. Agar biror strategiya ko'p xato qilsa, uning foizini ko'tarib (yoki pasaytirib) ta'sirini kamaytirishingiz mumkin.
+        </p>
+        <div className="space-y-6">
+          <Slider
+            label="SMC (Smart Money Concepts)"
+            value={Number(form.strategy_weight_smc ?? 60)}
+            min={35} max={75} step={1}
+            format={(v) => `${v}%`}
+            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_smc: v }))}
+            leftLabel="← Yaxshi ishlasa"
+            rightLabel="Zarar qilsa →"
+          />
+          <Slider
+            label="Naqsh (Harmonic Patterns)"
+            value={Number(form.strategy_weight_pattern ?? 60)}
+            min={35} max={75} step={1}
+            format={(v) => `${v}%`}
+            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_pattern: v }))}
+            leftLabel="← Yaxshi ishlasa"
+            rightLabel="Zarar qilsa →"
+          />
+          <Slider
+            label="Fundamental (Yangiliklar)"
+            value={Number(form.strategy_weight_news ?? 60)}
+            min={35} max={75} step={1}
+            format={(v) => `${v}%`}
+            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_news: v }))}
+            leftLabel="← Yaxshi ishlasa"
+            rightLabel="Zarar qilsa →"
+          />
+        </div>
+      </Card>
+
       {/* Save Button */}
       <Button size="lg" className="w-full bg-brand hover:bg-brand-strong text-white font-bold py-3.5 rounded-xl shadow-lg transition-all" onClick={save} disabled={busy}>
         {busy ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
         {saved ? "Muvaffaqiyatli saqlandi!" : "Barcha sozlamalarni saqlash"}
       </Button>
+
+      {/* Symbol Selection Modal */}
+      {isSymbolModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-[#040d21] border border-white/10 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            {/* Modal Header */}
+            <div className="flex justify-between items-center p-5 border-b border-white/5 relative">
+              <div>
+                <h2 className="text-lg font-bold text-white">Juftliklarni Tanlash</h2>
+                <p className="text-xs text-brand/80">Eng ko'pi bilan 3 ta juftlik tanlashingiz mumkin.</p>
+              </div>
+              <button 
+                onClick={() => setIsSymbolModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-all text-white/60 hover:text-white"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Toast Warning */}
+            {toastMsg && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center py-2 px-4 animate-in slide-in-from-top-2">
+                {toastMsg}
+              </div>
+            )}
+
+            {/* Category Tabs */}
+            <div className="flex items-center gap-1 overflow-x-auto p-3 scrollbar-hide border-b border-white/5">
+              {Object.keys(ASSET_CATEGORIES).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveCategory(cat)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                    activeCategory === cat 
+                      ? "bg-brand text-white shadow-lg shadow-brand/20" 
+                      : "bg-white/5 text-fg-muted hover:bg-white/10 hover:text-white"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Symbols Grid */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                {ASSET_CATEGORIES[activeCategory].map((sym) => {
+                  const isSelected = (form.symbols || []).includes(sym);
+                  const isMaxedOut = !isSelected && (form.symbols || []).length >= 3;
+                  return (
+                    <div 
+                      key={sym}
+                      onClick={() => toggleSymbol(sym)}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                        isSelected 
+                          ? "bg-brand/10 border-brand/50 shadow-[0_0_15px_rgba(37,99,235,0.15)]" 
+                          : isMaxedOut
+                            ? "bg-white/5 border-transparent opacity-50 cursor-not-allowed"
+                            : "bg-white/5 border-transparent hover:bg-white/10"
+                      }`}
+                    >
+                      <span className={`text-sm font-bold ${isSelected ? "text-brand" : "text-white"}`}>
+                        {sym}
+                      </span>
+                      <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${
+                        isSelected ? "bg-brand border-brand" : "border-white/20"
+                      }`}>
+                        {isSelected && <Check size={12} className="text-white" />}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-white/5 bg-black/20">
+              <Button 
+                onClick={() => setIsSymbolModalOpen(false)}
+                className="w-full py-6 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#0434b6] hover:brightness-110 shadow-[0_0_20px_rgba(37,99,235,0.3)] text-white font-bold"
+              >
+                Tasdiqlash ({(form.symbols || []).length}/3)
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function Slider({
-  label, value, min, max, step, onChange, format,
+  label, value, min, max, step, onChange, format, leftLabel, rightLabel
 }: {
   label: string; value: number; min: number; max: number; step: number;
   onChange: (v: number) => void; format: (v: number) => string;
+  leftLabel?: string; rightLabel?: string;
 }) {
   return (
     <div>
@@ -224,6 +500,37 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-[color:var(--color-brand)] h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
       />
+      {(leftLabel || rightLabel) && (
+        <div className="flex justify-between text-[10px] text-fg-muted/60 mt-1.5 px-0.5 font-medium">
+          <span>{leftLabel}</span>
+          <span>{rightLabel}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PromptEditor({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [isEditing, setIsEditing] = useState(false);
+  return (
+    <div className="border border-white/5 rounded-xl bg-black/20 p-4">
+      <div className="flex justify-between items-center mb-3">
+        <label className="text-xs font-semibold text-fg-muted uppercase tracking-wider">{label}</label>
+        <button onClick={() => setIsEditing(!isEditing)} className="text-brand hover:text-white flex items-center gap-1 text-xs px-2 py-1 bg-brand/10 rounded-md transition-all">
+          {isEditing ? <Check size={14}/> : <Pencil size={14}/>}
+          {isEditing ? "Saqlash" : "Tahrirlash"}
+        </button>
+      </div>
+      {isEditing ? (
+        <textarea
+          rows={5}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-xl border border-brand/50 bg-black/60 px-4 py-3 text-xs text-white outline-none focus:border-brand shadow-[0_0_10px_rgba(37,99,235,0.2)] font-mono transition-all"
+        />
+      ) : (
+        <div className="text-xs text-white/70 font-mono whitespace-pre-wrap">{value}</div>
+      )}
     </div>
   );
 }

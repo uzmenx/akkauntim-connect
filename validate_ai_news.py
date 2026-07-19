@@ -126,6 +126,16 @@ JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushu
         )
         print("\n=== AI RESPONSE ===")
         print(response.content[0].text)
+        
+        # Token usage & Cost calculation
+        try:
+            input_tokens = getattr(response.usage, "input_tokens", 0)
+            output_tokens = getattr(response.usage, "output_tokens", 0)
+            cost = (input_tokens * 3.0 / 1_000_000.0) + (output_tokens * 15.0 / 1_000_000.0)
+            from supabase_sync import log_claude_cost
+            log_claude_cost(cost)
+        except Exception as sync_err:
+            print(f"Cost sync failed: {sync_err}")
     except Exception as e:
         print(f"API chaqiruvida xatolik yuz berdi: {e}")
 

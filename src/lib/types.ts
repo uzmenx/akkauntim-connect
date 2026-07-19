@@ -10,12 +10,20 @@ export type BotSettings = {
   timeframe_minor?: string;
   ai_model?: string;
   system_prompt?: string;
+  prompt_identity?: string;
+  prompt_strategy?: string;
+  prompt_output?: string;
   risk_level_single_confirmation?: number;
   risk_level_multiple_confirmation?: number;
   mt5_login?: string;
   mt5_password?: string;
   mt5_server?: string;
   mt5_terminal_path?: string;
+  prompt_temporary?: string | null;
+  prompt_temporary_expires_at?: string | null;
+  strategy_weight_smc?: number;
+  strategy_weight_pattern?: number;
+  strategy_weight_news?: number;
   updated_at: string;
 };
 
@@ -29,6 +37,8 @@ export type BotStatus = {
   account_currency: string | null;
   broker: string | null;
   message: string | null;
+  claude_limit: number | null;
+  claude_used: number | null;
   updated_at: string;
 };
 

@@ -59,15 +59,24 @@ def init_db():
     except sqlite3.OperationalError:
         pass # Allaqachon mavjud
         
+    # Tokenlar va cost ustunlarini qo'shish
+    try:
+        cursor.execute("ALTER TABLE ai_decisions ADD COLUMN input_tokens INTEGER")
+        cursor.execute("ALTER TABLE ai_decisions ADD COLUMN output_tokens INTEGER")
+        cursor.execute("ALTER TABLE ai_decisions ADD COLUMN cost REAL")
+        conn.commit()
+    except sqlite3.OperationalError:
+        pass
+        
     conn.close()
 
-def log_decision(pair, timeframe, context, prompt, ai_response, final_decision, risk_pct, context_hash=None):
+def log_decision(pair, timeframe, context, prompt, ai_response, final_decision, risk_pct, context_hash=None, input_tokens=None, output_tokens=None, cost=None):
     init_db()
     conn = sqlite3.connect('decisions_log.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO ai_decisions (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO ai_decisions (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         datetime.now().isoformat(),
         pair,
@@ -77,7 +86,10 @@ def log_decision(pair, timeframe, context, prompt, ai_response, final_decision, 
         json.dumps(ai_response, ensure_ascii=False) if isinstance(ai_response, dict) else str(ai_response),
         final_decision,
         risk_pct,
-        context_hash
+        context_hash,
+        input_tokens,
+        output_tokens,
+        cost
     ))
     conn.commit()
     conn.close()
@@ -127,7 +139,10 @@ def extract_news_signal(news_result):
         return {"signal": "SELL", "confidence": 80}
     return {"signal": "HOLD", "confidence": 0}
 
-def build_decision_context(pair: str, timeframe: str) -> dict:
+def build_decision_context(pair: str, timeframe: str, settings: dict = None) -> dict:
+    if settings is None:
+        settings = {}
+        
     df_major = get_market_data(pair, timeframe, 150)
     current_price = 0.0
     if not df_major.empty:
@@ -145,7 +160,7 @@ def build_decision_context(pair: str, timeframe: str) -> dict:
     pattern_data = extract_pattern_signal(pattern_result)
     news_data = extract_news_signal(news_result)
     
-    voting_result = aggregate_signals(smc_data, pattern_data, news_data)
+    voting_result = aggregate_signals(smc_data, pattern_data, news_data, settings)
     
     return {
         "pair": pair,
@@ -218,9 +233,8 @@ DIQQAT:
 Voting Engine allaqachon risk% va yo'nalishni hisoblab bergan. Sening vazifang buni qayta hisoblash EMAS — balki quyidagi savolga javob berish: shu kontekstda bu savdoni HOZIR ochish xavfsizmi, yoki kutish/rad etish kerakmi?
 
 Quyidagi qat'iy qoidalarga rioya qil:
-1. Yaqinlashayotgan yangilik: Agar yuqori yoki o'rta ta'sirli yangilik chiqishiga 60 daqiqadan KAM vaqt qolgan bo'lsa, savdoni WAIT yoki REJECT qil. Agar 60 daqiqadan ko'p vaqt bo'lsa (masalan 120 daqiqa), buni xavfsiz deb hisobla va boshqa ziddiyatlar bo'lmasa EXECUTE qil.
+1. Yangiliklar va straddle: Bot endilikda yangilik payti qopqon (straddle) qo'yadi. Shuning uchun sening bu yerdagi tahliling asosan fundamental bias va texnik SMC ga asoslanishi kerak. Agar SMC va Fundamental tahlil bir-birini rad etsa, REJECT qil.
 2. Risk boshqaruvi limitlari: Agar joriy kunlik zarar (drawdown) va ochilayotgan savdoning risk% yig'indisi kunlik limitdan oshib ketadigan bo'lsa (ya'ni joriy_zarar - risk_pct <= limit_pct, masalan -8% - 4% = -12%, bu esa -10% lik limitdan o'tib ketgan), savdoni darhol REJECT qilishing SHART. Kunlik limit buzilmasligi eng oliy ustuvorlikdir.
-3. SMC va fundamental ziddiyatlar bo'lsa REJECT qil.
 
 Agar yuqoridagi qoidalarga ko'ra shartlar mos bo'lsa EXECUTE qaytar.
 Yo'nalish ({vote.get('direction')}) va risk% ni aslo o'zgartirma.
@@ -292,6 +306,10 @@ def get_ai_decision(context: dict, mock_response=None) -> dict:
         
     prompt = build_claude_prompt(context)
     
+    input_tokens = None
+    output_tokens = None
+    cost = None
+    
     if mock_response is not None:
         ai_text = mock_response
     else:
@@ -318,6 +336,26 @@ def get_ai_decision(context: dict, mock_response=None) -> dict:
                 messages=[{"role": "user", "content": prompt}]
             )
             ai_text = response.content[0].text.strip()
+            
+            # Token usage & Cost calculation
+            try:
+                input_tokens = getattr(response.usage, "input_tokens", 0)
+                output_tokens = getattr(response.usage, "output_tokens", 0)
+                if "haiku" in model.lower():
+                    cost = (input_tokens * 0.8 / 1_000_000.0) + (output_tokens * 4.0 / 1_000_000.0)
+                else:
+                    # Sonnet: $3.00 per M input, $15.00 per M output
+                    cost = (input_tokens * 3.0 / 1_000_000.0) + (output_tokens * 15.0 / 1_000_000.0)
+                
+                # Sync cost to Supabase
+                try:
+                    from supabase_sync import log_claude_cost
+                    log_claude_cost(cost)
+                except Exception as sync_err:
+                    print(f"Supabase sync failed for Claude cost: {sync_err}")
+            except Exception as usage_err:
+                print(f"Token/Cost calculation error: {usage_err}")
+                
         except Exception as e:
             return {
                 "final_decision": "REJECT",
@@ -351,7 +389,10 @@ def get_ai_decision(context: dict, mock_response=None) -> dict:
             decision,
             decision.get('final_decision'),
             vote_risk,
-            context_hash=current_hash
+            context_hash=current_hash,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=cost
         )
         return decision
         
@@ -372,11 +413,14 @@ def get_ai_decision(context: dict, mock_response=None) -> dict:
             ai_text,
             "REJECT",
             vote_risk,
-            context_hash=current_hash
+            context_hash=current_hash,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=cost
         )
         return err_res
 
-def make_trading_decision(pair: str, timeframe: str) -> dict:
+def make_trading_decision(pair: str, timeframe: str, settings: dict = None) -> dict:
     load_env()
     init_db()
     
@@ -384,11 +428,57 @@ def make_trading_decision(pair: str, timeframe: str) -> dict:
         print("MT5 ulanishda xatolik:", mt5.last_error())
         # Agar MT5 ishlamasa, fallback: HOLD qaytaradi, lekin biz testlar uchun davom etishimiz mumkin bo'lsa yaxshi
         
-    context = build_decision_context(pair, timeframe)
+    context = build_decision_context(pair, timeframe, settings)
     decision = get_ai_decision(context)
     
     mt5.shutdown()
     return decision
+
+def get_trailing_decision(context: dict) -> str:
+    """
+    Ochiq pozitsiyalar uchun qaysi trailing rejimidan foydalanish kerakligini aniqlaydi.
+    Qaytaradigan qiymatlar: "STEP", "STRUCTURE", yoki "CLOSE_ALL"
+    """
+    prompt = f"""Sen avtonom Trading AIsan. Hozirda foydada bo'lgan (TP1 2R ga yetgan va 70% yopilgan) pozitsiyani boshqaryapsan.
+Sening vazifang qolgan 30% pozitsiya uchun trailing rejimini tanlash.
+
+Bozor holati:
+SMC Trend: {context.get('smc_structure', {}).get('trend', {}).get('internal', 'Unknown')}
+Yangiliklar: {context.get('news_context', {}).get('next_event', {}).get('name', 'None')}
+
+QOIDALAR:
+1. Agar kuchli impuls yoki yangilik bo'lsa -> "STEP" (har 1R da SL ni surish)
+2. Agar barqaror trend bo'lsa -> "STRUCTURE" (yangi High/Low da SL ni surish)
+3. Agar trend keskin o'zgargan yoki bozor xavfli bo'lsa -> "CLOSE_ALL" (hammasini yopish)
+
+JAVOBNI FAQAT SHU UCHTASIDAN BIRI SIFATIDA QAYTAR (Hech qanday qo'shimcha matnsiz):
+STEP
+STRUCTURE
+CLOSE_ALL
+"""
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        return "STEP" # Default
+        
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=10,
+            system="Faqat bitta so'z bilan javob ber.",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        ai_text = response.content[0].text.strip().upper()
+        if "CLOSE" in ai_text:
+            return "CLOSE_ALL"
+        elif "STRUCT" in ai_text:
+            return "STRUCTURE"
+        else:
+            return "STEP"
+    except Exception as e:
+        print(f"Trailing qarori olishda xato: {e}")
+        return "STEP"
+
 
 if __name__ == "__main__":
     print("--- Testing ai_analysis.py ---")

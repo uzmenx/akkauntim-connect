@@ -5,11 +5,19 @@ import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
 import type { Position } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
+import { useAuth } from "@/hooks/useAuth";
+import { guestMock } from "@/lib/guestMock";
 
 export function PositionsPage() {
+  const { user } = useAuth();
+  const isGuest = user?.id === "guest";
+
   const { data, isLoading } = useQuery({
-    queryKey: ["positions_full"],
+    queryKey: ["positions_full", user?.id],
     queryFn: async () => {
+      if (isGuest) {
+        return guestMock.getPositions();
+      }
       const { data } = await supabase.from("positions").select("*").order("opened_at", { ascending: false });
       return (data ?? []) as Position[];
     },
