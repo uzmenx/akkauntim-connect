@@ -58,35 +58,65 @@ export type Database = {
       }
       bot_settings: {
         Row: {
+          ai_model: string
           created_at: string
           id: string
           max_daily_loss: number
           max_lot_size: number
           min_confidence: number
+          mt5_login: string | null
+          mt5_password: string | null
+          mt5_server: string | null
+          mt5_terminal_path: string | null
+          risk_level_multiple_confirmation: number
+          risk_level_single_confirmation: number
           risk_per_trade: number
           symbols: string[]
+          system_prompt: string
+          timeframe_major: string
+          timeframe_minor: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          ai_model?: string
           created_at?: string
           id?: string
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
+          mt5_login?: string | null
+          mt5_password?: string | null
+          mt5_server?: string | null
+          mt5_terminal_path?: string | null
+          risk_level_multiple_confirmation?: number
+          risk_level_single_confirmation?: number
           risk_per_trade?: number
           symbols?: string[]
+          system_prompt?: string
+          timeframe_major?: string
+          timeframe_minor?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          ai_model?: string
           created_at?: string
           id?: string
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
+          mt5_login?: string | null
+          mt5_password?: string | null
+          mt5_server?: string | null
+          mt5_terminal_path?: string | null
+          risk_level_multiple_confirmation?: number
+          risk_level_single_confirmation?: number
           risk_per_trade?: number
           symbols?: string[]
+          system_prompt?: string
+          timeframe_major?: string
+          timeframe_minor?: string
           updated_at?: string
           user_id?: string
         }
