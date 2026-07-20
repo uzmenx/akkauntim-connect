@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BalanceTrendChart } from "@/components/BalanceTrendChart";
 
 const MoneyCoinDuoIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -168,19 +169,23 @@ export function DashboardPage() {
   const pct = limit > 0 ? (remaining / limit) * 100 : 0;
 
   return (
-    <div className="flex flex-col items-center min-h-[100dvh] w-full font-sans">
+    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden bg-[#040914]">
       
       {/* Background Gradient to simulate the bottom green glow */}
-      <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/40 to-transparent pointer-events-none" />
+      <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/30 to-transparent pointer-events-none" />
 
-      <div className="w-full max-w-md px-4 pt-4 sm:pt-6 pb-8 relative z-10 flex flex-col">
+      <div className="w-full h-full max-w-md mx-auto px-4 pt-3 pb-2 relative z-10 flex flex-col gap-3">
         
-        
-        {/* Main Blue Card */}
-        <div className="w-full bg-gradient-to-b from-[#0a4ed6] to-[#041a5a] rounded-[30px] sm:rounded-[40px] p-4 sm:p-6 shadow-2xl relative overflow-hidden border border-white/10">
+        {/* Top 10%: Balance Trend Chart */}
+        <div className="h-[10dvh] min-h-[65px] shrink-0 w-full animate-in fade-in slide-in-from-top-4 duration-500">
+           <BalanceTrendChart history={history.data || []} currentBalance={Number(equity || 0)} />
+        </div>
+
+        {/* Card 30%: Main Blue Card */}
+        <div className="w-full h-[32dvh] min-h-[220px] max-h-[300px] bg-gradient-to-b from-[#0a4ed6] to-[#041a5a] rounded-[28px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Card Top Header */}
-          <div className="flex justify-between items-center mb-4 sm:mb-6">
+          <div className="flex justify-between items-center">
             <div className="relative" ref={profileMenuRef}>
               <div 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -189,7 +194,7 @@ export function DashboardPage() {
                 <img 
                   src={`https://api.dicebear.com/7.x/notionists/svg?seed=${user?.email || "Ana"}&backgroundColor=f8f9fa`} 
                   alt="Profile" 
-                  className="w-6 h-6 rounded-full bg-white object-cover"
+                  className="w-5 h-5 rounded-full bg-white object-cover"
                 />
                 <span className="text-white text-xs font-medium">{user?.email?.split("@")[0] ?? "Ana"}</span>
               </div>
@@ -225,99 +230,76 @@ export function DashboardPage() {
             </div>
             
             <Link to="/pricing" className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 px-3 py-1.5 rounded-full backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-lg shadow-amber-500/10">
-              <Crown size={14} className="text-amber-400" />
-              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Premium</span>
+              <Crown size={12} className="text-amber-400" />
+              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Premium</span>
             </Link>
           </div>
 
           {/* Balance Area */}
-          <div className="text-center mb-4 sm:mb-6 relative">
-            <span className="text-[10px] text-blue-200/80 font-semibold tracking-wider uppercase bg-white/10 px-3 py-1 rounded-full inline-block backdrop-blur-sm">
+          <div className="text-center flex flex-col items-center justify-center flex-1 py-2">
+            <span className="text-[9px] text-blue-200/80 font-semibold tracking-wider uppercase bg-white/10 px-3 py-1 rounded-full inline-block backdrop-blur-sm mb-1">
               Your Balance
             </span>
-            <h1 className="text-3xl sm:text-4xl font-black text-white mt-2 sm:mt-3 tracking-tight tabular-nums drop-shadow-md">
+            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums drop-shadow-md">
               {equity != null ? fmtMoney(Number(equity), currency) : "$ 52,002.50"}
             </h1>
           </div>
 
-          {/* Avatars Row (Cute bunny-like faces placeholder) */}
-          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center gap-1 sm:gap-2 mb-6 sm:mb-8 cursor-pointer">
+          {/* Avatars Row */}
+          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-3 cursor-pointer">
             {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
-              <div key={seed} className={`w-8.5 h-8.5 sm:w-11 sm:h-11 rounded-full border-2 border-[#1e40af] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2 sm:-ml-3" : ""}`}>
+              <div key={seed} className={`w-8 h-8 rounded-full border-2 border-[#1e40af] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
                 <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
               </div>
             ))}
           </a>
 
-          {/* Last Transaction / High Profit Box */}
-          <div className="bg-[#10192e]/90 rounded-[28px] p-4 mb-4 backdrop-blur-xl border border-white/10 relative overflow-hidden group hover:bg-[#10192e] transition-all shadow-lg">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-[10px] text-white/50 font-medium">Last transaction</span>
-              <Link to="/history" className="text-[10px] text-white/70 hover:text-white underline decoration-white/30 transition-all">
-                View all
-              </Link>
-            </div>
-            
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-500 to-purple-500 p-0.5 shadow-lg">
-                  <div className="w-full h-full bg-[#10192e] rounded-full flex items-center justify-center relative overflow-hidden">
-                     <span className="text-xs font-bold text-white relative z-10">{bestTrade ? (bestTrade.side === 'BUY' ? 'B' : 'S') : 'Pro'}</span>
-                     <div className="absolute inset-0 bg-white/5 backdrop-blur-sm rounded-full" />
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-white">{bestTrade ? bestTrade.symbol : "No trades yet"}</p>
-                  <p className="text-[10px] text-white/40">{bestTrade ? new Date(bestTrade.closed_at).toLocaleDateString() : "Jan 17 • 20:12"}</p>
-                </div>
-              </div>
-              <p className="text-lg font-bold text-white tabular-nums">{bestTrade ? fmtMoney(Number(bestTrade.profit)) : "$0.00"}</p>
-            </div>
-          </div>
-
           {/* 4 Action Buttons Row */}
-          <div className="flex gap-1.5 mt-2 w-full items-center justify-between">
-            <Link to="/settings" className="flex-shrink-0 w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Settings">
-              <Settings size={16} className="sm:w-5 sm:h-5 group-hover:rotate-90 transition-transform duration-500" />
+          <div className="flex gap-2 w-full items-center justify-between mt-auto">
+            <Link to="/settings" className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Settings">
+              <Settings size={18} className="group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
-            <Link to="/signals" className="flex-shrink-0 w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Signals">
-              <ArrowUpDown size={16} className="sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
+            <Link to="/signals" className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Signals">
+              <ArrowUpDown size={18} className="group-hover:scale-110 transition-transform" />
             </Link>
 
-            <button onClick={toggleFilter} className="flex-1 h-10 sm:h-14 rounded-full bg-[#10192e] hover:bg-[#16223f] active:scale-95 flex items-center justify-center gap-1.5 text-[10px] sm:text-sm font-bold text-white/90 transition-all border border-white/10 shadow-md">
+            <button onClick={toggleFilter} className="flex-1 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white/90 transition-all border border-white/10 shadow-md backdrop-blur-sm">
               <span>{filterMode === "all" ? "Receive" : filterMode === "profit" ? "Foyda" : "Zarar"}</span>
-              {filterMode === "all" && <ArrowUpDown size={12} className="text-blue-400 sm:w-4 sm:h-4 opacity-90" />}
-              {filterMode === "profit" && <TrendingUp size={12} className="text-emerald-400 sm:w-4 sm:h-4" />}
-              {filterMode === "loss" && <TrendingDown size={12} className="text-rose-400 sm:w-4 sm:h-4" />}
+              {filterMode === "all" && <ArrowUpDown size={14} className="text-blue-400 opacity-90" />}
+              {filterMode === "profit" && <TrendingUp size={14} className="text-emerald-400" />}
+              {filterMode === "loss" && <TrendingDown size={14} className="text-rose-400" />}
             </button>
 
-            <button onClick={() => setShowPrompt(true)} className="flex-1 h-10 sm:h-14 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center gap-1 text-[10px] sm:text-sm font-bold text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30">
+            <button onClick={() => setShowPrompt(true)} className="flex-1 h-11 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center gap-1 text-[11px] font-bold text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30">
               <span>AI Send</span>
-              <ArrowUpRight size={12} className="sm:w-4 sm:h-4 opacity-80" />
+              <ArrowUpRight size={14} className="opacity-80" />
             </button>
           </div>
         </div>
 
-        {/* Open Positions */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-3 ml-2">
-            <h3 className="text-xs font-bold text-white/60 tracking-wider">OCHIQ POZITSIYALAR</h3>
-            <span className="text-[10px] text-white/40">{filteredPositions?.length ?? 0}</span>
-          </div>
-          {positions.isLoading ? (
-            <SkeletonRows />
-          ) : filteredPositions && filteredPositions.length > 0 ? (
-            <div className="space-y-2">
-              {filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)}
+        {/* Scrollable List Section (Remaining Height) */}
+        <div className="flex-1 overflow-y-auto pb-4 space-y-5 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+          
+          {/* Open Positions */}
+          <div>
+            <div className="flex items-center justify-between mb-3 ml-2">
+              <h3 className="text-xs font-bold text-white/60 tracking-wider">OCHIQ POZITSIYALAR</h3>
+              <span className="text-[10px] text-white/40">{filteredPositions?.length ?? 0}</span>
             </div>
-          ) : (
-            <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
-          )}
-        </div>
+            {positions.isLoading ? (
+              <SkeletonRows />
+            ) : filteredPositions && filteredPositions.length > 0 ? (
+              <div className="space-y-2">
+                {filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)}
+              </div>
+            ) : (
+              <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
+            )}
+          </div>
 
         {/* Pending Orders */}
-        <div className="mt-6">
+        <div className="">
           <div className="flex items-center justify-between mb-3 ml-2">
             <h3 className="text-xs font-bold text-white/60 tracking-wider">KUTILAYOTGAN ORDERLAR</h3>
             <span className="text-[10px] text-white/40">{pending.data?.length ?? 0}</span>
@@ -334,7 +316,7 @@ export function DashboardPage() {
         </div>
 
         {/* Recent History */}
-        <div className="mt-6">
+        <div className="">
           <div className="flex items-center justify-between mb-3 ml-2">
             <h3 className="text-xs font-bold text-white/60 tracking-wider">SAVDO TARIXI</h3>
             <Link to="/history" className="text-[10px] text-white/50 hover:text-white">Barchasi</Link>
@@ -348,6 +330,8 @@ export function DashboardPage() {
           ) : (
             <EmptyBox text="Hozircha yopilgan savdo yo'q" />
           )}
+        </div>
+        
         </div>
 
       </div>

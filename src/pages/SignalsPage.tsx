@@ -2,8 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { fmtNum, timeAgo } from "@/lib/utils";
-import type { AISignal } from "@/lib/types";
-import { Brain, Check, X, Loader2, CircleMinus } from "lucide-react";
+import type { AISignal, PendingOrder } from "@/lib/types";
+import { Brain, Check, X, Loader2, CircleMinus, Clock } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
 import { guestMock } from "@/lib/guestMock";
@@ -12,40 +12,120 @@ export function SignalsPage() {
   const { user } = useAuth();
   const isGuest = user?.id === "guest";
 
-  const { data, isLoading } = useQuery({
+  const { data: signals, isLoading: loadingSignals } = useQuery({
     queryKey: ["ai_signals", user?.id],
     queryFn: async () => {
-      if (isGuest) {
-        return guestMock.getSignals();
-      }
+      if (isGuest) return guestMock.getSignals();
       const { data } = await supabase
         .from("ai_signals")
         .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: false });
       return (data ?? []) as AISignal[];
     },
     refetchInterval: 8000,
   });
 
-  if (isLoading) {
+  const { data: pending, isLoading: loadingPending } = useQuery({
+    queryKey: ["pending_orders", user?.id],
+    queryFn: async () => {
+      if (isGuest) return guestMock.getPendingOrders();
+      const { data } = await supabase
+        .from("pending_orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+      return (data ?? []) as PendingOrder[];
+    },
+    refetchInterval: 8000,
+  });
+
+  if (loadingSignals || loadingPending) {
     return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
   }
 
-  if (!data?.length) {
+  const hasSignals = signals && signals.length > 0;
+  const hasPending = pending && pending.length > 0;
+
+  if (!hasSignals && !hasPending) {
     return (
       <Card>
-        <EmptyLine text="AI hali signal chiqarmadi. Bot ishga tushishi bilan bu yerda paydo bo'ladi." />
+        <EmptyLine text="AI hali signal chiqarmadi va kutilayotgan limit qarorlari yo'q." />
       </Card>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {data.map((s) => (
-        <SignalCard key={s.id} s={s} />
-      ))}
+    <div className="space-y-6">
+      {hasPending && (
+        <div>
+          <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">Kutilayotgan Qarorlar (Limit)</h3>
+          <div className="space-y-3">
+            {pending.map((p) => (
+              <PendingCard key={p.id} p={p} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasSignals && (
+        <div>
+          <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">AI Signallar</h3>
+          <div className="space-y-3">
+            {signals.map((s) => (
+              <SignalCard key={s.id} s={s} />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+function PendingCard({ p }: { p: PendingOrder }) {
+  const isBuy = p.type.toLowerCase().includes("buy");
+  const tone = isBuy ? "success" : "danger";
+  const badge = isBuy ? "bg-success/20 text-success" : "bg-danger/20 text-danger";
+  
+  return (
+    <Card className="p-4 border-l-2 border-brand/50">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/5 text-brand shadow-lg">
+            <Clock size={18} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="truncate text-base font-bold">{p.symbol}</p>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${badge}`}>
+                {p.type.replace("_", " ")}
+              </span>
+            </div>
+            {p.created_at && (
+              <p className="text-[11px] text-fg-dim">{timeAgo(p.created_at)} oldin yaratilgan</p>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="tabular text-lg font-black">{p.price}</p>
+          <p className="text-[10px] uppercase tracking-wider text-fg-dim">KIRISH NARXI</p>
+        </div>
+      </div>
+      
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px]">
+        <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
+          Hajm: {p.volume} lot
+        </span>
+        {p.stop_loss != null && p.stop_loss > 0 && (
+          <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
+            SL: {p.stop_loss}
+          </span>
+        )}
+        {p.take_profit != null && p.take_profit > 0 && (
+          <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
+            TP: {p.take_profit}
+          </span>
+        )}
+      </div>
+    </Card>
   );
 }
 

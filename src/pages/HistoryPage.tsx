@@ -22,8 +22,7 @@ export function HistoryPage() {
       const { data } = await supabase
         .from("trade_history")
         .select("*")
-        .order("closed_at", { ascending: false })
-        .limit(100);
+        .order("closed_at", { ascending: false });
       return (data ?? []) as TradeHistory[];
     },
   });

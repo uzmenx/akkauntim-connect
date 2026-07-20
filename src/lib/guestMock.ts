@@ -1,9 +1,10 @@
-import type { BotSettings, BotStatus, Position, AISignal, TradeHistory } from "./types";
+import type { BotSettings, BotStatus, Position, AISignal, TradeHistory, PendingOrder } from "./types";
 
 const MOCK_STATUS_KEY = "guest_bot_status";
 const MOCK_POSITIONS_KEY = "guest_positions_v2";
 const MOCK_HISTORY_KEY = "guest_history";
 const MOCK_SIGNALS_KEY = "guest_signals";
+const MOCK_PENDING_KEY = "guest_pending_orders";
 const MOCK_SETTINGS_KEY = "guest_bot_settings";
 
 const defaultStatus = (): BotStatus => ({
@@ -122,6 +123,31 @@ const defaultSignals = (): AISignal[] => [
   }
 ];
 
+const defaultPending = (): PendingOrder[] => [
+  {
+    id: "mock-pend-1",
+    ticket: 88881111,
+    symbol: "EURUSD",
+    type: "buy_limit",
+    volume: 0.1,
+    price: 1.0800,
+    stop_loss: 1.0750,
+    take_profit: 1.0900,
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: "mock-pend-2",
+    ticket: 88882222,
+    symbol: "XAUUSD",
+    type: "sell_limit",
+    volume: 0.05,
+    price: 2350.00,
+    stop_loss: 2360.00,
+    take_profit: 2320.00,
+    created_at: new Date(Date.now() - 10800000).toISOString(),
+  }
+];
+
 const defaultSettings = (): BotSettings => ({
   id: "guest-settings",
   user_id: "guest",
@@ -215,6 +241,19 @@ export const guestMock = {
   },
   saveSignals: (signals: AISignal[]) => {
     localStorage.setItem(MOCK_SIGNALS_KEY, JSON.stringify(signals));
+  },
+
+  getPendingOrders: (): PendingOrder[] => {
+    const item = localStorage.getItem(MOCK_PENDING_KEY);
+    if (!item) {
+      const val = defaultPending();
+      localStorage.setItem(MOCK_PENDING_KEY, JSON.stringify(val));
+      return val;
+    }
+    return JSON.parse(item);
+  },
+  savePendingOrders: (orders: PendingOrder[]) => {
+    localStorage.setItem(MOCK_PENDING_KEY, JSON.stringify(orders));
   },
 
   getSettings: (): BotSettings => {
