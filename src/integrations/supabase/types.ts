@@ -194,6 +194,48 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_orders: {
+        Row: {
+          created_at: string
+          id: string
+          price: number
+          stop_loss: number | null
+          symbol: string
+          take_profit: number | null
+          ticket: number
+          type: string
+          updated_at: string
+          user_id: string
+          volume: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          price: number
+          stop_loss?: number | null
+          symbol: string
+          take_profit?: number | null
+          ticket: number
+          type: string
+          updated_at?: string
+          user_id: string
+          volume: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          price?: number
+          stop_loss?: number | null
+          symbol?: string
+          take_profit?: number | null
+          ticket?: number
+          type?: string
+          updated_at?: string
+          user_id?: string
+          volume?: number
+        }
+        Relationships: []
+      }
       positions: {
         Row: {
           current_price: number | null
