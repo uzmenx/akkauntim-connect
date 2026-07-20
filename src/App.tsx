@@ -40,16 +40,26 @@ export default function App() {
     return () => window.removeEventListener("settingsState", handler);
   }, []);
 
-  // Global Realtime listener
+  // Global Realtime listener — refresh every affected query key instantly
   useEffect(() => {
     if (!user || user.id === "guest") return;
-    
+
+    const invalidate = (keys: string[]) => {
+      keys.forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+    };
+
     const channel = supabase
       .channel('global_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bot_status' }, () => qc.invalidateQueries({ queryKey: ["bot_status"] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions' }, () => qc.invalidateQueries({ queryKey: ["positions"] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_signals' }, () => qc.invalidateQueries({ queryKey: ["ai_signals"] }))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trade_history' }, () => qc.invalidateQueries({ queryKey: ["trade_history"] }))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bot_status' },
+        () => invalidate(["bot_status"]))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'positions' },
+        () => invalidate(["positions", "positions_full"]))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ai_signals' },
+        () => invalidate(["ai_signals"]))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trade_history' },
+        () => invalidate(["trade_history", "history_today"]))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bot_settings' },
+        () => invalidate(["bot_settings"]))
       .subscribe();
 
     return () => {
