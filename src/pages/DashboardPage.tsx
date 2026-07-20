@@ -2,15 +2,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { guestMock } from "@/lib/guestMock";
 import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
-import type { BotStatus, Position, TradeHistory } from "@/lib/types";
+import type { BotStatus, Position, TradeHistory, PendingOrder } from "@/lib/types";
 import {
   Play, Pause, Settings, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { VerticalCarousel } from "@/components/ui/VerticalCarousel";
 
 const MoneyCoinDuoIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -40,36 +39,41 @@ export function DashboardPage() {
       const { data } = await supabase.from("bot_status").select("*").maybeSingle();
       return data as BotStatus | null;
     },
-    refetchInterval: 1500,
+    refetchInterval: 5000,
   });
 
   const positions = useQuery({
     queryKey: ["positions", user?.id],
     queryFn: async () => {
-      if (isGuest) {
-        return guestMock.getPositions();
-      }
+      if (isGuest) return guestMock.getPositions();
       const { data } = await supabase.from("positions").select("*").order("opened_at", { ascending: false });
       return (data ?? []) as Position[];
     },
-    refetchInterval: 1500,
+    refetchInterval: 5000,
+  });
+
+  const pending = useQuery({
+    queryKey: ["pending_orders", user?.id],
+    queryFn: async () => {
+      if (isGuest) return [] as PendingOrder[];
+      const { data } = await supabase.from("pending_orders").select("*").order("created_at", { ascending: false });
+      return (data ?? []) as PendingOrder[];
+    },
+    refetchInterval: 5000,
   });
 
   const history = useQuery({
     queryKey: ["history_today", user?.id],
     queryFn: async () => {
-      if (isGuest) {
-        return guestMock.getHistory();
-      }
-      const since = new Date(); since.setHours(0, 0, 0, 0);
+      if (isGuest) return guestMock.getHistory();
       const { data } = await supabase
         .from("trade_history")
         .select("*")
-        .gte("closed_at", since.toISOString())
-        .order("closed_at", { ascending: false });
+        .order("closed_at", { ascending: false })
+        .limit(20);
       return (data ?? []) as TradeHistory[];
     },
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 
   const stats = useMemo(() => {
