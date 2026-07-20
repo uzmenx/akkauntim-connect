@@ -168,12 +168,13 @@ export function DashboardPage() {
   const pct = limit > 0 ? (remaining / limit) * 100 : 0;
 
   return (
-    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden">
+    <div className="flex flex-col items-center min-h-[100dvh] w-full font-sans">
       
       {/* Background Gradient to simulate the bottom green glow */}
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/40 to-transparent pointer-events-none" />
 
-      <div className="w-full max-w-md px-4 pt-4 sm:pt-6 pb-4 sm:pb-6 relative z-10 flex flex-col h-full">
+      <div className="w-full max-w-md px-4 pt-4 sm:pt-6 pb-8 relative z-10 flex flex-col">
+        
         
         {/* Main Blue Card */}
         <div className="w-full bg-gradient-to-b from-[#0a4ed6] to-[#041a5a] rounded-[30px] sm:rounded-[40px] p-4 sm:p-6 shadow-2xl relative overflow-hidden border border-white/10">
