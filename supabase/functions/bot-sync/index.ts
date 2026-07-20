@@ -23,13 +23,25 @@ type Body = {
     account_currency?: string;
   };
   positions?: Array<{
-    id: number;
+    ticket: number;
     symbol: string;
     side: "BUY" | "SELL";
     volume: number;
     open_price: number;
+    current_price?: number | null;
+    stop_loss?: number | null;
+    take_profit?: number | null;
     profit: number;
     opened_at?: string;
+  }>;
+  pending_orders?: Array<{
+    ticket: number;
+    symbol: string;
+    type: string;
+    volume: number;
+    price: number;
+    stop_loss?: number | null;
+    take_profit?: number | null;
   }>;
   ai_signal?: {
     symbol: string;
@@ -40,7 +52,6 @@ type Body = {
     take_profit_pips?: number;
   };
   closed_trades?: Array<{
-    id: number;
     ticket: number;
     symbol: string;
     side: string;
@@ -127,10 +138,21 @@ Deno.serve(async (req) => {
     await supabase.from("positions").delete().eq("user_id", user_id);
     if (body.positions.length) {
       const rows = body.positions.map((p) => ({ ...p, user_id }));
-      const { error } = await supabase.from("positions").upsert(rows);
+      const { error } = await supabase.from("positions").upsert(rows, { onConflict: "user_id,ticket" });
       results.positions = error ? { error: error.message } : `ok:${rows.length}`;
     } else {
       results.positions = "ok:0";
+    }
+  }
+
+  if (body.pending_orders) {
+    await supabase.from("pending_orders").delete().eq("user_id", user_id);
+    if (body.pending_orders.length) {
+      const rows = body.pending_orders.map((o) => ({ ...o, user_id }));
+      const { error } = await supabase.from("pending_orders").upsert(rows, { onConflict: "user_id,ticket" });
+      results.pending_orders = error ? { error: error.message } : `ok:${rows.length}`;
+    } else {
+      results.pending_orders = "ok:0";
     }
   }
 
@@ -141,7 +163,7 @@ Deno.serve(async (req) => {
 
   if (body.closed_trades && body.closed_trades.length > 0) {
     const rows = body.closed_trades.map((t) => ({ ...t, user_id }));
-    const { error } = await supabase.from("trade_history").upsert(rows, { onConflict: "user_id, ticket" });
+    const { error } = await supabase.from("trade_history").upsert(rows, { onConflict: "user_id,ticket" });
     results.closed_trades = error ? { error: error.message } : `ok:${rows.length}`;
   }
 

@@ -56,6 +56,18 @@ export type Position = {
   opened_at: string;
 };
 
+export type PendingOrder = {
+  id: string;
+  ticket: number;
+  symbol: string;
+  type: string;
+  volume: number;
+  price: number;
+  stop_loss: number | null;
+  take_profit: number | null;
+  created_at: string;
+};
+
 export type AISignal = {
   id: string;
   symbol: string;

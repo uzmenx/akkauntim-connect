@@ -60,6 +60,8 @@ export default function App() {
         () => invalidate(["trade_history", "history_today"]))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bot_settings' },
         () => invalidate(["bot_settings"]))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pending_orders' },
+        () => invalidate(["pending_orders"]))
       .subscribe();
 
     return () => {
