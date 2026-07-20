@@ -179,9 +179,9 @@ export const guestMock = {
       const isJPY = p.symbol.includes("JPY");
       const tickSize = isJPY ? 0.01 : 0.0001;
       const move = (Math.random() - 0.5) * tickSize * 10;
-      p.current_price = Number((p.current_price + move).toFixed(5));
+      p.current_price = Number(((p.current_price ?? p.open_price ?? 0) + move).toFixed(5));
       const profitChange = (Math.random() - 0.5) * 2;
-      p.profit = Number((p.profit + profitChange).toFixed(2));
+      p.profit = Number(((p.profit ?? 0) + profitChange).toFixed(2));
       return p;
     });
     localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(val));
