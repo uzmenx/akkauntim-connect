@@ -76,6 +76,9 @@ export type Database = {
           risk_level_multiple_confirmation: number
           risk_level_single_confirmation: number
           risk_per_trade: number
+          strategy_weight_news: number | null
+          strategy_weight_pattern: number | null
+          strategy_weight_smc: number | null
           symbols: string[]
           system_prompt: string
           timeframe_major: string
@@ -102,6 +105,9 @@ export type Database = {
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
+          strategy_weight_news?: number | null
+          strategy_weight_pattern?: number | null
+          strategy_weight_smc?: number | null
           symbols?: string[]
           system_prompt?: string
           timeframe_major?: string
@@ -128,6 +134,9 @@ export type Database = {
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
+          strategy_weight_news?: number | null
+          strategy_weight_pattern?: number | null
+          strategy_weight_smc?: number | null
           symbols?: string[]
           system_prompt?: string
           timeframe_major?: string
@@ -143,13 +152,13 @@ export type Database = {
           account_currency: string | null
           account_equity: number | null
           broker: string | null
+          claude_limit: number
+          claude_used: number
           created_at: string
           id: string
           is_running: boolean
           last_heartbeat: string | null
           message: string | null
-          claude_limit: number | null
-          claude_used: number | null
           updated_at: string
           user_id: string
         }
@@ -158,13 +167,13 @@ export type Database = {
           account_currency?: string | null
           account_equity?: number | null
           broker?: string | null
+          claude_limit?: number
+          claude_used?: number
           created_at?: string
           id?: string
           is_running?: boolean
           last_heartbeat?: string | null
           message?: string | null
-          claude_limit?: number | null
-          claude_used?: number | null
           updated_at?: string
           user_id: string
         }
@@ -173,13 +182,13 @@ export type Database = {
           account_currency?: string | null
           account_equity?: number | null
           broker?: string | null
+          claude_limit?: number
+          claude_used?: number
           created_at?: string
           id?: string
           is_running?: boolean
           last_heartbeat?: string | null
           message?: string | null
-          claude_limit?: number | null
-          claude_used?: number | null
           updated_at?: string
           user_id?: string
         }
