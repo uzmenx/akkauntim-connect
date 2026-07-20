@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Akkauntim Connect</string>
+    <string name="title_activity_main">Akkauntim Connect</string>
+    <string name="package_name">com.uzmenx.akkauntimconnect</string>
+    <string name="custom_url_scheme">com.uzmenx.akkauntimconnect</string>
+</resources>
