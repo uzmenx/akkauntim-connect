@@ -18,8 +18,7 @@ export function useRealtimeSync(enabled: boolean) {
 
     TABLES.forEach((table) => {
       channel.on(
-        // @ts-expect-error - postgres_changes is a valid event type
-        "postgres_changes",
+        "postgres_changes" as never,
         { event: "*", schema: "public", table },
         () => {
           qc.invalidateQueries({ queryKey: [table] });
