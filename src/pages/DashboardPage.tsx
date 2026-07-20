@@ -300,32 +300,53 @@ export function DashboardPage() {
         </div>
 
         {/* Open Positions */}
-        <div className="mt-6 flex-1 flex flex-col min-h-0 relative">
-          <h3 className="text-xs font-bold text-white/60 mb-4 ml-2">OCHIQ POZITSIYALAR</h3>
-          
-          {filteredPositions && filteredPositions.length > 0 ? (
-            <VerticalCarousel items={filteredPositions} />
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3 ml-2">
+            <h3 className="text-xs font-bold text-white/60 tracking-wider">OCHIQ POZITSIYALAR</h3>
+            <span className="text-[10px] text-white/40">{filteredPositions?.length ?? 0}</span>
+          </div>
+          {positions.isLoading ? (
+            <SkeletonRows />
+          ) : filteredPositions && filteredPositions.length > 0 ? (
+            <div className="space-y-2">
+              {filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)}
+            </div>
           ) : (
-            // High fidelity pulsing skeletons simulating the card structure
-            [1, 2, 3, 4, 5, 6].map((i) => (
-              <div 
-                key={i} 
-                className="h-16 w-full rounded-2xl bg-[#10192e]/30 border border-white/5 animate-pulse flex items-center px-4"
-              >
-                {/* Left circle skeleton */}
-                <div className="w-10 h-10 rounded-xl bg-white/5 mr-3 shrink-0" />
-                {/* Middle details skeleton */}
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-16 bg-white/10 rounded-full" />
-                  <div className="h-2 w-24 bg-white/5 rounded-full" />
-                </div>
-                {/* Right profit skeleton */}
-                <div className="space-y-2 flex flex-col items-end">
-                  <div className="h-3 w-14 bg-white/10 rounded-full" />
-                  <div className="h-2 w-10 bg-white/5 rounded-full" />
-                </div>
-              </div>
-            ))
+            <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
+          )}
+        </div>
+
+        {/* Pending Orders */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3 ml-2">
+            <h3 className="text-xs font-bold text-white/60 tracking-wider">KUTILAYOTGAN ORDERLAR</h3>
+            <span className="text-[10px] text-white/40">{pending.data?.length ?? 0}</span>
+          </div>
+          {pending.isLoading ? (
+            <SkeletonRows count={2} />
+          ) : pending.data && pending.data.length > 0 ? (
+            <div className="space-y-2">
+              {pending.data.map((o) => <PendingRow key={o.id} o={o} />)}
+            </div>
+          ) : (
+            <EmptyBox text="Hozircha kutilayotgan order yo'q" />
+          )}
+        </div>
+
+        {/* Recent History */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between mb-3 ml-2">
+            <h3 className="text-xs font-bold text-white/60 tracking-wider">SAVDO TARIXI</h3>
+            <Link to="/history" className="text-[10px] text-white/50 hover:text-white">Barchasi</Link>
+          </div>
+          {history.isLoading ? (
+            <SkeletonRows count={2} />
+          ) : history.data && history.data.length > 0 ? (
+            <div className="space-y-2">
+              {history.data.slice(0, 8).map((t) => <HistoryRow key={t.id} t={t} />)}
+            </div>
+          ) : (
+            <EmptyBox text="Hozircha yopilgan savdo yo'q" />
           )}
         </div>
 
@@ -402,4 +423,101 @@ export function DashboardPage() {
 
 export function EmptyLine({ text }: { text: string }) {
   return <p className="py-6 text-center text-xs text-white/40">{text}</p>;
+}
+
+function PositionRow({ p }: { p: Position }) {
+  const isBuy = String(p.side).toUpperCase() === "BUY";
+  const profit = Number(p.profit ?? 0);
+  return (
+    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+            {isBuy ? "BUY" : "SELL"}
+          </span>
+          <span className="text-sm font-bold text-white truncate">{p.symbol}</span>
+          <span className="text-[10px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot</span>
+        </div>
+        <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+          {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
+        </span>
+      </div>
+      <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+        <MiniField label="Open" value={fmtNum(p.open_price, 5)} />
+        <MiniField label="Now" value={fmtNum(p.current_price, 5)} />
+        <MiniField label="SL" value={p.stop_loss ? fmtNum(p.stop_loss, 5) : "—"} tone={p.stop_loss ? "danger" : undefined} />
+        <MiniField label="TP" value={p.take_profit ? fmtNum(p.take_profit, 5) : "—"} tone={p.take_profit ? "success" : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function PendingRow({ o }: { o: PendingOrder }) {
+  const isBuy = o.type.toLowerCase().startsWith("buy");
+  return (
+    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+            {o.type.replace("_", " ")}
+          </span>
+          <span className="text-sm font-bold text-white truncate">{o.symbol}</span>
+          <span className="text-[10px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot</span>
+        </div>
+        <Clock size={14} className="text-white/40" />
+      </div>
+      <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+        <MiniField label="Price" value={fmtNum(o.price, 5)} />
+        <MiniField label="SL" value={o.stop_loss ? fmtNum(o.stop_loss, 5) : "—"} tone={o.stop_loss ? "danger" : undefined} />
+        <MiniField label="TP" value={o.take_profit ? fmtNum(o.take_profit, 5) : "—"} tone={o.take_profit ? "success" : undefined} />
+      </div>
+    </div>
+  );
+}
+
+function HistoryRow({ t }: { t: TradeHistory }) {
+  const isBuy = String(t.side).toUpperCase() === "BUY";
+  const profit = Number(t.profit ?? 0);
+  return (
+    <div className="rounded-2xl bg-[#10192e]/60 backdrop-blur-md border border-white/5 p-3 flex items-center justify-between">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
+          {isBuy ? "BUY" : "SELL"}
+        </span>
+        <span className="text-sm font-bold text-white truncate">{t.symbol}</span>
+        <span className="text-[10px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
+      </div>
+      <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
+      </span>
+    </div>
+  );
+}
+
+function MiniField({ label, value, tone }: { label: string; value: string; tone?: "success" | "danger" }) {
+  const cls = tone === "success" ? "text-emerald-400" : tone === "danger" ? "text-rose-400" : "text-white/90";
+  return (
+    <div className="rounded-lg bg-black/30 px-2 py-1">
+      <p className="text-[8px] uppercase tracking-wider text-white/40">{label}</p>
+      <p className={`tabular-nums text-[11px] font-bold ${cls} truncate`}>{value}</p>
+    </div>
+  );
+}
+
+function EmptyBox({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl bg-[#10192e]/40 border border-white/5 py-6 text-center">
+      <p className="text-xs text-white/40">{text}</p>
+    </div>
+  );
+}
+
+function SkeletonRows({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="h-16 w-full rounded-2xl bg-[#10192e]/30 border border-white/5 animate-pulse" />
+      ))}
+    </div>
+  );
 }
