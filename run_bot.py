@@ -1,21 +1,29 @@
 import time
 import logging
 from trading_bot_step6 import run_smart_bot
+from ai_analysis import load_env, load_config
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 def main():
-    symbol = "EURUSD"
+    load_env()  # .env faylini yuklaymiz
     interval_minutes = 5
-    logging.info(f"Bot ishga tushirildi. Har {interval_minutes} daqiqada {symbol} uchun tahlil qilinadi va savdo holati tekshiriladi.")
-    
     while True:
         try:
-            logging.info("Tahlil boshlandi...")
-            run_smart_bot(symbol)
-            logging.info(f"Tahlil tugadi. Keyingi tekshiruvgacha {interval_minutes} daqiqa kutilmoqda...")
+            # Har bir siklda yangi konfiguratsiyani o'qiymiz
+            config = load_config()
+            trading_config = config.get("trading", {})
+            symbols = trading_config.get("symbols", ["EURUSD"])
+            interval_minutes = trading_config.get("loop_interval_minutes", 5)
+            
+            for symbol in symbols:
+                logging.info(f"--- [{symbol}] uchun tahlil boshlandi ---")
+                run_smart_bot(symbol)
+                logging.info(f"--- [{symbol}] uchun tahlil tugadi ---")
+            
+            logging.info(f"Barcha juftliklar tekshirildi. Keyingi tsiklgacha {interval_minutes} daqiqa kutilmoqda...")
         except Exception as e:
-            logging.error(f"Xatolik yuz berdi: {e}")
+            logging.error(f"Asosiy siklda xatolik yuz berdi: {e}")
             
         # Kutiladigan vaqt (soniyalarda)
         time.sleep(interval_minutes * 60)

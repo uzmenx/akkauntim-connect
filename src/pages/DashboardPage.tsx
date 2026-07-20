@@ -40,6 +40,7 @@ export function DashboardPage() {
       const { data } = await supabase.from("bot_status").select("*").maybeSingle();
       return data as BotStatus | null;
     },
+    refetchInterval: 1500,
   });
 
   const positions = useQuery({
@@ -51,6 +52,7 @@ export function DashboardPage() {
       const { data } = await supabase.from("positions").select("*").order("opened_at", { ascending: false });
       return (data ?? []) as Position[];
     },
+    refetchInterval: 1500,
   });
 
   const history = useQuery({

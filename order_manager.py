@@ -30,9 +30,9 @@ def get_trade_info(ticket):
     state = load_trade_state()
     return state.get(str(ticket), {})
 
-def place_order(symbol, signal, lot_size, stop_loss_pips, take_profit_pips):
+def place_order(symbol, signal, lot_size, stop_loss_pips, take_profit_pips, entry_price=None):
     """
-    Tasdiqlangan signal asosida MT5'ga order yuboradi.
+    Tasdiqlangan signal asosida MT5'ga order (Market yoki Pending) yuboradi.
     Qaytaradi: (muvaffaqiyatli_mi: bool, xabar: str, order_ma'lumoti: dict yoki None)
     """
     symbol_info = mt5.symbol_info(symbol)
@@ -50,21 +50,46 @@ def place_order(symbol, signal, lot_size, stop_loss_pips, take_profit_pips):
     point = symbol_info.point
     pip_size = point * 10  # 5-xonali narxlar uchun 1 pip = 10 point
 
+    # Signal va narxlarni hisoblash
+    action = mt5.TRADE_ACTION_DEAL
+    order_type = None
+    price = None
+    
     if signal == "BUY":
         order_type = mt5.ORDER_TYPE_BUY
         price = tick.ask
-        sl = price - stop_loss_pips * pip_size
-        tp = price + take_profit_pips * pip_size
     elif signal == "SELL":
         order_type = mt5.ORDER_TYPE_SELL
         price = tick.bid
+    elif signal == "BUY_LIMIT":
+        action = mt5.TRADE_ACTION_PENDING
+        order_type = mt5.ORDER_TYPE_BUY_LIMIT
+        price = entry_price if entry_price else tick.ask
+    elif signal == "SELL_LIMIT":
+        action = mt5.TRADE_ACTION_PENDING
+        order_type = mt5.ORDER_TYPE_SELL_LIMIT
+        price = entry_price if entry_price else tick.bid
+    elif signal == "BUY_STOP":
+        action = mt5.TRADE_ACTION_PENDING
+        order_type = mt5.ORDER_TYPE_BUY_STOP
+        price = entry_price if entry_price else tick.ask
+    elif signal == "SELL_STOP":
+        action = mt5.TRADE_ACTION_PENDING
+        order_type = mt5.ORDER_TYPE_SELL_STOP
+        price = entry_price if entry_price else tick.bid
+    else:
+        return False, f"Noto'g'ri signal turi: {signal}", None
+
+    # SL va TP ni hisoblash (price dan, ya'ni agar Limit bo'lsa entry_price dan hisoblanadi)
+    if "BUY" in signal:
+        sl = price - stop_loss_pips * pip_size
+        tp = price + take_profit_pips * pip_size
+    elif "SELL" in signal:
         sl = price + stop_loss_pips * pip_size
         tp = price - take_profit_pips * pip_size
-    else:
-        return False, "Noto'g'ri signal turi", None
 
     request = {
-        "action": mt5.TRADE_ACTION_DEAL,
+        "action": action,
         "symbol": symbol,
         "volume": lot_size,
         "type": order_type,

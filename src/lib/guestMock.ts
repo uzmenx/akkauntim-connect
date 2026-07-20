@@ -147,12 +147,17 @@ const defaultSettings = (): BotSettings => ({
 export const guestMock = {
   getBotStatus: (): BotStatus => {
     const item = localStorage.getItem(MOCK_STATUS_KEY);
+    let val;
     if (!item) {
-      const val = defaultStatus();
-      localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(val));
-      return val;
+      val = defaultStatus();
+    } else {
+      val = JSON.parse(item);
     }
-    return JSON.parse(item);
+    // Simulate real-time equity tick
+    const tick = (Math.random() - 0.5) * 5.5; // +/- 2.75 change
+    val.account_equity = Number((val.account_equity + tick).toFixed(2));
+    localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(val));
+    return val;
   },
   saveBotStatus: (status: Partial<BotStatus>) => {
     const curr = guestMock.getBotStatus();
@@ -163,12 +168,24 @@ export const guestMock = {
 
   getPositions: (): Position[] => {
     const item = localStorage.getItem(MOCK_POSITIONS_KEY);
+    let val;
     if (!item) {
-      const val = defaultPositions();
-      localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(val));
-      return val;
+      val = defaultPositions();
+    } else {
+      val = JSON.parse(item);
     }
-    return JSON.parse(item);
+    // Simulate real-time position price ticks
+    val = val.map((p: Position) => {
+      const isJPY = p.symbol.includes("JPY");
+      const tickSize = isJPY ? 0.01 : 0.0001;
+      const move = (Math.random() - 0.5) * tickSize * 10;
+      p.current_price = Number((p.current_price + move).toFixed(5));
+      const profitChange = (Math.random() - 0.5) * 2;
+      p.profit = Number((p.profit + profitChange).toFixed(2));
+      return p;
+    });
+    localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(val));
+    return val;
   },
   savePositions: (positions: Position[]) => {
     localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(positions));

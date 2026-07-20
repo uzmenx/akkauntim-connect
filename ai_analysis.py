@@ -30,7 +30,7 @@ def load_config():
             "timeframe_minor": "M5",
         },
         "ai": {
-            "model": "claude-3-5-sonnet-20241022",
+            "model": "claude-sonnet-5",
         }
     }
 
@@ -325,7 +325,7 @@ def get_ai_decision(context: dict, mock_response=None) -> dict:
             }
             
         config = load_config()
-        model = config.get("ai", {}).get("model", "claude-3-5-sonnet-20241022")
+        model = config.get("ai", {}).get("model", "claude-sonnet-5")
         
         try:
             client = anthropic.Anthropic(api_key=api_key)
@@ -463,7 +463,7 @@ CLOSE_ALL
     try:
         client = anthropic.Anthropic(api_key=api_key)
         response = client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5-20251001",
             max_tokens=10,
             system="Faqat bitta so'z bilan javob ber.",
             messages=[{"role": "user", "content": prompt}]
