@@ -263,61 +263,95 @@ class TradingBot:
         context["timeframe"] = self.config.timeframe_major
         context["current_price"] = current_price
 
-        # Kesh tekshirish
-        current_hash = self._get_state_hash(context)
-        cached = self.decision_logger.get_last_cached_response(symbol, current_hash)
-        if cached:
-            logger.info(f"[{symbol}] Keshdan foydalanildi (hash: {current_hash[:8]}...)")
-            cached["reasoning"] = "(CACHED) " + cached.get("reasoning", "")
-            self.decision_logger.log(
-                pair=symbol, timeframe=self.config.timeframe_major,
-                context=context, prompt="CACHED_PROMPT",
-                response=cached, decision=cached.get("final_decision", "REJECT"),
-                risk_pct=vote_risk, hash_val=current_hash,
-                tokens={"input_tokens": 0, "output_tokens": 0}, cost=0.0
-            )
-            ai_decision = cached
-        else:
-            # 6. AI qaror
-            prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
-            logger.info(f"[{symbol}] Claude ga so'rov yuborilmoqda...")
+        # Kelishgan strategiyalar soni
+        agreed_count = len(voting_result.get('agreed_strategies', []))
 
-            ai_decision = self.ai.get_decision(prompt)
-            if not ai_decision:
-                logger.error(f"[{symbol}] AI javob bermadi — savdo bekor qilindi.")
-                return
-
-            # Direction/risk o'zgartirilganini tekshirish
-            if ai_decision.get('direction') != vote_direction or ai_decision.get('risk_pct') != vote_risk:
-                ai_decision['final_decision'] = "REJECT"
-                ai_decision['warnings'] = ai_decision.get('warnings', []) + [
-                    "Claude risk_pct yoki direction ni o'zgartirishga urindi, savdo rad etildi."
-                ]
-                ai_decision['direction'] = vote_direction
-                ai_decision['risk_pct'] = vote_risk
-
+        if agreed_count >= 2:
+            # === 2+ strategiya kelishdi — AI ni bypass qilish, to'g'ridan-to'g'ri execute ===
+            logger.info(f"[{symbol}] ✅ {agreed_count} strategiya kelishdi — Auto-Execute rejimi!")
+            
+            # Symbol-specific SL/TP
+            if "XAU" in symbol or "GOLD" in symbol:
+                default_sl, default_tp = 300, 600  # Oltin uchun kattaroq
+            else:
+                default_sl, default_tp = 30, 60  # Forex juftliklari uchun
+            
+            ai_decision = {
+                "final_decision": "EXECUTE",
+                "direction": vote_direction,
+                "confidence": 80,
+                "entry_price": None,
+                "stop_loss_pips": default_sl,
+                "take_profit_pips": default_tp,
+                "risk_pct": vote_risk,
+                "reasoning": f"Auto-execute: {agreed_count} strategiya ({', '.join(voting_result.get('agreed_strategies', []))}) tasdiqladi"
+            }
+            
             # Logga yozish
             self.decision_logger.log(
                 pair=symbol, timeframe=self.config.timeframe_major,
-                context=context, prompt=prompt,
-                response=ai_decision,
-                decision=ai_decision.get("final_decision", "REJECT"),
-                risk_pct=vote_risk, hash_val=current_hash,
-                tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
-                cost=self.ai.total_cost
+                context=context, prompt="AUTO_EXECUTE",
+                response=ai_decision, decision="EXECUTE",
+                risk_pct=vote_risk, hash_val=self._get_state_hash(context),
+                tokens={"input_tokens": 0, "output_tokens": 0}, cost=0.0
             )
-
-            # Supabase ga AI signal loglash
-            try:
-                self.sync.log_ai_signal(
-                    symbol=symbol,
-                    signal=vote_direction,
-                    confidence=int(ai_decision.get("confidence", 0)),
-                    reasoning=ai_decision.get("reasoning", "")
+        else:
+            # === 1 strategiya — AI qaror bersin ===
+            # Kesh tekshirish
+            current_hash = self._get_state_hash(context)
+            cached = self.decision_logger.get_last_cached_response(symbol, current_hash)
+            if cached:
+                logger.info(f"[{symbol}] Keshdan foydalanildi (hash: {current_hash[:8]}...)")
+                cached["reasoning"] = "(CACHED) " + cached.get("reasoning", "")
+                self.decision_logger.log(
+                    pair=symbol, timeframe=self.config.timeframe_major,
+                    context=context, prompt="CACHED_PROMPT",
+                    response=cached, decision=cached.get("final_decision", "REJECT"),
+                    risk_pct=vote_risk, hash_val=current_hash,
+                    tokens={"input_tokens": 0, "output_tokens": 0}, cost=0.0
                 )
-                self.sync.log_claude_cost(self.ai.total_cost)
-            except Exception as e:
-                logger.warning(f"Supabase sync xatolik: {e}")
+                ai_decision = cached
+            else:
+                # AI qaror
+                prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
+                logger.info(f"[{symbol}] Claude ga so'rov yuborilmoqda...")
+
+                ai_decision = self.ai.get_decision(prompt)
+                if not ai_decision:
+                    logger.error(f"[{symbol}] AI javob bermadi — savdo bekor qilindi.")
+                    return
+
+                # Direction/risk o'zgartirilganini tekshirish
+                if ai_decision.get('direction') != vote_direction or ai_decision.get('risk_pct') != vote_risk:
+                    ai_decision['final_decision'] = "REJECT"
+                    ai_decision['warnings'] = ai_decision.get('warnings', []) + [
+                        "Claude risk_pct yoki direction ni o'zgartirishga urindi, savdo rad etildi."
+                    ]
+                    ai_decision['direction'] = vote_direction
+                    ai_decision['risk_pct'] = vote_risk
+
+                # Logga yozish
+                self.decision_logger.log(
+                    pair=symbol, timeframe=self.config.timeframe_major,
+                    context=context, prompt=prompt,
+                    response=ai_decision,
+                    decision=ai_decision.get("final_decision", "REJECT"),
+                    risk_pct=vote_risk, hash_val=current_hash,
+                    tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
+                    cost=self.ai.total_cost
+                )
+
+                # Supabase ga AI signal loglash
+                try:
+                    self.sync.log_ai_signal(
+                        symbol=symbol,
+                        signal=vote_direction,
+                        confidence=int(ai_decision.get("confidence", 0)),
+                        reasoning=ai_decision.get("reasoning", "")
+                    )
+                    self.sync.log_claude_cost(self.ai.total_cost)
+                except Exception as e:
+                    logger.warning(f"Supabase sync xatolik: {e}")
 
         # 7. EXECUTE tekshiruvi
         final = ai_decision.get("final_decision", "REJECT")

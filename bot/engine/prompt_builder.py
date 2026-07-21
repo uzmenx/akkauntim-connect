@@ -75,26 +75,30 @@ Risk (fraction): {vote.get('risk_pct', 0.0)}
 Kelishgan strategiyalar: {', '.join(vote.get('agreed_strategies') or [])}
 
 === VAZIFA ===
-Yuqoridagi ma'lumotlarni va Voting Engine qarorini tahlil qil.
-Agar narx kuchli tarixiy SMC zonasida (Memory Bank) bo'lsa va yaqinlashayotgan yangilikning tarixiy yo'nalishi buni tasdiqlasa, yuqori ishonch bilan tasdiqla.
-Voting Engine allaqachon risk% va yo'nalishni hisoblab bergan. Sening vazifang - shu kontekstda bu savdoni HOZIR ochish xavfsizmi, yoki kutish/rad etish kerakmi - shuni hal qilish.
+Voting Engine allaqachon yo'nalish va risk darajasini tasdiqlagan. Sening vazifang:
+1. Optimal Stop Loss (pips) va Take Profit (pips) ni texnik tahlil asosida aniqlash
+2. Savdoni HOZIR ochish mumkinligini tasdiqlash
 
-Quyidagi qat'iy qoidalarga rioya qil:
-1. Yangiliklar va straddle: Agar SMC va Fundamental tahlil bir-birini rad etsa yoki bozor holati noaniq bo'lsa, REJECT qil.
-2. Risk boshqaruvi: Kunlik limit buzilmasligi eng oliy ustuvorlikdir. Agar shartlar mos bo'lsa EXECUTE qaytar.
-Yo'nalish va risk% ni aslo o'zgartirma.
+Qoidalar:
+1. Agar kamida 1 ta strategiya signal bergan va bozor sharoiti ochiq TESKARI bo'lmasa → EXECUTE.
+2. Agar bozorda kuchli trend TESKARI yo'nalishda bo'lsa (masalan, BUY signal lekin kuchli bearish trend) → REJECT.
+3. Agar kuchli yangilik 5 daqiqa ichida bo'lsa → WAIT.
+4. Stop Loss va Take Profit ni texnik darajalar asosida aniqla (minimum 1:1.5 ratio).
+5. Yo'nalish va risk_pct ni O'ZGARTIRMA — ular Voting Engine tomonidan belgilangan.
+
+MUHIM: Voting Engine allaqachon tasdiqlagan. Faqat OCHIQ xavf bo'lsa REJECT qil. Shubha bo'lsa EXECUTE qil, chunki risk allaqachon boshqarilgan.
 
 JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn yozma:
 ```json
 {{
   "final_decision": "EXECUTE",
-  "direction": "BUY",
+  "direction": "{vote.get('signal', 'BUY')}",
   "confidence": 75,
   "entry_price": null,
   "stop_loss_pips": 30,
   "take_profit_pips": 60,
-  "risk_pct": 0.02,
-  "reasoning": "SMC structure confirms bullish trend...",
+  "risk_pct": {vote.get('risk_pct', 0.02)},
+  "reasoning": "Savdo sababi...",
   "warnings": []
 }}
 ```

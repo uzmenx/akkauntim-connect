@@ -8,13 +8,13 @@
     "risk_level_multiple_confirmation": 2.0,
     "magic_number": 234000,
     "max_daily_loss_pct": 0.10,
-    "min_confidence": 50,
+    "min_confidence": 40,
     "max_lot_size": 5.0,
     "risk_per_trade": 0.02,
     "deviation": 20,
-    "strategy_weight_smc": 60,
-    "strategy_weight_pattern": 60,
-    "strategy_weight_news": 60,
+    "strategy_weight_smc": 40,
+    "strategy_weight_pattern": 40,
+    "strategy_weight_news": 40,
     "allow_single_strategy_trade": true
   },
   "ai": {

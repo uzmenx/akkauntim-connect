@@ -11,15 +11,28 @@ class OrderManager:
         self.magic_number = getattr(self.config, "magic_number", 234000)
 
     def _get_filling_mode(self, symbol: str) -> int:
+        """Broker qo'llab-quvvatlaydigan filling mode ni aniqlash."""
+        try:
+            import MetaTrader5 as mt5
+            FILLING_FOK = mt5.ORDER_FILLING_FOK
+            FILLING_IOC = mt5.ORDER_FILLING_IOC
+            FILLING_RETURN = mt5.ORDER_FILLING_RETURN
+            SYMBOL_FOK = getattr(mt5, 'SYMBOL_FILLING_FOK', 1)
+            SYMBOL_IOC = getattr(mt5, 'SYMBOL_FILLING_IOC', 2)
+        except (ImportError, AttributeError):
+            # Fallback constants
+            FILLING_FOK, FILLING_IOC, FILLING_RETURN = 0, 1, 2
+            SYMBOL_FOK, SYMBOL_IOC = 1, 2
+        
         symbol_info = self.mt5.symbol_info(symbol)
         if not symbol_info:
-            return self.mt5.ORDER_FILLING_FOK
+            return FILLING_FOK
         filling_mode = symbol_info.filling_mode
-        if filling_mode & self.mt5.SYMBOL_FILLING_FOK:
-            return self.mt5.ORDER_FILLING_FOK
-        elif filling_mode & self.mt5.SYMBOL_FILLING_IOC:
-            return self.mt5.ORDER_FILLING_IOC
-        return self.mt5.ORDER_FILLING_RETURN
+        if filling_mode & SYMBOL_FOK:
+            return FILLING_FOK
+        elif filling_mode & SYMBOL_IOC:
+            return FILLING_IOC
+        return FILLING_RETURN
 
     def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None) -> Tuple[bool, str, Optional[dict]]:
         """

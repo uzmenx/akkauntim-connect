@@ -65,7 +65,7 @@ def aggregate_signals(smc_data: Dict[str, Any], pattern_data: Dict[str, Any], ne
             risk_pct = 0.02
     elif num_strats == 1:
         if allow_single:
-            risk_pct = 0.01
+            risk_pct = 0.02
         else:
             logger.info("Yakka strategiya signali olingan, ammo ruxsat etilmagan.")
             return {

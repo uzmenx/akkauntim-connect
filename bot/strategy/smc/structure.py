@@ -162,9 +162,44 @@ class SMCStructure:
 
     def latest_context(self) -> dict:
         """AI qaror qatlamiga (ai_analysis.py) uzatish uchun qulay xulosa."""
+        # Fallback trend detection: agar standard SMC trend "No Trend" bo'lsa,
+        # oxirgi swing nuqtalar asosida HH/HL yoki LH/LL pattern tekshirish
+        effective_internal = self.internal_trend
+        effective_external = self.external_trend
+        
+        if effective_internal == "No Trend" and len(self.zz_value) >= 5:
+            # Oxirgi swing high va low larni ajratish
+            recent_highs = []
+            recent_lows = []
+            for k in range(len(self.zz_type) - 1, max(len(self.zz_type) - 8, -1), -1):
+                if self.zz_type[k] in HIGH_TYPES:
+                    recent_highs.append(self.zz_value[k])
+                elif self.zz_type[k] in LOW_TYPES:
+                    recent_lows.append(self.zz_value[k])
+                if len(recent_highs) >= 3 and len(recent_lows) >= 3:
+                    break
+            
+            recent_highs.reverse()
+            recent_lows.reverse()
+            
+            if len(recent_highs) >= 2 and len(recent_lows) >= 2:
+                # Higher Highs + Higher Lows = Up Trend
+                hh = all(recent_highs[i] > recent_highs[i-1] for i in range(1, len(recent_highs)))
+                hl = all(recent_lows[i] > recent_lows[i-1] for i in range(1, len(recent_lows)))
+                # Lower Highs + Lower Lows = Down Trend
+                lh = all(recent_highs[i] < recent_highs[i-1] for i in range(1, len(recent_highs)))
+                ll = all(recent_lows[i] < recent_lows[i-1] for i in range(1, len(recent_lows)))
+                
+                if hh and hl:
+                    effective_internal = "Up Trend (Fallback HH/HL)"
+                elif lh and ll:
+                    effective_internal = "Down Trend (Fallback LH/LL)"
+        
         return {
-            "external_trend": self.external_trend,
-            "internal_trend": self.internal_trend,
+            "trend": {
+                "internal": effective_internal,
+                "external": effective_external,
+            },
             "major_high": self.major_high,
             "major_low": self.major_low,
             "minor_high": self.minor_high,
