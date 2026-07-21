@@ -59,6 +59,7 @@ export type Database = {
       bot_settings: {
         Row: {
           ai_model: string
+          ai_enabled?: boolean
           created_at: string
           id: string
           max_daily_loss: number
@@ -88,6 +89,7 @@ export type Database = {
         }
         Insert: {
           ai_model?: string
+          ai_enabled?: boolean
           created_at?: string
           id?: string
           max_daily_loss?: number
@@ -117,6 +119,7 @@ export type Database = {
         }
         Update: {
           ai_model?: string
+          ai_enabled?: boolean
           created_at?: string
           id?: string
           max_daily_loss?: number

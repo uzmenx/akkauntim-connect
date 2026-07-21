@@ -297,6 +297,10 @@ class TradingBot:
             )
         else:
             # === 1 strategiya — AI qaror bersin ===
+            if getattr(self.config, 'ai_enabled', True) is False:
+                logger.info(f"[{symbol}] ⚠️ AI o'chirilgan va faqat {agreed_count} ta strategiya mos keldi. Savdo rad etildi (kamida 2 ta kerak).")
+                return
+
             # Kesh tekshirish
             current_hash = self._get_state_hash(context)
             cached = self.decision_logger.get_last_cached_response(symbol, current_hash)
@@ -441,6 +445,15 @@ class TradingBot:
         try:
             while self._running:
                 try:
+                    # Cloud'dan yangi sozlamalarni yuklab olish
+                    try:
+                        settings = self.sync.fetch_bot_settings()
+                        if settings:
+                            self.config.update_from_dict(settings)
+                            logger.info("Bot sozlamalari yangilandi.")
+                    except Exception as e:
+                        logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
+
                     # Har bir symbol uchun tahlil
                     for symbol in self.config.trading_symbols:
                         if not self._running:

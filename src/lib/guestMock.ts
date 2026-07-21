@@ -159,6 +159,7 @@ const defaultSettings = (): BotSettings => ({
   timeframe_major: "H1",
   timeframe_minor: "M5",
   ai_model: "claude-3-5-sonnet-20241022",
+  ai_enabled: true,
   prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
   prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
   prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',

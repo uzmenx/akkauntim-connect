@@ -5,7 +5,7 @@ import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder } from "@/lib/types";
 import {
   Play, Pause, Settings, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -254,7 +254,7 @@ export function DashboardPage() {
             ))}
           </a>
 
-          {/* 4 Action Buttons Row */}
+          {/* 5 Action Buttons Row */}
           <div className="flex gap-2 w-full items-center justify-between mt-auto">
             <Link to="/settings" className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Settings">
               <Settings size={18} className="group-hover:rotate-90 transition-transform duration-500" />
@@ -264,16 +264,23 @@ export function DashboardPage() {
               <ArrowUpDown size={18} className="group-hover:scale-110 transition-transform" />
             </Link>
 
-            <button onClick={toggleFilter} className="flex-1 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white/90 transition-all border border-white/10 shadow-md backdrop-blur-sm">
-              <span>{filterMode === "all" ? "Receive" : filterMode === "profit" ? "Foyda" : "Zarar"}</span>
-              {filterMode === "all" && <ArrowUpDown size={14} className="text-blue-400 opacity-90" />}
-              {filterMode === "profit" && <TrendingUp size={14} className="text-emerald-400" />}
-              {filterMode === "loss" && <TrendingDown size={14} className="text-rose-400" />}
+            <Link to="/backtest" className="flex-shrink-0 w-11 h-11 rounded-full bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 flex items-center justify-center text-amber-400 transition-all border border-amber-500/20 group shadow-md backdrop-blur-sm shadow-amber-500/10" aria-label="Backtest">
+              <FlaskConical size={18} className="group-hover:scale-110 transition-transform" />
+            </Link>
+
+            <button onClick={toggleFilter} className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Filter Mode">
+              {filterMode === "all" && (
+                <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
+                  <TrendingUp size={12} className="text-emerald-400 absolute top-0 left-0" />
+                  <TrendingDown size={12} className="text-rose-400 absolute bottom-0 right-0" />
+                </div>
+              )}
+              {filterMode === "profit" && <TrendingUp size={18} className="text-emerald-400 group-hover:scale-110 transition-transform" />}
+              {filterMode === "loss" && <TrendingDown size={18} className="text-rose-400 group-hover:scale-110 transition-transform" />}
             </button>
 
-            <button onClick={() => setShowPrompt(true)} className="flex-1 h-11 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center gap-1 text-[11px] font-bold text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30">
-              <span>AI Send</span>
-              <ArrowUpRight size={14} className="opacity-80" />
+            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-11 h-11 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30 group" aria-label="AI Send">
+              <Sparkles size={18} className="group-hover:scale-110 transition-transform text-white" />
             </button>
           </div>
         </div>

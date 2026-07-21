@@ -21,6 +21,12 @@ const MINOR_TIMEFRAME_OPTIONS = [
   { value: "M1", label: "M1 (1 daqiqa)" },
 ];
 
+const AI_MODEL_OPTIONS = [
+  { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet (Tavsiya)" },
+  { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (Tezkor)" },
+  { value: "claude-3-opus-20240229", label: "Claude 3 Opus (Murakkab)" },
+];
+
 const ASSET_CATEGORIES: Record<string, string[]> = {
   Forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURCHF", "EURAUD"],
   Crypto: ["BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD", "ADAUSD", "DOGEUSD", "BNBUSD", "LTCUSD", "LINKUSD"],
@@ -94,6 +100,7 @@ export function SettingsPage() {
         max_lot_size: 5.0,
         timeframe_major: "H1",
         timeframe_minor: "M5",
+        ai_enabled: true,
         ai_model: "claude-3-5-sonnet-20241022",
         prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
         prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
@@ -128,6 +135,7 @@ export function SettingsPage() {
         max_lot_size: Number(form.max_lot_size ?? 5.0),
         timeframe_major: form.timeframe_major ?? "H1",
         timeframe_minor: form.timeframe_minor ?? "M5",
+        ai_enabled: form.ai_enabled ?? true,
         ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
         prompt_identity: form.prompt_identity ?? "",
         prompt_strategy: form.prompt_strategy ?? "",
@@ -154,6 +162,7 @@ export function SettingsPage() {
           max_lot_size: Number(form.max_lot_size ?? 5.0),
           timeframe_major: form.timeframe_major ?? "H1",
           timeframe_minor: form.timeframe_minor ?? "M5",
+          ai_enabled: form.ai_enabled ?? true,
           ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
           prompt_identity: form.prompt_identity ?? "",
           prompt_strategy: form.prompt_strategy ?? "",
@@ -206,6 +215,7 @@ export function SettingsPage() {
           max_lot_size: 5.0,
           timeframe_major: "H1",
           timeframe_minor: "M5",
+          ai_enabled: true,
           ai_model: "claude-3-5-sonnet-20241022",
           prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
           prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
@@ -307,6 +317,31 @@ export function SettingsPage() {
         </div>
 
         <div className="space-y-4">
+          <div className="flex items-center justify-between py-3 border-b border-white/5">
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-semibold text-white/90">AI Dvigateli</p>
+              <p className="text-[11px] text-white/40 leading-snug mt-0.5">
+                O'chirilganda bot qo'shimcha tasdiqlarsiz strategiyaga tayanadi.
+              </p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setForm(f => ({ ...f, ai_enabled: !f.ai_enabled }))}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 ease-in-out ${form.ai_enabled !== false ? 'bg-blue-500' : 'bg-white/10'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${form.ai_enabled !== false ? 'translate-x-[18px]' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="py-3">
+            <p className="text-xs font-semibold text-white/90 mb-2">AI Modeli</p>
+            <CustomSelect
+              options={AI_MODEL_OPTIONS}
+              value={form.ai_model ?? "claude-3-5-sonnet-20241022"}
+              onChange={(v) => setForm((f) => ({ ...f, ai_model: v }))}
+              placeholder="Modelni tanlang..."
+            />
+          </div>
 
           <div className="space-y-4">
             <PromptEditor 

@@ -23,6 +23,7 @@ class BotConfig:
     loop_interval_minutes: int = 5
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
+    ai_enabled: bool = True
     ai_model: str = "claude-sonnet-4-6"
     ai_system_prompt: str = ""
     
@@ -91,3 +92,56 @@ class BotConfig:
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
+
+    def update_from_dict(self, data: dict) -> None:
+        """Supabase'dan kelgan sozlamalar bilan config ni yangilash."""
+        if not data:
+            return
+            
+        if "symbols" in data and isinstance(data["symbols"], list):
+            self.trading_symbols = data["symbols"]
+            
+        if "timeframe_major" in data:
+            self.timeframe_major = data["timeframe_major"]
+            
+        if "timeframe_minor" in data:
+            self.timeframe_minor = data["timeframe_minor"]
+            
+        if "ai_enabled" in data:
+            self.ai_enabled = bool(data["ai_enabled"])
+            
+        if "ai_model" in data:
+            self.ai_model = data["ai_model"]
+            
+        if "max_daily_loss" in data:
+            self.max_daily_loss_pct = float(data["max_daily_loss"])
+            
+        if "max_lot_size" in data:
+            self.max_lot_size = float(data["max_lot_size"])
+            
+        if "risk_per_trade" in data:
+            self.risk_per_trade = float(data["risk_per_trade"])
+            
+        if "min_confidence" in data:
+            self.min_confidence = int(data["min_confidence"])
+            
+        if "strategy_weight_smc" in data:
+            self.strategy_weight_smc = int(data["strategy_weight_smc"])
+            
+        if "strategy_weight_pattern" in data:
+            self.strategy_weight_pattern = int(data["strategy_weight_pattern"])
+            
+        if "strategy_weight_news" in data:
+            self.strategy_weight_news = int(data["strategy_weight_news"])
+            
+        if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
+            identity = data.get("prompt_identity", "")
+            strategy = data.get("prompt_strategy", "")
+            output = data.get("prompt_output", "")
+            temp = data.get("prompt_temporary", "")
+            
+            sys_prompt = f"{identity}\n\nQOIDALAR:\n{strategy}\n\n"
+            if temp:
+                sys_prompt += f"QO'SHIMCHA KO'RSATMA: {temp}\n\n"
+            sys_prompt += f"FORMAT: {output}"
+            self.ai_system_prompt = sys_prompt
