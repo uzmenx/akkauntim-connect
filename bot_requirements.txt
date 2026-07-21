@@ -1,5 +1,5 @@
 # AI Trading Bot — Python Dependencies
-# Install: pip install -r requirements.txt
+# Install: pip install -r bot_requirements.txt
 
 # MetaTrader 5
 MetaTrader5>=5.0.45
