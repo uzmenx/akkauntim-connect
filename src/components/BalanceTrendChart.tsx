@@ -59,26 +59,29 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
     const w = 300;
     const h = 50;
     
-    const minTime = startTime.getTime();
-    const maxTime = endTime.getTime();
-    const timeRange = Math.max(maxTime - minTime, 1);
-    
     const minBalance = Math.min(...dataPoints.map(p => p.balance));
     const maxBalance = Math.max(...dataPoints.map(p => p.balance));
     
     // Add some padding to Y axis
-    const yPad = (maxBalance - minBalance) * 0.1 || 10;
+    const yPad = (maxBalance - minBalance) * 0.15 || 10;
     const minY = minBalance - yPad;
     const maxY = maxBalance + yPad;
     const yRange = Math.max(maxY - minY, 1);
 
-    const getX = (t: number) => ((t - minTime) / timeRange) * w;
+    const getX = (index: number) => (index / (dataPoints.length - 1)) * w;
     const getY = (b: number) => h - ((b - minY) / yRange) * h;
 
-    const pathData = dataPoints.map((p, i) => {
-      const cmd = i === 0 ? "M" : "L";
-      return `${cmd} ${getX(p.time).toFixed(2)},${getY(p.balance).toFixed(2)}`;
-    }).join(" ");
+    // Build the stair-step path
+    let pathData = `M ${getX(0).toFixed(2)},${getY(dataPoints[0].balance).toFixed(2)}`;
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+      const nextX = getX(i + 1);
+      const currentY = getY(dataPoints[i].balance);
+      const nextY = getY(dataPoints[i + 1].balance);
+      
+      // Step horizontally to the next X, then vertically to the next Y
+      pathData += ` L ${nextX.toFixed(2)},${currentY.toFixed(2)}`;
+      pathData += ` L ${nextX.toFixed(2)},${nextY.toFixed(2)}`;
+    }
 
     const fillData = `${pathData} L ${w},${h} L 0,${h} Z`;
 
