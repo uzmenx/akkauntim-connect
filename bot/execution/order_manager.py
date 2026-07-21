@@ -1,0 +1,389 @@
+import logging
+from typing import Tuple, Optional, Any, Callable
+
+logger = logging.getLogger(__name__)
+
+class OrderManager:
+    def __init__(self, mt5_client: Any, state_manager: Any, config: Any):
+        self.mt5 = mt5_client
+        self.state_manager = state_manager
+        self.config = config
+        self.magic_number = getattr(self.config, "magic_number", 234000)
+
+    def _get_filling_mode(self, symbol: str) -> int:
+        symbol_info = self.mt5.symbol_info(symbol)
+        if not symbol_info:
+            return self.mt5.ORDER_FILLING_FOK
+        filling_mode = symbol_info.filling_mode
+        if filling_mode & self.mt5.SYMBOL_FILLING_FOK:
+            return self.mt5.ORDER_FILLING_FOK
+        elif filling_mode & self.mt5.SYMBOL_FILLING_IOC:
+            return self.mt5.ORDER_FILLING_IOC
+        return self.mt5.ORDER_FILLING_RETURN
+
+    def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None) -> Tuple[bool, str, Optional[dict]]:
+        """
+        Tasdiqlangan signal asosida MT5'ga order (Market yoki Pending) yuboradi.
+        """
+        symbol_info = self.mt5.symbol_info(symbol)
+        if symbol_info is None:
+            return False, f"{symbol} topilmadi", None
+
+        if not symbol_info.visible:
+            if not self.mt5.symbol_select(symbol, True):
+                return False, f"{symbol} tanlab bo'lmadi", None
+
+        tick = self.mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return False, "Narx ma'lumotini olib bo'lmadi", None
+
+        point = symbol_info.point
+        pip_size = point * 10  # 5-xonali narxlar uchun 1 pip = 10 point
+
+        stop_level_pips = symbol_info.trade_stops_level / 10.0
+        if stop_loss_pips < stop_level_pips:
+            stop_loss_pips = stop_level_pips
+        if take_profit_pips < stop_level_pips:
+            take_profit_pips = stop_level_pips
+
+        # Signal va narxlarni hisoblash
+        action = self.mt5.TRADE_ACTION_DEAL
+        order_type = None
+        price = None
+        
+        if signal == "BUY":
+            order_type = self.mt5.ORDER_TYPE_BUY
+            price = tick.ask
+        elif signal == "SELL":
+            order_type = self.mt5.ORDER_TYPE_SELL
+            price = tick.bid
+        elif signal == "BUY_LIMIT":
+            if entry_price is None:
+                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
+                return False, f"Pending order uchun entry_price majburiy", None
+            action = self.mt5.TRADE_ACTION_PENDING
+            order_type = self.mt5.ORDER_TYPE_BUY_LIMIT
+            price = entry_price
+        elif signal == "SELL_LIMIT":
+            if entry_price is None:
+                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
+                return False, f"Pending order uchun entry_price majburiy", None
+            action = self.mt5.TRADE_ACTION_PENDING
+            order_type = self.mt5.ORDER_TYPE_SELL_LIMIT
+            price = entry_price
+        elif signal == "BUY_STOP":
+            if entry_price is None:
+                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
+                return False, f"Pending order uchun entry_price majburiy", None
+            action = self.mt5.TRADE_ACTION_PENDING
+            order_type = self.mt5.ORDER_TYPE_BUY_STOP
+            price = entry_price
+        elif signal == "SELL_STOP":
+            if entry_price is None:
+                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
+                return False, f"Pending order uchun entry_price majburiy", None
+            action = self.mt5.TRADE_ACTION_PENDING
+            order_type = self.mt5.ORDER_TYPE_SELL_STOP
+            price = entry_price
+        else:
+            return False, f"Noto'g'ri signal turi: {signal}", None
+
+        # SL va TP ni hisoblash
+        digits = symbol_info.digits
+        if "BUY" in signal:
+            sl = round(price - stop_loss_pips * pip_size, digits)
+            tp = round(price + take_profit_pips * pip_size, digits)
+        elif "SELL" in signal:
+            sl = round(price + stop_loss_pips * pip_size, digits)
+            tp = round(price - take_profit_pips * pip_size, digits)
+
+        request = {
+            "action": action,
+            "symbol": symbol,
+            "volume": lot_size,
+            "type": order_type,
+            "price": price,
+            "sl": sl,
+            "tp": tp,
+            "deviation": 20,
+            "magic": self.magic_number,
+            "comment": "AI forex bot",
+            "type_time": self.mt5.ORDER_TIME_GTC,
+            "type_filling": self._get_filling_mode(symbol),
+        }
+
+        result = self.mt5.order_send(request)
+
+        if result is None:
+            return False, f"Order yuborilmadi: {self.mt5.last_error()}", None
+
+        if result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            return False, f"Order rad etildi, kod: {result.retcode}, komment: {result.comment}", None
+
+        order_info = {
+            "ticket": result.order,
+            "symbol": symbol,
+            "signal": signal,
+            "volume": lot_size,
+            "price": price,
+            "sl": sl,
+            "tp": tp,
+        }
+
+        # Holatni saqlash
+        one_r_dist = stop_loss_pips * pip_size
+        self.state_manager.set_trade_info(result.order, {
+            "status": "OPEN", 
+            "1r_dist": one_r_dist,
+            "entry_price": price,
+            "signal": signal,
+            "partial_closed": False,
+            "trailing_mode": None,
+            "current_sl_level": 0
+        })
+
+        return True, "Order muvaffaqiyatli ochildi", order_info
+
+    def close_partial_position(self, ticket: int, percent: float) -> Tuple[bool, str]:
+        positions = self.mt5.positions_get(ticket=ticket)
+        if not positions:
+            return False, "Position topilmadi"
+        position = positions[0]
+        
+        symbol_info = self.mt5.symbol_info(position.symbol)
+        close_volume = round(round((position.volume * (percent / 100.0)) / symbol_info.volume_step) * symbol_info.volume_step, 2)
+        if close_volume <= 0:
+            return False, "Hajm kichik"
+            
+        symbol = position.symbol
+        tick = self.mt5.symbol_info_tick(symbol)
+        if not tick:
+            return False, "Tick ma'lumoti topilmadi"
+        
+        if position.type == self.mt5.ORDER_TYPE_BUY:
+            order_type = self.mt5.ORDER_TYPE_SELL
+            price = tick.bid
+        else:
+            order_type = self.mt5.ORDER_TYPE_BUY
+            price = tick.ask
+            
+        request = {
+            "action": self.mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": close_volume,
+            "type": order_type,
+            "position": ticket,
+            "price": price,
+            "deviation": 20,
+            "magic": self.magic_number,
+            "comment": f"Partial close ({percent}%)",
+            "type_time": self.mt5.ORDER_TIME_GTC,
+            "type_filling": self._get_filling_mode(symbol),
+        }
+        
+        result = self.mt5.order_send(request)
+        if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            return False, f"Partial close error: {self.mt5.last_error()}"
+        return True, f"Partial close {percent}% qilingan"
+
+    def update_sl(self, ticket: int, new_sl: float) -> Tuple[bool, str]:
+        positions = self.mt5.positions_get(ticket=ticket)
+        if not positions:
+            return False, "Position topilmadi"
+        position = positions[0]
+        
+        symbol_info = self.mt5.symbol_info(position.symbol)
+        digits = symbol_info.digits
+        new_sl = round(new_sl, digits)
+        
+        request = {
+            "action": self.mt5.TRADE_ACTION_SLTP,
+            "symbol": position.symbol,
+            "sl": new_sl,
+            "tp": position.tp,
+            "position": ticket,
+            "magic": self.magic_number
+        }
+        result = self.mt5.order_send(request)
+        if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            return False, "SL update error"
+        return True, "SL surildi"
+
+    def manage_open_trades(self, trailing_decision_fn: Callable[[str], str]):
+        """
+        Ochiq pozitsiyalarni tekshiradi va 2R ga yetganlarni 70% yopadi.
+        Qolgan 30% uchun callback yordamida AI dan trailing rejimini so'raydi.
+        """
+        positions = self.mt5.positions_get()
+        if not positions:
+            return
+
+        for pos in positions:
+            ticket = pos.ticket
+            info = self.state_manager.get_trade_info(ticket)
+            if not info:
+                continue
+                
+            signal = info.get("signal")
+            entry_price = info.get("entry_price")
+            one_r = info.get("1r_dist")
+            
+            if not one_r or one_r <= 0:
+                continue
+                
+            current_price = pos.price_current
+            
+            if signal == "BUY":
+                profit_r = (current_price - entry_price) / one_r
+            else:
+                profit_r = (entry_price - current_price) / one_r
+                
+            if profit_r < 0:
+                continue
+                
+            # TP1 (2R) ga yetdimi?
+            if profit_r >= 2.0 and not info.get("partial_closed"):
+                logger.info(f"[{pos.symbol}] 2R foydaga yetdi! 70% yopilyapti...")
+                success, msg = self.close_partial_position(ticket, 70)
+                if success:
+                    if signal == "BUY":
+                        new_sl = entry_price + one_r
+                    else:
+                        new_sl = entry_price - one_r
+                        
+                    self.update_sl(ticket, new_sl)
+                    self.state_manager.set_trade_info(ticket, {
+                        "partial_closed": True,
+                        "current_sl_level": 1
+                    })
+                    logger.info(f"[{pos.symbol}] 70% yopildi, SL +1R ga surildi.")
+                continue
+                
+            # Trailing logikasi
+            if info.get("partial_closed") and profit_r >= 2.0:
+                trailing_mode = info.get("trailing_mode")
+                if not trailing_mode:
+                    try:
+                        trailing_mode = trailing_decision_fn(pos.symbol)
+                        self.state_manager.set_trade_info(ticket, {"trailing_mode": trailing_mode})
+                        logger.info(f"[{pos.symbol}] AI Trailing rejimini tanladi: {trailing_mode}")
+                    except Exception as e:
+                        logger.error(f"Trailing qarori olishda xato: {e}")
+                        trailing_mode = "STEP"
+                
+                if trailing_mode == "CLOSE_ALL":
+                    logger.info(f"[{pos.symbol}] AI bozor xavfli deb topdi, pozitsiya to'liq yopilmoqda.")
+                    self.close_partial_position(ticket, 100)
+                    self.state_manager.set_trade_info(ticket, {"status": "CLOSED"})
+                    
+                elif trailing_mode == "STEP":
+                    expected_sl_level = int(profit_r) - 1
+                    if expected_sl_level > info.get("current_sl_level", 0):
+                        if signal == "BUY":
+                            new_sl = entry_price + (expected_sl_level * one_r)
+                        else:
+                            new_sl = entry_price - (expected_sl_level * one_r)
+                            
+                        if (signal == "BUY" and new_sl > pos.sl) or (signal == "SELL" and (pos.sl == 0 or new_sl < pos.sl)):
+                            self.update_sl(ticket, new_sl)
+                            self.state_manager.set_trade_info(ticket, {"current_sl_level": expected_sl_level})
+                            logger.info(f"[{pos.symbol}] STEP Trailing: SL +{expected_sl_level}R ga surildi.")
+                
+                elif trailing_mode == "STRUCTURE":
+                    # STRUCTURE placeholder logic
+                    pass
+
+    def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "News Straddle") -> Tuple[bool, str, Optional[dict]]:
+        symbol_info = self.mt5.symbol_info(symbol)
+        if symbol_info is None:
+            return False, f"{symbol} topilmadi", None
+
+        if not symbol_info.visible:
+            if not self.mt5.symbol_select(symbol, True):
+                return False, f"{symbol} tanlab bo'lmadi", None
+
+        point = symbol_info.point
+        pip_size = point * 10
+        digits = symbol_info.digits
+
+        stop_level_pips = symbol_info.trade_stops_level / 10.0
+        if stop_loss_pips < stop_level_pips:
+            stop_loss_pips = stop_level_pips
+        if take_profit_pips < stop_level_pips:
+            take_profit_pips = stop_level_pips
+
+        if order_type_str == "BUY_STOP":
+            order_type = self.mt5.ORDER_TYPE_BUY_STOP
+            sl = round(price - stop_loss_pips * pip_size, digits)
+            tp = round(price + take_profit_pips * pip_size, digits)
+        elif order_type_str == "SELL_STOP":
+            order_type = self.mt5.ORDER_TYPE_SELL_STOP
+            sl = round(price + stop_loss_pips * pip_size, digits)
+            tp = round(price - take_profit_pips * pip_size, digits)
+        else:
+            return False, "Noto'g'ri pending order turi", None
+
+        request = {
+            "action": self.mt5.TRADE_ACTION_PENDING,
+            "symbol": symbol,
+            "volume": lot_size,
+            "type": order_type,
+            "price": price,
+            "sl": sl,
+            "tp": tp,
+            "deviation": 20,
+            "magic": magic,
+            "comment": comment,
+            "type_time": self.mt5.ORDER_TIME_GTC,
+            "type_filling": self._get_filling_mode(symbol),
+        }
+
+        result = self.mt5.order_send(request)
+
+        if result is None:
+            return False, f"Pending order yuborilmadi: {self.mt5.last_error()}", None
+
+        if result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            return False, f"Pending order rad etildi, kod: {result.retcode}, komment: {result.comment}", None
+
+        order_info = {
+            "ticket": result.order,
+            "symbol": symbol,
+            "signal": order_type_str,
+            "volume": lot_size,
+            "price": price,
+            "sl": sl,
+            "tp": tp,
+            "1r_dist": stop_loss_pips * pip_size
+        }
+
+        self.state_manager.set_trade_info(result.order, {
+            "status": "PENDING", 
+            "1r_dist": stop_loss_pips * pip_size,
+            "entry_price": price,
+            "signal": "BUY" if "BUY" in order_type_str else "SELL",
+            "partial_closed": False,
+            "trailing_mode": None,
+            "current_sl_level": 0,
+            "is_straddle": True
+        })
+
+        return True, "Pending order muvaffaqiyatli qo'yildi", order_info
+
+    def delete_pending_order(self, ticket: int) -> Tuple[bool, str]:
+        request = {
+            "action": self.mt5.TRADE_ACTION_REMOVE,
+            "order": ticket
+        }
+        result = self.mt5.order_send(request)
+        if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            return False, f"O'chirishda xatolik: {self.mt5.last_error()}"
+        
+        self.state_manager.set_trade_info(ticket, {"status": "DELETED"})
+        return True, "O'chirildi"
+
+    def manage_pending_orders(self):
+        """
+        News Straddle uchun qo'yilgan, lekin ishga tushmagan qopqonlarni boshqarish.
+        """
+        pass
