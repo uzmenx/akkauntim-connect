@@ -23,7 +23,9 @@ class RiskManager:
         realized_loss = sum(d.profit for d in deals if d.profit < 0) if deals else 0
         
         daily_loss_pct = (abs(realized_loss) + max(0, balance - equity)) / balance if balance > 0 else 0
-        max_loss = getattr(self.config, "max_daily_loss", 0.10)
+        # BotConfig maydoni `max_daily_loss_pct`; Cloud `max_daily_loss` bilan ham keladi — ikkalasini ham qo'llab-quvvatlaymiz.
+        max_loss = getattr(self.config, "max_daily_loss_pct",
+                           getattr(self.config, "max_daily_loss", 0.10))
 
         if daily_loss_pct >= max_loss:
             return False, f"Kunlik zarar limiti oshib ketdi: {daily_loss_pct*100:.2f}% (Limit: {max_loss*100:.0f}%)"

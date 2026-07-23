@@ -25,6 +25,7 @@ export type BotSettings = {
   strategy_weight_smc?: number;
   strategy_weight_pattern?: number;
   strategy_weight_news?: number;
+  loop_interval_minutes?: number;
   updated_at: string;
 };
 

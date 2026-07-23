@@ -24,7 +24,7 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model: str = "claude-sonnet-4-6"
+    ai_model: str = "claude-sonnet-4-5"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -42,11 +42,9 @@ class BotConfig:
     max_spread_multiplier: float = 4.0
     ai_max_tokens: int = 2000
     ai_models_fallback: List[str] = field(default_factory=lambda: [
-        "claude-sonnet-4-6",
-        "claude-sonnet-5",
-        "claude-sonnet-4-5-20250929",
-        "claude-haiku-4-5-20251001",
-        "claude-fable-5"
+        "claude-sonnet-4-5",
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022",
     ])
 
     @classmethod

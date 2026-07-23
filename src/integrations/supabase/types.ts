@@ -58,9 +58,11 @@ export type Database = {
       }
       bot_settings: {
         Row: {
+          ai_enabled: boolean | null
           ai_model: string
           created_at: string
           id: string
+          loop_interval_minutes: number | null
           max_daily_loss: number
           max_lot_size: number
           min_confidence: number
@@ -87,9 +89,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_enabled?: boolean | null
           ai_model?: string
           created_at?: string
           id?: string
+          loop_interval_minutes?: number | null
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
@@ -116,9 +120,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_enabled?: boolean | null
           ai_model?: string
           created_at?: string
           id?: string
+          loop_interval_minutes?: number | null
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number

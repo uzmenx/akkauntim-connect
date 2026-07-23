@@ -39,27 +39,35 @@ class AIClient:
             return {}
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
-        # Approximate pricing per 1M tokens
-        if "haiku" in model.lower():
-            cost = (input_tokens * 0.8 / 1_000_000.0) + (output_tokens * 4.0 / 1_000_000.0)
-        elif "opus" in model.lower():
-            cost = (input_tokens * 15.0 / 1_000_000.0) + (output_tokens * 75.0 / 1_000_000.0)
-        else:
-            # Sonnet: $3.00 per M input, $15.00 per M output
-            cost = (input_tokens * 3.0 / 1_000_000.0) + (output_tokens * 15.0 / 1_000_000.0)
-        return cost
+        # Anthropic public pricing per 1M tokens (2025).
+        m = model.lower()
+        if "haiku-3" in m or "haiku-3-5" in m or "claude-3-haiku" in m:
+            in_price, out_price = 0.25, 1.25
+        elif "haiku" in m:  # Haiku 4.x
+            in_price, out_price = 0.80, 4.00
+        elif "opus" in m:
+            in_price, out_price = 15.0, 75.0
+        else:  # Sonnet 3.5 / 4.x default
+            in_price, out_price = 3.0, 15.0
+        return (input_tokens * in_price / 1_000_000.0) + (output_tokens * out_price / 1_000_000.0)
 
     def get_decision(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: Optional[int] = None) -> Dict[str, Any]:
         sys_prompt = system_prompt or self.config.ai_system_prompt
         max_tok = max_tokens or self.config.ai_max_tokens
-        
-        models_to_try = self.config.ai_models_fallback
-        if self.config.ai_model not in models_to_try:
-            models_to_try = [self.config.ai_model] + models_to_try
-            
-        # Force correct model to avoid 404
-        if "claude-3-5-sonnet-20240620" not in models_to_try:
-            models_to_try.insert(0, "claude-3-5-sonnet-20240620")
+
+        # Faqat haqiqiy Anthropic model-slug'lariga tayanamiz.
+        preferred = getattr(self.config, "ai_model", "") or ""
+        fallbacks = list(getattr(self.config, "ai_models_fallback", []) or [])
+        default_stack = [
+            "claude-sonnet-4-5",
+            "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022",
+        ]
+        seen, models_to_try = set(), []
+        for m in [preferred, *fallbacks, *default_stack]:
+            if m and m not in seen:
+                seen.add(m)
+                models_to_try.append(m)
 
         import time
         import anthropic

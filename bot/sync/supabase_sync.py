@@ -21,6 +21,7 @@ class SupabaseSync:
         self.bot_sync_secret = config.bot_sync_secret
         self.mt5_login = str(config.mt5_login)
         self.last_sync_time = datetime.datetime(2000, 1, 1)
+        self._last_reported_cost = 0.0
 
     def _post(self, payload: dict) -> Optional[dict]:
         """Supabase Edge Function ga POST yuboradi."""
@@ -140,6 +141,11 @@ class SupabaseSync:
             "stop_loss_pips": stop_loss_pips, "take_profit_pips": take_profit_pips,
         }})
 
-    def log_claude_cost(self, cost: float) -> None:
-        if self._post({"add_claude_cost": cost}):
-            logger.info(f"Claude cost loglandi (${cost:.6f})")
+    def log_claude_cost(self, total_cost: float) -> None:
+        """Cumulative total_cost qabul qiladi va faqat delta ni Cloud'ga yuboradi."""
+        delta = max(0.0, float(total_cost) - float(self._last_reported_cost))
+        if delta <= 0:
+            return
+        if self._post({"add_claude_cost": delta}):
+            self._last_reported_cost = float(total_cost)
+            logger.info(f"Claude cost loglandi (+${delta:.6f}, jami ${total_cost:.6f})")

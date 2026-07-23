@@ -51,7 +51,17 @@ class OrderManager:
             return False, "Narx ma'lumotini olib bo'lmadi", None
 
         point = symbol_info.point
-        pip_size = point * 10  # 5-xonali narxlar uchun 1 pip = 10 point
+        digits = symbol_info.digits
+        # pip_size: 5-xonali forex va 3-xonali JPY uchun 1 pip = 10 point.
+        # 4-xonali forex (kam uchraydi) va 2-xonali indeks/gold uchun 1 pip = 1 point (gold da point=0.01, pip=0.1 → mul=10, alohida ishlaymiz).
+        if digits in (3, 5):
+            pip_size = point * 10
+        elif digits == 2:
+            # Gold/silver: point=0.01, pip=0.1
+            pip_size = point * 10
+        else:
+            pip_size = point
+        pip_mul = pip_size / point if point > 0 else 10  # necha "point" = 1 "pip"
 
         # --- SPREAD FILTER ---
         current_spread_points = round((tick.ask - tick.bid) / point)
@@ -68,7 +78,8 @@ class OrderManager:
                     return False, f"Spread is too high ({current_spread_points} points)", None
         # ---------------------
 
-        stop_level_pips = symbol_info.trade_stops_level / 10.0
+        # trade_stops_level broker tomonidan POINT birlikda beriladi — pip'ga o'girish uchun pip_mul ga bo'lamiz.
+        stop_level_pips = symbol_info.trade_stops_level / pip_mul if pip_mul > 0 else 0
         if stop_loss_pips < stop_level_pips:
             stop_loss_pips = stop_level_pips
         if take_profit_pips < stop_level_pips:
@@ -116,8 +127,7 @@ class OrderManager:
         else:
             return False, f"Noto'g'ri signal turi: {signal}", None
 
-        # SL va TP ni hisoblash
-        digits = symbol_info.digits
+        # SL va TP ni hisoblash (digits yuqorida allaqachon o'rnatildi)
         if "BUY" in signal:
             sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
