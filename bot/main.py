@@ -57,6 +57,11 @@ class TradingBot:
         self.risk = RiskManager(self.mt5, config)
         self.orders = OrderManager(self.mt5, self.state, config)
 
+        # AI Trade Reviewer (Learning)
+        from bot.engine.trade_reviewer import TradeReviewer
+        self.reviewer = TradeReviewer(self.ai, self.mt5, config)
+        self.closed_trades_count = 0
+
         # Sync
         self.sync = SupabaseSync(config)
 
@@ -106,10 +111,39 @@ class TradingBot:
         """Yangiliklar konteksti."""
         try:
             from bot.strategy.news.scheduler import get_news_signal
-            return get_news_signal(symbol)
+            return get_news_signal(symbol, ai_client=self.ai)
         except Exception as e:
             logger.error(f"News tahlil xatolik: {e}")
             return None
+
+    def _get_sr_volume_analysis(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """SR Volume (Support & Resistance Boxes) tahlili."""
+        try:
+            from bot.strategy.sr_volume.engine import analyze_sr_volume
+            return analyze_sr_volume(df)
+        except Exception as e:
+            logger.error(f"SR Volume tahlil xatosi: {e}")
+            return {}
+
+    def _get_auto_patterns_analysis(self, df: pd.DataFrame, current_price: float) -> Optional[Dict[str, Any]]:
+        """Auto Chart Patterns (Figuralar) tahlili."""
+        try:
+            from bot.strategy.auto_patterns.engine import analyze_auto_patterns
+            from bot.engine.confluence import compute_atr
+            atr = compute_atr(df)
+            return analyze_auto_patterns(df, current_price, atr)
+        except Exception as e:
+            logger.error(f"Auto Patterns tahlil xatosi: {e}")
+            return {}
+
+    def _get_kill_zones_analysis(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """Kill Zones va sessiyalar tahlili."""
+        try:
+            from bot.strategy.kill_zones.engine import analyze_kill_zones
+            return analyze_kill_zones(df)
+        except Exception as e:
+            logger.error(f"Kill Zones tahlil xatosi: {e}")
+            return {}
 
     def _get_memory_bank_alerts(self, symbol: str, current_price: float) -> str:
         """SMC Memory Bank — tarixiy zonalar."""
@@ -158,6 +192,12 @@ class TradingBot:
                 return {"signal": "BUY", "confidence": 80}
             elif rec == "prepare_short":
                 return {"signal": "SELL", "confidence": 80}
+
+        elif signal_type in ["wyckoff", "sr_volume", "auto_patterns", "kill_zones"]:
+            sig = data.get("signal", "HOLD")
+            conf = data.get("confidence", 60)
+            if sig in ["BUY", "SELL"]:
+                return {"signal": sig, "confidence": conf}
 
         return {"signal": "HOLD", "confidence": 0}
 
@@ -209,17 +249,21 @@ class TradingBot:
     def run_cycle(self, symbol: str) -> None:
         """
         Bitta symbol uchun to'liq trading siklini bajarish.
-        
-        1. Ma'lumot olish
+
+        YANGI OQIM (Confluence Engine):
+        1. Ma'lumot olish (H1)
         2. Texnik tahlil (SMC + Harmonic + News)
-        3. Ovoz berish (Voting Engine)
-        4. AI qaror (Claude)
-        5. Risk tekshiruv
-        6. Order joylashtirish
+        3. Confluence Ball hisoblash (0-140)
+        4. Qaror: EXECUTE (70+) / AI_DECIDE (50-69) / REJECT (<50)
+        5. Dinamik SL/TP hisoblash
+        6. Risk tekshiruv
+        7. Order joylashtirish
         """
         logger.info(f"=== [{symbol}] Tahlil boshlandi ===")
 
-        # 1. Ma'lumot olish
+        # ============================================================
+        # 1. MA'LUMOT OLISH
+        # ============================================================
         df_major = self._fetch_data(symbol, self.config.timeframe_major, 150)
         if df_major.empty:
             logger.warning(f"[{symbol}] uchun ma'lumot olib bo'lmadi, o'tkazib yuborildi.")
@@ -227,83 +271,222 @@ class TradingBot:
 
         current_price = float(df_major.iloc[-1]['close'])
 
-        # 2. Texnik tahlil
+        # ============================================================
+        # 2. TEXNIK TAHLIL — barcha strategiyalarni ishga tushirish
+        # ============================================================
         smc_result = self._get_smc_full_analysis(df_major)
         smc_context = self._get_smc_data(df_major)
         pattern_result = self._get_harmonic_patterns(df_major)
         news_result = self._get_news_context(symbol)
         memory_bank_text = self._get_memory_bank_alerts(symbol, current_price)
 
-        # 3. Signallarni ajratish
+        try:
+            from bot.strategy.wyckoff.engine import analyze_wyckoff
+            wyckoff_result = analyze_wyckoff(df_major)
+        except Exception as e:
+            logger.error(f"Wyckoff tahlil xatosi: {e}")
+            wyckoff_result = {}
+
+        sr_volume_result = self._get_sr_volume_analysis(df_major)
+        auto_patterns_result = self._get_auto_patterns_analysis(df_major, current_price)
+        kill_zones_result = self._get_kill_zones_analysis(df_major)
+
+        # ============================================================
+        # 3. CONFLUENCE ENGINE — ball tizimi asosida savdo qarori
+        # ============================================================
+        adj = getattr(self, "last_adjustments", self.reviewer.get_latest_adjustments())
+        min_conf = adj.get("min_confluence_score", 20)
+        reason_weights = adj.get("reason_weights", {})
+        
+        conf_cfg = {
+            "score_threshold_ai": min_conf,
+            "score_threshold_execute": min_conf + 10  # Masalan, 20 ai, 30 execute
+        }
+        conf_cfg.update(reason_weights)
+
+        from bot.engine.confluence import calculate_confluence
+
+        # M5 ma'lumotlarini olish (MTF tasdiq uchun)
+        df_minor = self._fetch_data(symbol, self.config.timeframe_minor, 50)
+        smc_minor = self._get_smc_data(df_minor) if not df_minor.empty else {}
+
+        confluence = calculate_confluence(
+            smc_data=smc_result or {},
+            harmonic_data=pattern_result or {},
+            news_data=news_result,
+            df=df_major,
+            current_price=current_price,
+            config=conf_cfg,
+            wyckoff_data=wyckoff_result,
+            sr_volume_data=sr_volume_result,
+            auto_pattern_data=auto_patterns_result,
+            kill_zones_data=kill_zones_result,
+            df_minor=df_minor,
+            smc_minor=smc_minor,
+        )
+
+        logger.info(
+            f"[{symbol}] Confluence: {confluence.signal} | "
+            f"Score: {confluence.score}/200 | "
+            f"Decision: {confluence.decision} | "
+            f"Risk: {confluence.risk_pct:.1%} | "
+            f"Breakdown: {confluence.score_breakdown}"
+        )
+
+        if confluence.warnings:
+            for w in confluence.warnings:
+                logger.warning(f"[{symbol}] ⚠️ {w}")
+
+        # ============================================================
+        # 3.1. QAROR TEKSHIRUVI — REJECT bo'lsa to'xtatish
+        # ============================================================
+        if confluence.decision == "REJECT" or confluence.signal == "HOLD":
+            logger.info(
+                f"[{symbol}] Confluence REJECT (score={confluence.score}) — "
+                f"savdo qilinmaydi. Sabab: {confluence.reasoning}"
+            )
+            return
+
+        # Yo'nalish va risk o'zgaruvchilari
+        conf_direction = confluence.signal      # "BUY" | "SELL"
+        conf_risk = confluence.risk_pct          # 0.01 - 0.04
+        conf_score = confluence.score
+
+        # MTF tekshiruvi endi Confluence ichida hisoblanadi (mtf_weight orqali)
+
+        # ============================================================
+        # 3.2. Eski voting natijalarini ham oldindan tayyorlash
+        #      (AI prompt va loglar uchun kerak)
+        # ============================================================
         smc_signal = self._extract_signal(smc_context, "smc")
         pattern_signal = self._extract_signal(pattern_result, "pattern")
         news_signal = self._extract_signal(news_result, "news")
+        wyckoff_signal = self._extract_signal(wyckoff_result, "wyckoff")
+        sr_volume_signal = self._extract_signal(sr_volume_result, "sr_volume")
+        auto_patterns_signal = self._extract_signal(auto_patterns_result, "auto_patterns")
+        kill_zones_signal = self._extract_signal(kill_zones_result, "kill_zones")
+        
+        voting_result = aggregate_signals(
+            smc_signal, pattern_signal, news_signal,
+            wyckoff_signal, sr_volume_signal, auto_patterns_signal, kill_zones_signal,
+            self.config
+        )
 
-        # 4. Voting Engine
-        voting_result = aggregate_signals(smc_signal, pattern_signal, news_signal, self.config)
-        logger.info(f"[{symbol}] Voting: {voting_result['signal']} | Strategies: {voting_result['agreed_strategies']}")
-
-        vote_direction = voting_result.get("signal", "HOLD")
-        vote_risk = voting_result.get("risk_pct", 0.0)
-
-        # Agar HOLD bo'lsa, AI chaqirilmaydi
-        if vote_direction == "HOLD" or vote_risk == 0.0:
-            logger.info(f"[{symbol}] Voting Engine HOLD — AI chaqirilmadi.")
-            return
-
-        # 5. Kontekst va kesh
+        # Kontekst (AI prompt va log uchun)
         context = self.prompt_builder.build_context_summary(
             smc_result=smc_result or smc_context,
             patterns=pattern_result,
             news=news_result,
             voting=voting_result,
-            memory_bank=memory_bank_text
+            memory_bank=memory_bank_text,
+            wyckoff=wyckoff_result,
+            sr_volume=sr_volume_result,
+            auto_patterns=auto_patterns_result,
+            kill_zones=kill_zones_result
         )
         context["pair"] = symbol
         context["timeframe"] = self.config.timeframe_major
         context["current_price"] = current_price
+        context["confluence"] = confluence.to_dict()
 
-        # Kelishgan strategiyalar soni
-        agreed_count = len(voting_result.get('agreed_strategies', []))
+        # ============================================================
+        # 4. DINAMIK SL/TP HISOBLASH (SMC/Harmonic/ATR asosida)
+        # ============================================================
+        from bot.engine.confluence import compute_atr
+        atr = compute_atr(df_major, period=14)
 
-        if agreed_count >= 2:
-            # === 2+ strategiya kelishdi — AI ni bypass qilish, to'g'ridan-to'g'ri execute ===
-            logger.info(f"[{symbol}] ✅ {agreed_count} strategiya kelishdi — Auto-Execute rejimi!")
-            
-            # Symbol-specific SL/TP
-            if "XAU" in symbol or "GOLD" in symbol:
-                default_sl, default_tp = 300, 600  # Oltin uchun kattaroq
-            else:
-                default_sl, default_tp = 30, 60  # Forex juftliklari uchun
-            
+        if "XAU" in symbol or "GOLD" in symbol:
+            pip_divisor = 0.1  # 1 pip = 0.1 (gold uchun)
+        elif "JPY" in symbol:
+            pip_divisor = 0.01  # JPY juftliklari uchun
+        else:
+            pip_divisor = 0.0001  # Standard forex juftliklari uchun
+
+        atr_pips = atr / pip_divisor if pip_divisor > 0 else 30
+
+        from bot.engine.dynamic_levels import calculate_dynamic_levels
+        dynamic_result = calculate_dynamic_levels(
+            signal=conf_direction,
+            current_price=current_price,
+            smc_data=smc_result or smc_context or {},
+            harmonic_data=pattern_result or {},
+            atr_pips=atr_pips,
+            pip_divisor=pip_divisor
+        )
+
+        if not dynamic_result["is_valid"]:
+            logger.info(f"[{symbol}] FAILED: Dynamic SL/TP rad etdi. Sabab: {dynamic_result['reason']}")
+            return
+
+        # AI Adjustments
+        adj = getattr(self, "last_adjustments", self.reviewer.get_latest_adjustments())
+        sl_mult = adj.get("sl_multiplier", 1.0)
+        tp_mult = adj.get("tp_multiplier", 1.0)
+        
+        dynamic_sl = round(dynamic_result["sl_pips"] * sl_mult, 1)
+        dynamic_tp = round(dynamic_result["tp2_pips"] * tp_mult, 1) # Asosiy order TP eng uzoq (TP2) ga qo'yiladi
+        dynamic_tp1 = round(dynamic_result["tp1_pips"] * tp_mult, 1)
+        
+        # Sessiya filtri
+        session_filter = adj.get("session_filter", [])
+        if session_filter and kill_zones_result and kill_zones_result.get("active_sessions"):
+            actives = kill_zones_result.get("active_sessions")
+            if not any(s in session_filter for s in actives):
+                logger.info(f"[{symbol}] AI Adjustment (session_filter) rad etdi. Faol: {actives}, Ruxsat: {session_filter}")
+                return
+
+        logger.info(
+            f"[{symbol}] Dinamik SL/TP: SL={dynamic_sl} pip, TP1={dynamic_tp1} pip, TP2={dynamic_tp} pip "
+            f"(ATR={atr_pips:.1f} pip, R:R=1:{dynamic_result['rr']})"
+        )
+
+        # ============================================================
+        # 5. EXECUTE yoki AI_DECIDE
+        # ============================================================
+        if confluence.decision == "EXECUTE":
+            # === Score 70+ — Avtomatik EXECUTE ===
+            logger.info(
+                f"[{symbol}] ✅ Confluence EXECUTE (score={conf_score}) — "
+                f"Avtomatik savdo!"
+            )
+
             ai_decision = {
                 "final_decision": "EXECUTE",
-                "direction": vote_direction,
-                "confidence": 80,
+                "direction": conf_direction,
+                "confidence": min(95, 50 + conf_score),
                 "entry_price": None,
-                "stop_loss_pips": default_sl,
-                "take_profit_pips": default_tp,
-                "risk_pct": vote_risk,
-                "reasoning": f"Auto-execute: {agreed_count} strategiya ({', '.join(voting_result.get('agreed_strategies', []))}) tasdiqladi"
+                "stop_loss_pips": dynamic_sl,
+                "take_profit_pips": dynamic_tp,
+                "take_profit_1_pips": dynamic_tp1,
+                "risk_pct": conf_risk,
+                "reasoning": (
+                    f"Confluence EXECUTE (score={conf_score}/140): "
+                    f"{confluence.reasoning}"
+                ),
+                "warnings": confluence.warnings,
             }
-            
+
             # Logga yozish
             self.decision_logger.log(
                 pair=symbol, timeframe=self.config.timeframe_major,
-                context=context, prompt="AUTO_EXECUTE",
+                context=context, prompt="CONFLUENCE_EXECUTE",
                 response=ai_decision, decision="EXECUTE",
-                risk_pct=vote_risk, hash_val=self._get_state_hash(context),
+                risk_pct=conf_risk, hash_val=self._get_state_hash(context),
                 tokens={"input_tokens": 0, "output_tokens": 0}, cost=0.0
             )
-        else:
-            # === 1 strategiya — AI qaror bersin ===
+
+        elif confluence.decision in ["AI_DECIDE", "PENDING_LIMIT"]:
+            # === Score 50-69 yoki PENDING_LIMIT — AI tasdiq kerak ===
             if getattr(self.config, 'ai_enabled', True) is False:
-                logger.info(f"[{symbol}] ⚠️ AI o'chirilgan va faqat {agreed_count} ta strategiya mos keldi. Savdo rad etildi (kamida 2 ta kerak).")
+                logger.info(
+                    f"[{symbol}] ⚠️ AI o'chirilgan va qaror: {confluence.decision}. Savdo rad etildi."
+                )
                 return
 
             # Kesh tekshirish
             current_hash = self._get_state_hash(context)
             cached = self.decision_logger.get_last_cached_response(symbol, current_hash)
+
             if cached:
                 logger.info(f"[{symbol}] Keshdan foydalanildi (hash: {current_hash[:8]}...)")
                 cached["reasoning"] = "(CACHED) " + cached.get("reasoning", "")
@@ -311,28 +494,64 @@ class TradingBot:
                     pair=symbol, timeframe=self.config.timeframe_major,
                     context=context, prompt="CACHED_PROMPT",
                     response=cached, decision=cached.get("final_decision", "REJECT"),
-                    risk_pct=vote_risk, hash_val=current_hash,
+                    risk_pct=conf_risk, hash_val=current_hash,
                     tokens={"input_tokens": 0, "output_tokens": 0}, cost=0.0
                 )
                 ai_decision = cached
             else:
-                # AI qaror
+                # AI qaror — Confluence ma'lumotlarini prompt ga qo'shish
                 prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
-                logger.info(f"[{symbol}] Claude ga so'rov yuborilmoqda...")
+                if confluence.decision == "PENDING_LIMIT":
+                    prompt += f"\n\n🚨 PENDING_LIMIT SO'ROVI 🚨\nJoriy narx optimal zonadan uzoq. Tavsiya etilgan Limit Entry: {confluence.suggested_limit_entry}.\nIltimos, ushbu zonaga narx qaytishi ehtimolini hisoblang. Agar tasdiqlasangiz, 'final_decision' ni 'PENDING_LIMIT' deb, 'entry_price' ni {confluence.suggested_limit_entry} qilib belgilang."
+
+                logger.info(
+                    f"[{symbol}] Claude ga so'rov yuborilmoqda "
+                    f"(confluence score={conf_score}, decision={confluence.decision})..."
+                )
 
                 ai_decision = self.ai.get_decision(prompt)
                 if not ai_decision:
                     logger.error(f"[{symbol}] AI javob bermadi — savdo bekor qilindi.")
                     return
 
-                # Direction/risk o'zgartirilganini tekshirish
-                if ai_decision.get('direction') != vote_direction or ai_decision.get('risk_pct') != vote_risk:
+                # AI Confluence yo'nalishi va riskni o'zgartirmasligi kerak
+                if ai_decision.get('direction') != conf_direction:
                     ai_decision['final_decision'] = "REJECT"
                     ai_decision['warnings'] = ai_decision.get('warnings', []) + [
-                        "Claude risk_pct yoki direction ni o'zgartirishga urindi, savdo rad etildi."
+                        "Claude direction ni o'zgartirishga urindi — savdo rad etildi."
                     ]
-                    ai_decision['direction'] = vote_direction
-                    ai_decision['risk_pct'] = vote_risk
+                    ai_decision['direction'] = conf_direction
+
+                # AI risk ni Confluence dan oladi
+                ai_decision['risk_pct'] = conf_risk
+
+                # AI SL/TP ni tavsiya qilishi mumkin, lekin asosiy chegaralar saqlanadi
+                ai_sl = ai_decision.get("stop_loss_pips", dynamic_sl)
+                ai_tp = ai_decision.get("take_profit_pips", dynamic_tp)
+
+                # AI ning SL/TP si mantiqiy bo'lsa qabul qilish
+                if isinstance(ai_sl, (int, float)) and ai_sl > 0:
+                    # AI SL dynamic_sl dan 50% dan ko'p farq qilmasligi kerak
+                    if abs(ai_sl - dynamic_sl) / dynamic_sl <= 0.5:
+                        ai_decision["stop_loss_pips"] = round(ai_sl)
+                    else:
+                        ai_decision["stop_loss_pips"] = dynamic_sl
+                else:
+                    ai_decision["stop_loss_pips"] = dynamic_sl
+
+                if isinstance(ai_tp, (int, float)) and ai_tp > 0:
+                    if abs(ai_tp - dynamic_tp) / dynamic_tp <= 0.5:
+                        ai_decision["take_profit_pips"] = round(ai_tp)
+                    else:
+                        ai_decision["take_profit_pips"] = dynamic_tp
+                else:
+                    ai_decision["take_profit_pips"] = dynamic_tp
+
+                # R:R tekshiruvi (1:1.5 minimal)
+                final_sl = ai_decision["stop_loss_pips"]
+                final_tp = ai_decision["take_profit_pips"]
+                if final_tp < final_sl * 1.5:
+                    ai_decision["take_profit_pips"] = round(final_sl * 1.5)
 
                 # Logga yozish
                 self.decision_logger.log(
@@ -340,8 +559,11 @@ class TradingBot:
                     context=context, prompt=prompt,
                     response=ai_decision,
                     decision=ai_decision.get("final_decision", "REJECT"),
-                    risk_pct=vote_risk, hash_val=current_hash,
-                    tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
+                    risk_pct=conf_risk, hash_val=current_hash,
+                    tokens={
+                        "input_tokens": self.ai.total_tokens_in,
+                        "output_tokens": self.ai.total_tokens_out
+                    },
                     cost=self.ai.total_cost
                 )
 
@@ -349,7 +571,7 @@ class TradingBot:
                 try:
                     self.sync.log_ai_signal(
                         symbol=symbol,
-                        signal=vote_direction,
+                        signal=conf_direction,
                         confidence=int(ai_decision.get("confidence", 0)),
                         reasoning=ai_decision.get("reasoning", "")
                     )
@@ -357,25 +579,37 @@ class TradingBot:
                 except Exception as e:
                     logger.warning(f"Supabase sync xatolik: {e}")
 
-        # 7. EXECUTE tekshiruvi
-        final = ai_decision.get("final_decision", "REJECT")
-        logger.info(f"[{symbol}] AI Qaror: {final} | Sabab: {ai_decision.get('reasoning', '')}")
-
-        if final != "EXECUTE":
-            logger.info(f"[{symbol}] AI {final} berdi — savdo qilinmaydi.")
+        else:
+            # Bu holat yuz bermasligi kerak (REJECT yuqorida qaytarilgan)
+            logger.info(f"[{symbol}] Noma'lum confluence decision: {confluence.decision}")
             return
 
-        # 8. Risk validatsiyasi
-        sl_pips = ai_decision.get("stop_loss_pips", 30)
-        tp_pips = ai_decision.get("take_profit_pips", 60)
+        # ============================================================
+        # 6. EXECUTE yoki PENDING_LIMIT TEKSHIRUVI
+        # ============================================================
+        final = ai_decision.get("final_decision", "REJECT")
+        logger.info(
+            f"[{symbol}] Yakuniy qaror: {final} | "
+            f"Sabab: {ai_decision.get('reasoning', '')[:200]}"
+        )
+
+        if final not in ["EXECUTE", "PENDING_LIMIT"]:
+            logger.info(f"[{symbol}] {final} — savdo qilinmaydi.")
+            return
+
+        # ============================================================
+        # 7. RISK VALIDATSIYASI
+        # ============================================================
+        sl_pips = ai_decision.get("stop_loss_pips", dynamic_sl)
+        tp_pips = ai_decision.get("take_profit_pips", dynamic_tp)
         confidence = ai_decision.get("confidence", 0)
 
         approved, msg, lot = self.risk.validate_trade(
             symbol=symbol,
-            signal=vote_direction,
+            signal=conf_direction,
             confidence=confidence,
             stop_loss_pips=sl_pips,
-            risk_pct=vote_risk
+            risk_pct=conf_risk
         )
         logger.info(f"[{symbol}] Risk natijasi: {msg} (Lot: {lot})")
 
@@ -383,7 +617,9 @@ class TradingBot:
             logger.info(f"[{symbol}] Risk manager rad etdi: {msg}")
             return
 
-        # 9. Order ochish
+        # ============================================================
+        # 8. ORDER OCHISH
+        # ============================================================
         entry_price = ai_decision.get("entry_price")
         if entry_price == "null" or entry_price is None:
             entry_price = None
@@ -394,12 +630,11 @@ class TradingBot:
                 entry_price = None
 
         # Signal turini aniqlash (BUY, SELL, BUY_LIMIT, etc.)
-        order_signal = vote_direction
+        order_signal = conf_direction
         if entry_price is not None:
-            # Agar entry_price berilgan bo'lsa, pending order
-            if vote_direction == "BUY":
+            if conf_direction == "BUY":
                 order_signal = "BUY_LIMIT"
-            elif vote_direction == "SELL":
+            elif conf_direction == "SELL":
                 order_signal = "SELL_LIMIT"
 
         success, order_msg, order_info = self.orders.place_order(
@@ -412,7 +647,11 @@ class TradingBot:
         )
 
         if success:
-            logger.info(f"✅ [{symbol}] Order ochildi! Ticket: {order_info.get('ticket', 'N/A')}")
+            logger.info(
+                f"✅ [{symbol}] Order ochildi! Ticket: {order_info.get('ticket', 'N/A')} | "
+                f"Confluence: {conf_score}/140 | SL: {sl_pips} | TP: {tp_pips} | "
+                f"Risk: {conf_risk:.1%} | R:R=1:{tp_pips/sl_pips:.1f}"
+            )
         else:
             logger.error(f"❌ [{symbol}] Order xatolik: {order_msg}")
 
@@ -462,6 +701,26 @@ class TradingBot:
 
                     # Ochiq pozitsiyalarni boshqarish
                     self.manage_positions()
+                    
+                    # AI Review tekshiruvi
+                    try:
+                        import datetime
+                        import MetaTrader5 as mt5
+                        now = datetime.datetime.now()
+                        start_time = now - datetime.timedelta(days=60)
+                        deals = self.mt5.history_deals_get(start_time, now)
+                        if deals:
+                            closed_count = sum(1 for d in deals if d.entry == mt5.DEAL_ENTRY_OUT)
+                            if closed_count > self.closed_trades_count:
+                                self.closed_trades_count = closed_count
+                                review_type = self.reviewer.should_review(self.closed_trades_count)
+                                if review_type:
+                                    logger.info(f"Yangi yopilgan savdolar yetarli ({self.closed_trades_count}). AI Review ({review_type}) boshlanmoqda...")
+                                    self.reviewer.perform_review(review_type=review_type)
+                                    # Yangi adjustments'larni qayta o'qish mumkin
+                                    self.last_adjustments = self.reviewer.get_latest_adjustments()
+                    except Exception as e:
+                        logger.error(f"AI Review loop xatosi: {e}")
 
                     # Cloud sync
                     try:

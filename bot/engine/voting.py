@@ -3,19 +3,36 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-def aggregate_signals(smc_data: Dict[str, Any], pattern_data: Dict[str, Any], news_data: Dict[str, Any], config: Any) -> Dict[str, Any]:
+def aggregate_signals(
+    smc_data: Dict[str, Any],
+    pattern_data: Dict[str, Any],
+    news_data: Dict[str, Any],
+    wyckoff_data: Dict[str, Any],
+    sr_volume_data: Dict[str, Any],
+    auto_pattern_data: Dict[str, Any],
+    kill_zones_data: Dict[str, Any],
+    config: Any
+) -> Dict[str, Any]:
     """
-    Uchta strategiyaning natijalarini oladi va umumiy risk/signal hisoblaydi.
+    Yetti strategiyaning natijalarini oladi va umumiy risk/signal hisoblaydi.
     Kutilayotgan format: {"signal": "BUY"|"SELL"|"HOLD", "confidence": 0-100}
     """
     conf_smc = getattr(config, "strategy_weight_smc", 60)
     conf_pattern = getattr(config, "strategy_weight_pattern", 60)
     conf_news = getattr(config, "strategy_weight_news", 60)
+    conf_wyckoff = getattr(config, "strategy_weight_wyckoff", 50)
+    conf_sr_volume = getattr(config, "strategy_weight_sr_volume", 50)
+    conf_auto_pattern = getattr(config, "strategy_weight_auto_pattern", 50)
+    conf_kill_zones = getattr(config, "strategy_weight_kill_zones", 50)
     allow_single = getattr(config, "allow_single_strategy_trade", False)
     
     smc_data = smc_data or {}
     pattern_data = pattern_data or {}
     news_data = news_data or {}
+    wyckoff_data = wyckoff_data or {}
+    sr_volume_data = sr_volume_data or {}
+    auto_pattern_data = auto_pattern_data or {}
+    kill_zones_data = kill_zones_data or {}
     valid_signals = []
     
     # 1. Belgilangan threshold'dan past ishonch va HOLD larni filtrlash
@@ -27,6 +44,18 @@ def aggregate_signals(smc_data: Dict[str, Any], pattern_data: Dict[str, Any], ne
         
     if str(news_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(news_data.get("confidence") or 0) >= conf_news:
         valid_signals.append(("News", str(news_data.get("signal")).upper()))
+
+    if str(wyckoff_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(wyckoff_data.get("confidence") or 0) >= conf_wyckoff:
+        valid_signals.append(("Wyckoff", str(wyckoff_data.get("signal")).upper()))
+
+    if str(sr_volume_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(sr_volume_data.get("confidence") or 0) >= conf_sr_volume:
+        valid_signals.append(("SR_Volume", str(sr_volume_data.get("signal")).upper()))
+
+    if str(auto_pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(auto_pattern_data.get("confidence") or 0) >= conf_auto_pattern:
+        valid_signals.append(("Auto_Pattern", str(auto_pattern_data.get("signal")).upper()))
+
+    if str(kill_zones_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(kill_zones_data.get("confidence") or 0) >= conf_kill_zones:
+        valid_signals.append(("Kill_Zones", str(kill_zones_data.get("signal")).upper()))
         
     # 2. Yo'nalishlarni guruhlash
     buy_strategies = [s[0] for s in valid_signals if s[1] == "BUY"]
@@ -53,19 +82,17 @@ def aggregate_signals(smc_data: Dict[str, Any], pattern_data: Dict[str, Any], ne
     risk_pct = 0.0
     num_strats = len(winner_strategies)
     
-    if num_strats == 3:
-        # SMC + News + Pattern
+    if num_strats >= 5:
+        risk_pct = 0.05
+    elif num_strats == 4:
         risk_pct = 0.04
+    elif num_strats == 3:
+        risk_pct = 0.03
     elif num_strats == 2:
-        if "SMC" in winner_strategies and "News" in winner_strategies:
-            risk_pct = 0.03
-        elif "SMC" in winner_strategies and "Pattern" in winner_strategies:
-            risk_pct = 0.02
-        elif "News" in winner_strategies and "Pattern" in winner_strategies:
-            risk_pct = 0.02
+        risk_pct = 0.02
     elif num_strats == 1:
         if allow_single:
-            risk_pct = 0.02
+            risk_pct = 0.01
         else:
             logger.info("Yakka strategiya signali olingan, ammo ruxsat etilmagan.")
             return {

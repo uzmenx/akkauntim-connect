@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { guestMock } from "@/lib/guestMock";
-import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
-import type { BotStatus, Position, TradeHistory, PendingOrder } from "@/lib/types";
+import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
+import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
   Play, Pause, Settings, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown,
   ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles
@@ -64,17 +64,25 @@ export function DashboardPage() {
   });
 
   const history = useQuery({
-    queryKey: ["history_today", user?.id],
+    queryKey: ["trade_history_all", user?.id],
     queryFn: async () => {
       if (isGuest) return guestMock.getHistory();
       const { data } = await supabase
         .from("trade_history")
         .select("*")
-        .order("closed_at", { ascending: false })
-        .limit(20);
+        .order("closed_at", { ascending: false });
       return (data ?? []) as TradeHistory[];
     },
     refetchInterval: 5000,
+  });
+
+  const settings = useQuery({
+    queryKey: ["bot_settings", user?.id],
+    queryFn: async () => {
+      if (isGuest) return guestMock.getSettings();
+      const { data } = await supabase.from("bot_settings").select("*").maybeSingle();
+      return data as BotSettings | null;
+    },
   });
 
   const stats = useMemo(() => {
@@ -101,6 +109,7 @@ export function DashboardPage() {
   }
 
   const [filterMode, setFilterMode] = useState<"all" | "profit" | "loss">("all");
+  const [activeTab, setActiveTab] = useState<"positions" | "limits" | "history">("positions");
   const [showPrompt, setShowPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
@@ -182,21 +191,25 @@ export function DashboardPage() {
         </div>
 
         {/* Card 30%: Main Blue Card */}
-        <div className="w-full h-[32dvh] min-h-[220px] max-h-[300px] bg-gradient-to-b from-[#0a4ed6] to-[#041a5a] rounded-[28px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        <div className="w-full h-[34dvh] min-h-[235px] max-h-[310px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-5 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Card Top Header */}
           <div className="flex justify-between items-center">
             <div className="relative" ref={profileMenuRef}>
               <div 
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md cursor-pointer hover:bg-white/20 transition-all border border-white/5"
+                className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md cursor-pointer hover:bg-white/20 transition-all border border-white/10"
               >
-                <img 
-                  src={`https://api.dicebear.com/7.x/notionists/svg?seed=${user?.email || "Ana"}&backgroundColor=f8f9fa`} 
-                  alt="Profile" 
-                  className="w-5 h-5 rounded-full bg-white object-cover"
-                />
-                <span className="text-white text-xs font-medium">{user?.email?.split("@")[0] ?? "Ana"}</span>
+                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email || "Ana"}`} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="text-white text-xs font-bold tracking-tight">
+                  {settings.data?.mt5_login || "109545213"}
+                </span>
               </div>
               
               {showProfileMenu && (
@@ -229,46 +242,42 @@ export function DashboardPage() {
               )}
             </div>
             
-            <Link to="/pricing" className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 px-3 py-1.5 rounded-full backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-lg shadow-amber-500/10">
-              <Crown size={12} className="text-amber-400" />
-              <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">Premium</span>
+            <Link to="/pricing" className="flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-full backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-lg shadow-amber-500/5">
+              <Crown size={12} className="text-amber-400 fill-amber-400/20" />
+              <span className="text-[9px] font-extrabold text-amber-400 uppercase tracking-widest">Premium</span>
             </Link>
           </div>
 
           {/* Balance Area */}
-          <div className="text-center flex flex-col items-center justify-center flex-1 py-2">
-            <span className="text-[9px] text-blue-200/80 font-semibold tracking-wider uppercase bg-white/10 px-3 py-1 rounded-full inline-block backdrop-blur-sm mb-1">
+          <div className="text-center flex flex-col items-center justify-center flex-1 py-1">
+            <span className="text-[9px] text-blue-200/80 font-bold tracking-widest uppercase bg-white/10 px-3 py-1 rounded-full inline-block backdrop-blur-sm mb-2">
               Your Balance
             </span>
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums drop-shadow-md">
-              {equity != null ? fmtMoney(Number(equity), currency) : "$ 52,002.50"}
+              {equity != null ? fmtMoney(Number(equity), currency) : "$89,405.18"}
             </h1>
           </div>
 
           {/* Avatars Row */}
           <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-3 cursor-pointer">
             {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
-              <div key={seed} className={`w-8 h-8 rounded-full border-2 border-[#1e40af] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
+              <div key={seed} className={`w-8 h-8 rounded-full border-2 border-[#0052e0] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
                 <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
               </div>
             ))}
           </a>
 
-          {/* 5 Action Buttons Row */}
-          <div className="flex gap-2 w-full items-center justify-between mt-auto">
-            <Link to="/settings" className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Settings">
+          {/* 4 Action Buttons Row */}
+          <div className="flex gap-2 w-full items-center justify-between mt-auto px-1">
+            <Link to="/settings" className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Settings">
               <Settings size={18} className="group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
-            <Link to="/signals" className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Signals">
+            <Link to="/signals" className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Signals">
               <ArrowUpDown size={18} className="group-hover:scale-110 transition-transform" />
             </Link>
 
-            <Link to="/backtest" className="flex-shrink-0 w-11 h-11 rounded-full bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 flex items-center justify-center text-amber-400 transition-all border border-amber-500/20 group shadow-md backdrop-blur-sm shadow-amber-500/10" aria-label="Backtest">
-              <FlaskConical size={18} className="group-hover:scale-110 transition-transform" />
-            </Link>
-
-            <button onClick={toggleFilter} className="flex-shrink-0 w-11 h-11 rounded-full bg-[#10192e]/80 hover:bg-[#16223f] active:scale-95 flex items-center justify-center transition-all border border-white/10 group shadow-md backdrop-blur-sm" aria-label="Filter Mode">
+            <button onClick={toggleFilter} className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center transition-all border border-white/10 group shadow-md" aria-label="Filter Mode">
               {filterMode === "all" && (
                 <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
                   <TrendingUp size={12} className="text-emerald-400 absolute top-0 left-0" />
@@ -279,66 +288,93 @@ export function DashboardPage() {
               {filterMode === "loss" && <TrendingDown size={18} className="text-rose-400 group-hover:scale-110 transition-transform" />}
             </button>
 
-            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-11 h-11 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:opacity-95 active:scale-95 flex items-center justify-center text-white transition-all shadow-lg shadow-blue-500/20 border border-blue-400/30 group" aria-label="AI Send">
+            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-600 to-violet-600 hover:opacity-95 active:scale-95 flex items-center justify-center text-white transition-all shadow-lg shadow-blue-500/25 border border-white/10 group" aria-label="AI Send">
               <Sparkles size={18} className="group-hover:scale-110 transition-transform text-white" />
             </button>
           </div>
         </div>
 
         {/* Scrollable List Section (Remaining Height) */}
-        <div className="flex-1 overflow-y-auto pb-4 space-y-5 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex-1 overflow-y-auto pb-4 space-y-4 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
           
-          {/* Open Positions */}
-          <div>
-            <div className="flex items-center justify-between mb-3 ml-2">
-              <h3 className="text-xs font-bold text-white/60 tracking-wider">OCHIQ POZITSIYALAR</h3>
-              <span className="text-[10px] text-white/40">{filteredPositions?.length ?? 0}</span>
+          {/* Tab Selector */}
+          <div className="flex bg-[#10192e]/60 border border-white/5 rounded-2xl p-1 shrink-0 sticky top-0 backdrop-blur-md z-30">
+            <button 
+              onClick={() => setActiveTab("positions")}
+              className={cn(
+                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                activeTab === "positions" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
+              )}
+            >
+              <span>Pozitsiya</span>
+              <span className={cn("text-[9px] px-1 py-0.5 rounded-full font-bold", activeTab === "positions" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
+                {filteredPositions?.length ?? 0}
+              </span>
+            </button>
+            <button 
+              onClick={() => setActiveTab("limits")}
+              className={cn(
+                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                activeTab === "limits" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
+              )}
+            >
+              <span>Limitlar</span>
+              <span className={cn("text-[9px] px-1 py-0.5 rounded-full font-bold", activeTab === "limits" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
+                {pending.data?.length ?? 0}
+              </span>
+            </button>
+            <button 
+              onClick={() => setActiveTab("history")}
+              className={cn(
+                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                activeTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
+              )}
+            >
+              <span>Tarix</span>
+            </button>
+          </div>
+
+          {/* Tab Contents */}
+          {activeTab === "positions" && (
+            <div className="space-y-2 animate-in fade-in duration-200">
+              {positions.isLoading ? (
+                <SkeletonRows />
+              ) : filteredPositions && filteredPositions.length > 0 ? (
+                filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)
+              ) : (
+                <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
+              )}
             </div>
-            {positions.isLoading ? (
-              <SkeletonRows />
-            ) : filteredPositions && filteredPositions.length > 0 ? (
-              <div className="space-y-2">
-                {filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)}
+          )}
+
+          {activeTab === "limits" && (
+            <div className="space-y-2 animate-in fade-in duration-200">
+              {pending.isLoading ? (
+                <SkeletonRows count={2} />
+              ) : pending.data && pending.data.length > 0 ? (
+                pending.data.map((o) => <PendingRow key={o.id} o={o} />)
+              ) : (
+                <EmptyBox text="Hozircha kutilayotgan order yo'q" />
+              )}
+            </div>
+          )}
+
+          {activeTab === "history" && (
+            <div className="space-y-2 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between px-2 mb-1">
+                <span className="text-[10px] text-white/40 font-bold">SAVDO TARIXI</span>
+                <Link to="/history" className="text-[10px] text-blue-400 hover:underline">Barchasi</Link>
               </div>
-            ) : (
-              <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
-            )}
-          </div>
-
-        {/* Pending Orders */}
-        <div className="">
-          <div className="flex items-center justify-between mb-3 ml-2">
-            <h3 className="text-xs font-bold text-white/60 tracking-wider">KUTILAYOTGAN ORDERLAR</h3>
-            <span className="text-[10px] text-white/40">{pending.data?.length ?? 0}</span>
-          </div>
-          {pending.isLoading ? (
-            <SkeletonRows count={2} />
-          ) : pending.data && pending.data.length > 0 ? (
-            <div className="space-y-2">
-              {pending.data.map((o) => <PendingRow key={o.id} o={o} />)}
+              {history.isLoading ? (
+                <SkeletonRows count={2} />
+              ) : history.data && history.data.length > 0 ? (
+                history.data.slice(0, 15).map((t) => <HistoryRow key={t.id} t={t} />)
+              ) : (
+                <EmptyBox text="Hozircha yopilgan savdo yo'q" />
+              )}
             </div>
-          ) : (
-            <EmptyBox text="Hozircha kutilayotgan order yo'q" />
           )}
-        </div>
-
-        {/* Recent History */}
-        <div className="">
-          <div className="flex items-center justify-between mb-3 ml-2">
-            <h3 className="text-xs font-bold text-white/60 tracking-wider">SAVDO TARIXI</h3>
-            <Link to="/history" className="text-[10px] text-white/50 hover:text-white">Barchasi</Link>
-          </div>
-          {history.isLoading ? (
-            <SkeletonRows count={2} />
-          ) : history.data && history.data.length > 0 ? (
-            <div className="space-y-2">
-              {history.data.slice(0, 8).map((t) => <HistoryRow key={t.id} t={t} />)}
-            </div>
-          ) : (
-            <EmptyBox text="Hozircha yopilgan savdo yo'q" />
-          )}
-        </div>
-        
+          
         </div>
 
       </div>
@@ -433,7 +469,7 @@ function PositionRow({ p }: { p: Position }) {
           {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-1.5 text-[10px]">
+      <div className="grid grid-cols-4 gap-1 text-[10px]">
         <MiniField label="Open" value={fmtNum(p.open_price, 5)} />
         <MiniField label="Now" value={fmtNum(p.current_price, 5)} />
         <MiniField label="SL" value={p.stop_loss ? fmtNum(p.stop_loss, 5) : "—"} tone={p.stop_loss ? "danger" : undefined} />
@@ -457,7 +493,7 @@ function PendingRow({ o }: { o: PendingOrder }) {
         </div>
         <Clock size={14} className="text-white/40" />
       </div>
-      <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+      <div className="grid grid-cols-3 gap-1 text-[10px]">
         <MiniField label="Price" value={fmtNum(o.price, 5)} />
         <MiniField label="SL" value={o.stop_loss ? fmtNum(o.stop_loss, 5) : "—"} tone={o.stop_loss ? "danger" : undefined} />
         <MiniField label="TP" value={o.take_profit ? fmtNum(o.take_profit, 5) : "—"} tone={o.take_profit ? "success" : undefined} />
@@ -488,9 +524,9 @@ function HistoryRow({ t }: { t: TradeHistory }) {
 function MiniField({ label, value, tone }: { label: string; value: string; tone?: "success" | "danger" }) {
   const cls = tone === "success" ? "text-emerald-400" : tone === "danger" ? "text-rose-400" : "text-white/90";
   return (
-    <div className="rounded-lg bg-black/30 px-2 py-1">
-      <p className="text-[8px] uppercase tracking-wider text-white/40">{label}</p>
-      <p className={`tabular-nums text-[11px] font-bold ${cls} truncate`}>{value}</p>
+    <div className="rounded-lg bg-black/35 px-1 py-1 text-center">
+      <p className="text-[7.5px] uppercase tracking-wider text-white/35 font-medium leading-none mb-0.5">{label}</p>
+      <p className={`tabular-nums text-[9.5px] min-[375px]:text-[10.5px] font-bold ${cls} truncate leading-tight`}>{value}</p>
     </div>
   );
 }

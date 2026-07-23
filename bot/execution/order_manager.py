@@ -53,6 +53,21 @@ class OrderManager:
         point = symbol_info.point
         pip_size = point * 10  # 5-xonali narxlar uchun 1 pip = 10 point
 
+        # --- SPREAD FILTER ---
+        current_spread_points = round((tick.ask - tick.bid) / point)
+        max_multiplier = getattr(self.config, "max_spread_multiplier", 4.0)
+        
+        # Get spread from the last 10 M15 candles from MT5
+        rates = self.mt5.copy_rates_from_pos(symbol, self.mt5.TIMEFRAME_M15, 1, 10)
+        if rates is not None and len(rates) > 0:
+            avg_spread_points = sum(r['spread'] for r in rates) / len(rates)
+            if avg_spread_points > 0:
+                max_allowed_spread_points = avg_spread_points * max_multiplier
+                if current_spread_points > max_allowed_spread_points:
+                    logger.warning(f"[{symbol}] Spread filter triggered: Current spread ({current_spread_points} points) is {max_multiplier}x larger than average ({avg_spread_points:.1f} points). Trade aborted.")
+                    return False, f"Spread is too high ({current_spread_points} points)", None
+        # ---------------------
+
         stop_level_pips = symbol_info.trade_stops_level / 10.0
         if stop_loss_pips < stop_level_pips:
             stop_loss_pips = stop_level_pips
@@ -271,13 +286,26 @@ class OrderManager:
                     })
                     logger.info(f"[{pos.symbol}] 70% yopildi, SL +1R ga surildi.")
                 continue
+
+            # BREAKEVEN_FAST (1R ga yetganda riskni yo'q qilish)
+            if profit_r >= 1.0 and not info.get("partial_closed") and info.get("current_sl_level", 0) < 0.5:
+                trailing_mode = info.get("trailing_mode", "STEP")
+                if trailing_mode == "BREAKEVEN_FAST":
+                    new_sl = entry_price + (one_r * 0.1) if signal == "BUY" else entry_price - (one_r * 0.1)
+                    if (signal == "BUY" and new_sl > pos.sl) or (signal == "SELL" and (pos.sl == 0 or new_sl < pos.sl)):
+                        self.update_sl(ticket, new_sl)
+                        self.state_manager.set_trade_info(ticket, {"current_sl_level": 0.5})
+                        logger.info(f"[{pos.symbol}] BREAKEVEN_FAST: SL entry price ga surildi.")
                 
-            # Trailing logikasi
+            # Trailing logikasi (faqat 70% yopilgandan keyin qolgan 30% uchun)
             if info.get("partial_closed") and profit_r >= 2.0:
                 trailing_mode = info.get("trailing_mode")
                 if not trailing_mode:
                     try:
                         trailing_mode = trailing_decision_fn(pos.symbol)
+                        if not trailing_mode or trailing_mode not in ["STEP", "ATR_TRAIL", "CLOSE_ALL", "BREAKEVEN_FAST", "STRUCTURE"]:
+                            trailing_mode = "STEP"
+                            
                         self.state_manager.set_trade_info(ticket, {"trailing_mode": trailing_mode})
                         logger.info(f"[{pos.symbol}] AI Trailing rejimini tanladi: {trailing_mode}")
                     except Exception as e:
@@ -289,7 +317,8 @@ class OrderManager:
                     self.close_partial_position(ticket, 100)
                     self.state_manager.set_trade_info(ticket, {"status": "CLOSED"})
                     
-                elif trailing_mode == "STEP":
+                elif trailing_mode in ["STEP", "BREAKEVEN_FAST"]:
+                    # STEP trailing — har bir yangi R da SL ni 1R ortga surish
                     expected_sl_level = int(profit_r) - 1
                     if expected_sl_level > info.get("current_sl_level", 0):
                         if signal == "BUY":
@@ -302,8 +331,20 @@ class OrderManager:
                             self.state_manager.set_trade_info(ticket, {"current_sl_level": expected_sl_level})
                             logger.info(f"[{pos.symbol}] STEP Trailing: SL +{expected_sl_level}R ga surildi.")
                 
+                elif trailing_mode == "ATR_TRAIL":
+                    # ATR bazasida surish (narxdan 1.5R uzoqlikda ushlab borish)
+                    if signal == "BUY":
+                        new_sl = current_price - (one_r * 1.5)
+                    else:
+                        new_sl = current_price + (one_r * 1.5)
+                        
+                    # Faqatgina foyda tomon suramiz (orqaga qaytmaydi)
+                    if (signal == "BUY" and new_sl > pos.sl) or (signal == "SELL" and (pos.sl == 0 or new_sl < pos.sl)):
+                        self.update_sl(ticket, new_sl)
+                        logger.info(f"[{pos.symbol}] ATR_TRAIL: SL surildi.")
+                
                 elif trailing_mode == "STRUCTURE":
-                    # STRUCTURE placeholder logic
+                    # Kelajakda M5 tuzilishi asosida suriladi, hozircha STEP kabi ishlaydi
                     pass
 
     def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "News Straddle") -> Tuple[bool, str, Optional[dict]]:
@@ -397,6 +438,48 @@ class OrderManager:
 
     def manage_pending_orders(self):
         """
-        News Straddle uchun qo'yilgan, lekin ishga tushmagan qopqonlarni boshqarish.
+        Pending (Limit/Stop) orderlarni tekshirish va yaroqsiz bo'lsa o'chirish.
+        1. Narx limit_entry ga bormasdan oldin stop_loss gacha yetib borsa, setup invalid bo'ladi.
+        2. Order 24 soatdan oshib qolsa, eskirgan hisoblanib o'chiriladi.
         """
-        pass
+        orders = self.mt5.orders_get()
+        if not orders:
+            return
+
+        import datetime
+        now = datetime.datetime.now()
+
+        for order in orders:
+            ticket = order.ticket
+            symbol = order.symbol
+            order_type = order.type
+            time_setup = order.time_setup
+            sl = order.sl
+            
+            # Faqat limit orderlarni tekshiramiz
+            if order_type not in [self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_SELL_LIMIT]:
+                continue
+                
+            tick = self.mt5.symbol_info_tick(symbol)
+            if not tick:
+                continue
+                
+            # Setup vaqti (24 soat = 86400 sek)
+            setup_time_dt = datetime.datetime.fromtimestamp(time_setup)
+            if (now - setup_time_dt).total_seconds() > 86400:
+                logger.info(f"[{symbol}] Pending order #{ticket} eskirgan (24 soat). O'chirilmoqda...")
+                self.delete_pending_order(ticket)
+                continue
+                
+            # Invalidation tekshiruvi
+            if sl > 0:
+                if order_type == self.mt5.ORDER_TYPE_BUY_LIMIT:
+                    # Agar narx buy limit olinmasdan SL ga tushib ketgan bo'lsa
+                    if tick.ask <= sl:
+                        logger.info(f"[{symbol}] Buy Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
+                        self.delete_pending_order(ticket)
+                elif order_type == self.mt5.ORDER_TYPE_SELL_LIMIT:
+                    # Agar narx sell limit olinmasdan SL dan oshib ketgan bo'lsa
+                    if tick.bid >= sl:
+                        logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
+                        self.delete_pending_order(ticket)

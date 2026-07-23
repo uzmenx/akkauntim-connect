@@ -39,6 +39,7 @@ class BotConfig:
     strategy_weight_news: int = 60
     allow_single_strategy_trade: bool = True
     news_lookback_hours: int = 24
+    max_spread_multiplier: float = 4.0
     ai_max_tokens: int = 2000
     ai_models_fallback: List[str] = field(default_factory=lambda: [
         "claude-sonnet-4-6",
@@ -107,6 +108,9 @@ class BotConfig:
         if "timeframe_minor" in data:
             self.timeframe_minor = data["timeframe_minor"]
             
+        if "loop_interval_minutes" in data:
+            self.loop_interval_minutes = int(data["loop_interval_minutes"])
+            
         if "ai_enabled" in data:
             self.ai_enabled = bool(data["ai_enabled"])
             
@@ -133,6 +137,9 @@ class BotConfig:
             
         if "strategy_weight_news" in data:
             self.strategy_weight_news = int(data["strategy_weight_news"])
+            
+        if "max_spread_multiplier" in data:
+            self.max_spread_multiplier = float(data["max_spread_multiplier"])
             
         if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
             identity = data.get("prompt_identity", "")

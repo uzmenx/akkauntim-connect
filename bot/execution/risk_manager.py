@@ -68,7 +68,8 @@ class RiskManager:
             return None, "Hisob ma'lumotini olib bo'lmadi"
             
         balance = account_info.balance
-
+        
+        # 1. Risk qilinayotgan summa
         risk_amount = balance * risk_pct
 
         symbol_info = self.mt5.symbol_info(symbol)
@@ -77,26 +78,48 @@ class RiskManager:
 
         tick_value = symbol_info.trade_tick_value
         digits = symbol_info.digits
-        if digits == 3 or digits == 5:  # Standard forex (5-digit) or JPY pairs (3-digit)
+        
+        # 2. 1 pip qiymatini hisoblash (1 lot uchun)
+        # MT5 da tick_value bu 1 ta point (tick) o'zgarishining 1 lot uchun qiymati.
+        # Bizda stop_loss_pips berilgan, shuning uchun pip qadrini topishimiz kerak.
+        if digits == 3 or digits == 5:  # JPY (masalan 150.123) yoki standart Forex (1.10543)
+            # 1 pip = 10 point (tick)
             pip_value_per_lot = tick_value * 10
-        elif digits == 2:  # Gold, indices
-            pip_value_per_lot = tick_value * 100
+        elif digits == 2:  # Oltin (XAUUSD - 2400.50)
+            # Oltin uchun pip divisor odatda 0.1 (ya'ni 1 pip = 0.1)
+            # Tick o'lchami esa 0.01. Demak 1 pip = 10 tick.
+            pip_value_per_lot = tick_value * 10
         else:
-            pip_value_per_lot = tick_value
+            pip_value_per_lot = tick_value * 10 # Standart fallback
 
         if pip_value_per_lot <= 0 or stop_loss_pips <= 0:
-            return None, "Noto'g'ri parametrlar"
+            return None, "Noto'g'ri SL yoki Pip Value parametrlar"
 
-        lot_size = risk_amount / (stop_loss_pips * pip_value_per_lot)
+        # 3. Lot formulasini qo'llash
+        # Lot = Risk Summasi / (SL pips * 1 lot uchun Pip Value)
+        raw_lot_size = risk_amount / (stop_loss_pips * pip_value_per_lot)
 
-        # Broker cheklovlariga moslashtirish
-        lot_size = round(lot_size / symbol_info.volume_step) * symbol_info.volume_step
+        # 4. Broker cheklovlariga (volume step) aniq moslashtirish
+        volume_step = symbol_info.volume_step
+        if volume_step > 0:
+            lot_size = round(raw_lot_size / volume_step) * volume_step
+        else:
+            lot_size = raw_lot_size
+            
         lot_size = round(lot_size, 2)
+        
+        # Min va Max broker limitlari
         lot_size = max(symbol_info.volume_min, min(lot_size, symbol_info.volume_max))
 
-        # Bizning o'z xavfsizlik chegaramiz — bu hech qachon oshib ketmasligi kerak
+        # 5. O'zimizning xavfsizlik chegaramiz
         max_lot = getattr(self.config, "max_lot_size", 5.0)
         lot_size = min(lot_size, max_lot)
+
+        logger.info(
+            f"[{symbol}] Risk Hisob-kitobi: Balans=${balance:.2f}, Risk={risk_pct*100:.2f}% (${risk_amount:.2f}), "
+            f"SL={stop_loss_pips} pip, Pip Value=${pip_value_per_lot:.2f} -> "
+            f"Kerakli Lot: {raw_lot_size:.4f}, Yaxlitlangan Lot: {lot_size}"
+        )
 
         return lot_size, "OK"
 

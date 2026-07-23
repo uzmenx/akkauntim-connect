@@ -100,6 +100,7 @@ export function SettingsPage() {
         max_lot_size: 5.0,
         timeframe_major: "H1",
         timeframe_minor: "M5",
+        loop_interval_minutes: 5,
         ai_enabled: true,
         ai_model: "claude-3-5-sonnet-20241022",
         prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
@@ -135,6 +136,7 @@ export function SettingsPage() {
         max_lot_size: Number(form.max_lot_size ?? 5.0),
         timeframe_major: form.timeframe_major ?? "H1",
         timeframe_minor: form.timeframe_minor ?? "M5",
+        loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
         ai_enabled: form.ai_enabled ?? true,
         ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
         prompt_identity: form.prompt_identity ?? "",
@@ -162,6 +164,7 @@ export function SettingsPage() {
           max_lot_size: Number(form.max_lot_size ?? 5.0),
           timeframe_major: form.timeframe_major ?? "H1",
           timeframe_minor: form.timeframe_minor ?? "M5",
+          loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
           ai_enabled: form.ai_enabled ?? true,
           ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
           prompt_identity: form.prompt_identity ?? "",
@@ -215,6 +218,7 @@ export function SettingsPage() {
           max_lot_size: 5.0,
           timeframe_major: "H1",
           timeframe_minor: "M5",
+          loop_interval_minutes: 5,
           ai_enabled: true,
           ai_model: "claude-3-5-sonnet-20241022",
           prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
@@ -303,6 +307,15 @@ export function SettingsPage() {
                 value={form.timeframe_minor ?? "M5"}
                 onChange={(val) => setForm((f) => ({ ...f, timeframe_minor: val }))}
                 options={MINOR_TIMEFRAME_OPTIONS}
+              />
+            </div>
+            <div className="col-span-2">
+              <Slider
+                label="Bozorni tahlil qilish tezligi (Daqiqa)"
+                value={Number(form.loop_interval_minutes ?? 5)}
+                min={1} max={60} step={1}
+                format={(v) => `Har ${v} daqiqada`}
+                onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
               />
             </div>
           </div>

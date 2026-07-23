@@ -66,7 +66,7 @@ export function PositionsPage() {
                 <p className="text-[11px] text-fg-dim">{fmtNum(p.volume, 2)} lot</p>
               </div>
             </div>
-            <div className="mt-3 grid grid-cols-4 gap-2 text-[11px]">
+            <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">
               <Field label="Open" value={fmtNum(p.open_price, 5)} />
               <Field label="Now" value={fmtNum(p.current_price, 5)} />
               <Field label="SL" value={fmtNum(p.stop_loss, 5)} tone="danger" />
@@ -82,9 +82,9 @@ export function PositionsPage() {
 function Field({ label, value, tone }: { label: string; value: string; tone?: "success" | "danger" }) {
   const cls = tone === "success" ? "text-success" : tone === "danger" ? "text-danger" : "text-fg";
   return (
-    <div className="rounded-xl bg-black/20 px-2 py-1.5">
-      <p className="text-[9px] uppercase tracking-wider text-fg-dim">{label}</p>
-      <p className={`tabular text-xs font-bold ${cls}`}>{value}</p>
+    <div className="rounded-xl bg-black/20 px-1 py-1 text-center">
+      <p className="text-[7.5px] uppercase tracking-wider text-fg-dim leading-none mb-0.5">{label}</p>
+      <p className={`tabular text-[9.5px] min-[375px]:text-[10.5px] font-bold ${cls} truncate leading-tight`}>{value}</p>
     </div>
   );
 }

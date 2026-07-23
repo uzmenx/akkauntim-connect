@@ -56,6 +56,10 @@ class AIClient:
         models_to_try = self.config.ai_models_fallback
         if self.config.ai_model not in models_to_try:
             models_to_try = [self.config.ai_model] + models_to_try
+            
+        # Force correct model to avoid 404
+        if "claude-3-5-sonnet-20240620" not in models_to_try:
+            models_to_try.insert(0, "claude-3-5-sonnet-20240620")
 
         import time
         import anthropic

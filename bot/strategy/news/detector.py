@@ -22,10 +22,10 @@ class NewsDetector:
         self.cache_duration = 43200  # 12 soat (sekundlarda)
         self.events = []
     
-    def fetch_calendar(self):
+    def fetch_calendar(self, force_refresh=False):
         """Fetches the latest economic calendar events for this week"""
         # 1. Kesh faylni tekshiramiz
-        if os.path.exists(self.cache_file):
+        if os.path.exists(self.cache_file) and not force_refresh:
             file_age = time.time() - os.path.getmtime(self.cache_file)
             if file_age < self.cache_duration:
                 try:

@@ -12,7 +12,11 @@ class PromptBuilder:
                               patterns: Optional[Dict[str, Any]], 
                               news: Optional[Dict[str, Any]], 
                               voting: Dict[str, Any], 
-                              memory_bank: Optional[str] = None) -> Dict[str, Any]:
+                              memory_bank: Optional[str] = None,
+                              wyckoff: Optional[Dict[str, Any]] = None,
+                              sr_volume: Optional[Dict[str, Any]] = None,
+                              auto_patterns: Optional[Dict[str, Any]] = None,
+                              kill_zones: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Gathers context components into a structured dictionary.
         """
@@ -21,7 +25,11 @@ class PromptBuilder:
             "harmonic_pattern": patterns or {},
             "news_context": news or {},
             "voting_result": voting or {},
-            "memory_bank": memory_bank or ""
+            "memory_bank": memory_bank or "",
+            "wyckoff": wyckoff or {},
+            "sr_volume": sr_volume or {},
+            "auto_patterns": auto_patterns or {},
+            "kill_zones": kill_zones or {}
         }
 
     def build_trading_prompt(self, context: Dict[str, Any], pair: str, current_price: float) -> str:
@@ -49,6 +57,19 @@ class PromptBuilder:
             
         vote = context.get('voting_result', {})
         
+        # New strategy summaries
+        wyckoff = context.get('wyckoff', {})
+        wyckoff_summary = f"Phase: {wyckoff.get('phase', 'Unknown')}, Signal: {wyckoff.get('signal', 'HOLD')}"
+        
+        sr_vol = context.get('sr_volume', {})
+        sr_summary = f"Signal: {sr_vol.get('signal', 'HOLD')}"
+        
+        auto_pat = context.get('auto_patterns', {})
+        auto_pat_summary = f"Signal: {auto_pat.get('signal', 'HOLD')}"
+        
+        kz = context.get('kill_zones', {})
+        kz_summary = f"Active sessions: {', '.join(kz.get('active_sessions', []))}, Signal: {kz.get('signal', 'HOLD')}"
+
         memory_bank = context.get('memory_bank', "SMC Memory Bank: Joriy narx atrofida kuchli tarixiy zonalar topilmadi.\n")
         
         system_prompt = getattr(self.config, "ai_system_prompt", "Sen professional Forex treyderi va Quantitative Analistisan.")
@@ -69,7 +90,13 @@ Hozirgi narx: {current_price}
 === 4. YANGILIKLAR KONTEKSTI ===
 {news_summary}
 
-=== 5. VOTING ENGINE XULOSASI ===
+=== 5. QO'SHIMCHA STRATEGIYALAR ===
+Wyckoff: {wyckoff_summary}
+SR Volume: {sr_summary}
+Auto Patterns: {auto_pat_summary}
+Kill Zones: {kz_summary}
+
+=== 6. VOTING ENGINE XULOSASI ===
 Yo'nalish (Direction): {vote.get('signal', 'HOLD')}
 Risk (fraction): {vote.get('risk_pct', 0.0)}
 Kelishgan strategiyalar: {', '.join(vote.get('agreed_strategies') or [])}

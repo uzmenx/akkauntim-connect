@@ -1,11 +1,12 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import math
+import logging
 from bot.strategy.news.detector import NewsDetector
 
+logger = logging.getLogger(__name__)
+
 def get_atr(mt5_client, symbol, timeframe, period=14):
-    """
-    ATR (Average True Range) ni hisoblash, stop masofalarini moslashtirish uchun.
-    """
+    """ATR (Average True Range) ni hisoblash."""
     rates = mt5_client.copy_rates_from_pos(symbol, timeframe, 0, period + 1)
     if rates is None or len(rates) < period:
         return 15.0 # Default 15 pips
@@ -22,23 +23,33 @@ def get_atr(mt5_client, symbol, timeframe, period=14):
     atr = sum(tr_list) / len(tr_list)
     symbol_info = mt5_client.symbol_info(symbol)
     
-    def _get_pip_size(symbol_info):
-        digits = symbol_info.digits
-        if digits == 3 or digits == 5:
-            return symbol_info.point * 10
-        elif digits == 2:
-            return symbol_info.point * 100
-        else:
-            return symbol_info.point
-            
-    pip_size = _get_pip_size(symbol_info)
+    digits = symbol_info.digits
+    pip_size = symbol_info.point * 10 if digits in [3, 5] else (symbol_info.point * 100 if digits == 2 else symbol_info.point)
     
     return atr / pip_size
+
+def spread_check(mt5_client, symbol, atr_pips) -> bool:
+    """Spread juda kengayib ketmaganini tekshiradi."""
+    symbol_info = mt5_client.symbol_info(symbol)
+    if not symbol_info:
+        return False
+        
+    digits = symbol_info.digits
+    pip_size = symbol_info.point * 10 if digits in [3, 5] else (symbol_info.point * 100 if digits == 2 else symbol_info.point)
+    
+    current_spread_pips = (symbol_info.ask - symbol_info.bid) / pip_size
+    
+    # Agar spread ATR ning yarmidan ko'p bo'lsa, xavfli!
+    if current_spread_pips > (atr_pips * 0.5):
+        logger.warning(f"[{symbol}] Spread juda keng ({current_spread_pips:.1f} pip). Straddle bekor qilinadi.")
+        return False
+        
+    return True
 
 def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
     """
     1-2 daqiqa qolgan kuchli yangiliklarni topib, har bir symbol uchun 
-    Buy Stop va Sell Stop o'rnatadi.
+    Buy Stop va Sell Stop o'rnatadi. (V2 xavfsiz versiya)
     """
     detector = NewsDetector()
     upcoming = detector.get_upcoming_news(impact_filter=["High"], minutes_ahead=5)
@@ -50,7 +61,7 @@ def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
         mins_left = event.get('minutes_to_release', 99)
         # 1-2 daqiqa qolgan bo'lsa qopqon qo'yamiz
         if 1 <= mins_left <= 2:
-            print(f"!!! DIQQAT !!! '{event['title']}' yangiligiga {mins_left} daqiqa qoldi. Straddle tayyorlanmoqda.")
+            logger.info(f"!!! DIQQAT !!! '{event['title']}' yangiligiga {mins_left} daqiqa qoldi. Straddle v2 tayyorlanmoqda.")
             
             for symbol in symbols:
                 symbol_info = mt5_client.symbol_info(symbol)
@@ -69,22 +80,19 @@ def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
                 if already_placed:
                     continue
                 
-                # Masofa hisoblash (ATR asosida yoki fix)
+                # Masofa hisoblash (ATR asosida)
                 atr_pips = get_atr(mt5_client, symbol, mt5_client.TIMEFRAME_M5, 14)
-                distance_pips = max(10.0, atr_pips * 1.5) # Kamida 10 pip, yoki ATR * 1.5
+                
+                # SPREAD TEKSHIRUVI
+                if not spread_check(mt5_client, symbol, atr_pips):
+                    continue
+                
+                # ATR * 2.0 (slippage protection uchun kattaroq masofa)
+                distance_pips = max(15.0, atr_pips * 2.0)
                 
                 account_info = mt5_client.account_info()
-                
-                def _get_pip_size(symbol_info):
-                    digits = symbol_info.digits
-                    if digits == 3 or digits == 5:
-                        return symbol_info.point * 10
-                    elif digits == 2:
-                        return symbol_info.point * 100
-                    else:
-                        return symbol_info.point
-                        
-                pip_size = _get_pip_size(symbol_info)
+                digits = symbol_info.digits
+                pip_size = symbol_info.point * 10 if digits in [3, 5] else (symbol_info.point * 100 if digits == 2 else symbol_info.point)
                 
                 if account_info:
                     risk_amount = account_info.balance * 0.01
@@ -103,8 +111,8 @@ def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
                     order_type_str="BUY_STOP",
                     price=buy_stop_price,
                     lot_size=lot_size,
-                    stop_loss_pips=distance_pips,
-                    take_profit_pips=distance_pips * 3, # 3R TP
+                    stop_loss_pips=distance_pips,  # 1R
+                    take_profit_pips=distance_pips * 2.5, # 2.5R TP
                     magic=234000,
                     comment="News Straddle"
                 )
@@ -117,15 +125,16 @@ def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
                     price=sell_stop_price,
                     lot_size=lot_size,
                     stop_loss_pips=distance_pips,
-                    take_profit_pips=distance_pips * 3,
+                    take_profit_pips=distance_pips * 2.5,
                     magic=234000,
                     comment="News Straddle"
                 )
-                print(f"[{symbol}] Straddle o'rnatildi. Masofa: {distance_pips:.1f} pip. Lot: {lot_size}")
+                logger.info(f"[{symbol}] Straddle V2 o'rnatildi. Masofa: {distance_pips:.1f} pip. Lot: {lot_size}")
 
 def cleanup_straddle_orders(mt5_client, order_manager):
     """
     Agar biri ishlab ketgan bo'lsa (Pozitsiyaga aylangan bo'lsa), ikkinchi teskari pending orderni o'chiradi.
+    Shuningdek, yangilik chiqib 5 daqiqa o'tgandan keyin ishlamagan qopqonlarni ham tozalaydi.
     """
     orders = mt5_client.orders_get()
     if not orders:
@@ -139,9 +148,32 @@ def cleanup_straddle_orders(mt5_client, order_manager):
             if pos.magic == 234000 and "Straddle" in pos.comment:
                 active_straddle_symbols.add(pos.symbol)
                 
+    current_time = datetime.now()
+    
     for ord in orders:
         if ord.magic == 234000 and "Straddle" in ord.comment:
+            # Agar teskari tomoni ishlab ketgan bo'lsa
             if ord.symbol in active_straddle_symbols:
-                print(f"[{ord.symbol}] Straddle qopqoni ishga tushgan. Teskari Pending order o'chirilmoqda.")
+                logger.info(f"[{ord.symbol}] Straddle qopqoni ishga tushgan. Teskari Pending order o'chirilmoqda.")
                 order_manager.delete_pending_order(ord.ticket)
                 continue
+                
+            # Vaqt tekshiruvi (agar 5 daqiqa ichida ishlamagan bo'lsa)
+            order_time = datetime.fromtimestamp(ord.time_setup)
+            if (current_time - order_time).total_seconds() > 300: # 5 daqiqa
+                logger.info(f"[{ord.symbol}] Straddle eskirdi (>5 min). O'chirilmoqda.")
+                order_manager.delete_pending_order(ord.ticket)
+
+
+def post_news_fvg_hunter(mt5_client, symbol, smc_data):
+    """
+    Yangilikdan keyingi (15-30 daqiqa o'tib) FVG ga qaytishni ovlash logikasi.
+    Bu funksiya asosan confluence engine va main.py tomonidan chaqirilishi rejalashtirilgan.
+    """
+    # Mantiq: 
+    # 1. Yangilik o'tganiga qancha bo'ldi?
+    # 2. Agar katta impulsive harakat (ATR dan ancha katta) qilingan bo'lsa
+    # 3. Katta FVG hosil qilingan bo'lsa
+    # 4. Narx orqaga qaytayotgan bo'lsa
+    # => Limit order FVG boshiga qo'yiladi.
+    pass

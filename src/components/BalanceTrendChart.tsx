@@ -71,16 +71,20 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
     const getX = (index: number) => (index / (dataPoints.length - 1)) * w;
     const getY = (b: number) => h - ((b - minY) / yRange) * h;
 
-    // Build the stair-step path
+    // Build a smooth wavy bezier curve path
     let pathData = `M ${getX(0).toFixed(2)},${getY(dataPoints[0].balance).toFixed(2)}`;
     for (let i = 0; i < dataPoints.length - 1; i++) {
-      const nextX = getX(i + 1);
+      const currentX = getX(i);
       const currentY = getY(dataPoints[i].balance);
+      const nextX = getX(i + 1);
       const nextY = getY(dataPoints[i + 1].balance);
       
-      // Step horizontally to the next X, then vertically to the next Y
-      pathData += ` L ${nextX.toFixed(2)},${currentY.toFixed(2)}`;
-      pathData += ` L ${nextX.toFixed(2)},${nextY.toFixed(2)}`;
+      const cp1X = currentX + (nextX - currentX) / 2;
+      const cp1Y = currentY;
+      const cp2X = currentX + (nextX - currentX) / 2;
+      const cp2Y = nextY;
+      
+      pathData += ` C ${cp1X.toFixed(2)},${cp1Y.toFixed(2)} ${cp2X.toFixed(2)},${cp2Y.toFixed(2)} ${nextX.toFixed(2)},${nextY.toFixed(2)}`;
     }
 
     const fillData = `${pathData} L ${w},${h} L 0,${h} Z`;
