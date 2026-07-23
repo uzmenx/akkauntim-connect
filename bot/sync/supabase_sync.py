@@ -141,6 +141,11 @@ class SupabaseSync:
             "stop_loss_pips": stop_loss_pips, "take_profit_pips": take_profit_pips,
         }})
 
-    def log_claude_cost(self, cost: float) -> None:
-        if self._post({"add_claude_cost": cost}):
-            logger.info(f"Claude cost loglandi (${cost:.6f})")
+    def log_claude_cost(self, total_cost: float) -> None:
+        """Cumulative total_cost qabul qiladi va faqat delta ni Cloud'ga yuboradi."""
+        delta = max(0.0, float(total_cost) - float(self._last_reported_cost))
+        if delta <= 0:
+            return
+        if self._post({"add_claude_cost": delta}):
+            self._last_reported_cost = float(total_cost)
+            logger.info(f"Claude cost loglandi (+${delta:.6f}, jami ${total_cost:.6f})")
