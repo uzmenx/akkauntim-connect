@@ -21,6 +21,7 @@ class SupabaseSync:
         self.bot_sync_secret = config.bot_sync_secret
         self.mt5_login = str(config.mt5_login)
         self.last_sync_time = datetime.datetime(2000, 1, 1)
+        self._last_reported_cost = 0.0
 
     def _post(self, payload: dict) -> Optional[dict]:
         """Supabase Edge Function ga POST yuboradi."""
