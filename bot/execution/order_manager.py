@@ -127,8 +127,7 @@ class OrderManager:
         else:
             return False, f"Noto'g'ri signal turi: {signal}", None
 
-        # SL va TP ni hisoblash
-        digits = symbol_info.digits
+        # SL va TP ni hisoblash (digits yuqorida allaqachon o'rnatildi)
         if "BUY" in signal:
             sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
