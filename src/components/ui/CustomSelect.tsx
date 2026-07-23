@@ -12,9 +12,10 @@ interface CustomSelectProps {
   onChange: (value: string) => void;
   options: Option[];
   className?: string;
+  placeholder?: string;
 }
 
-export function CustomSelect({ value, onChange, options, className }: CustomSelectProps) {
+export function CustomSelect({ value, onChange, options, className, placeholder }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
