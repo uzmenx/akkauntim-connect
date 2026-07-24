@@ -173,56 +173,87 @@ class OrderManager:
         if "BUY" in signal:
             sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
-        elif "SELL" in signal:
+            tp1 = round(price + take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
+        else:  # SELL*
             sl = round(price + stop_loss_pips * pip_size, digits)
             tp = round(price - take_profit_pips * pip_size, digits)
+            tp1 = round(price - take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
 
-        request = {
-            "action": action,
-            "symbol": symbol,
-            "volume": lot_size,
-            "type": order_type,
-            "price": price,
-            "sl": sl,
-            "tp": tp,
-            "deviation": 20,
-            "magic": self.magic_number,
-            "comment": "AI forex bot",
-            "type_time": self.mt5.ORDER_TIME_GTC,
-            "type_filling": self._get_filling_mode(symbol),
-        }
+        # TP1 broker-side: hajmni 70/30 ga bo'lib ikki alohida order yuboramiz.
+        vol_step = getattr(symbol_info, "volume_step", 0.01) or 0.01
+        vol_min = getattr(symbol_info, "volume_min", 0.01) or 0.01
+        def _q(v: float) -> float:
+            return max(vol_min, round(round(v / vol_step) * vol_step, 2))
 
-        result = self.mt5.order_send(request)
+        splits: list = []  # (volume, tp_price)
+        if tp1 is not None:
+            vol_tp1 = _q(lot_size * self.TP1_PORTION)
+            vol_tp2 = _q(lot_size - vol_tp1)
+            if vol_tp1 >= vol_min and vol_tp2 >= vol_min:
+                splits.append((vol_tp1, tp1))
+                splits.append((vol_tp2, tp))
+        if not splits:
+            splits.append((lot_size, tp))
 
-        if result is None:
-            return False, f"Order yuborilmadi: {self.mt5.last_error()}", None
+        pending_ttl = None
+        if action == self.mt5.TRADE_ACTION_PENDING:
+            pending_ttl = int(time.time()) + self.PENDING_TTL_SECONDS
 
-        if result.retcode != self.mt5.TRADE_RETCODE_DONE:
-            return False, f"Order rad etildi, kod: {result.retcode}, komment: {result.comment}", None
+        tickets: list = []
+        first_result = None
+        for vol, tp_price in splits:
+            request = {
+                "action": action,
+                "symbol": symbol,
+                "volume": vol,
+                "type": order_type,
+                "price": price,
+                "sl": sl,
+                "tp": tp_price,
+                "deviation": self._symbol_deviation(symbol),
+                "magic": self.magic_number,
+                "comment": "AI forex bot",
+                "type_filling": self._get_filling_mode(symbol),
+            }
+            if pending_ttl is not None:
+                request["type_time"] = self.mt5.ORDER_TIME_SPECIFIED
+                request["expiration"] = pending_ttl
+            else:
+                request["type_time"] = self.mt5.ORDER_TIME_GTC
+
+            result = self.mt5.order_send(request)
+            if result is None:
+                return False, f"Order yuborilmadi: {self.mt5.last_error()}", None
+            if result.retcode != self.mt5.TRADE_RETCODE_DONE:
+                return False, f"Order rad etildi, kod: {result.retcode}, komment: {result.comment}", None
+            tickets.append(result.order)
+            if first_result is None:
+                first_result = result
+
+            one_r_dist = stop_loss_pips * pip_size
+            self.state_manager.set_trade_info(result.order, {
+                "status": "OPEN",
+                "1r_dist": one_r_dist,
+                "entry_price": price,
+                "signal": signal,
+                "partial_closed": tp_price == tp1,  # TP1 leg — kichik hajmli qism
+                "trailing_mode": None,
+                "current_sl_level": 0,
+            })
 
         order_info = {
-            "ticket": result.order,
+            "ticket": first_result.order,
+            "tickets": tickets,
             "symbol": symbol,
             "signal": signal,
             "volume": lot_size,
             "price": price,
             "sl": sl,
             "tp": tp,
+            "tp1": tp1,
         }
-
-        # Holatni saqlash
-        one_r_dist = stop_loss_pips * pip_size
-        self.state_manager.set_trade_info(result.order, {
-            "status": "OPEN", 
-            "1r_dist": one_r_dist,
-            "entry_price": price,
-            "signal": signal,
-            "partial_closed": False,
-            "trailing_mode": None,
-            "current_sl_level": 0
-        })
-
         return True, "Order muvaffaqiyatli ochildi", order_info
+
 
     def close_partial_position(self, ticket: int, percent: float) -> Tuple[bool, str]:
         positions = self.mt5.positions_get(ticket=ticket)
