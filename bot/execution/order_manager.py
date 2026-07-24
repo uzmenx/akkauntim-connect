@@ -71,10 +71,17 @@ class OrderManager:
             return FILLING_IOC
         return FILLING_RETURN
 
-    def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None) -> Tuple[bool, str, Optional[dict]]:
+    def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None, take_profit_1_pips: Optional[float] = None) -> Tuple[bool, str, Optional[dict]]:
         """
         Tasdiqlangan signal asosida MT5'ga order (Market yoki Pending) yuboradi.
+        Agar `take_profit_1_pips` berilsa, hajm 70/30 ga bo'lib 2 ta alohida order joylashtiriladi (TP1 broker tomonida).
         """
+        # --- Portfolio guardlari ---
+        if self._in_cooldown(symbol):
+            return False, f"[{symbol}] cooldown ({self.COOLDOWN_SECONDS}s) ichida", None
+        if self._open_count(symbol) >= self.MAX_POSITIONS_PER_SYMBOL:
+            return False, f"[{symbol}] {self.MAX_POSITIONS_PER_SYMBOL} pozitsiya limiti to'ldi", None
+
         symbol_info = self.mt5.symbol_info(symbol)
         if symbol_info is None:
             return False, f"{symbol} topilmadi", None
@@ -82,6 +89,7 @@ class OrderManager:
         if not symbol_info.visible:
             if not self.mt5.symbol_select(symbol, True):
                 return False, f"{symbol} tanlab bo'lmadi", None
+
 
         tick = self.mt5.symbol_info_tick(symbol)
         if tick is None:
