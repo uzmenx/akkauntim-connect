@@ -141,36 +141,33 @@ class OrderManager:
         elif signal == "SELL":
             order_type = self.mt5.ORDER_TYPE_SELL
             price = tick.bid
-        elif signal == "BUY_LIMIT":
+        elif signal in ("BUY_LIMIT", "SELL_LIMIT", "BUY_STOP", "SELL_STOP"):
             if entry_price is None:
-                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
-                return False, f"Pending order uchun entry_price majburiy", None
+                return False, f"Pending order ({signal}) uchun entry_price majburiy", None
             action = self.mt5.TRADE_ACTION_PENDING
-            order_type = self.mt5.ORDER_TYPE_BUY_LIMIT
-            price = entry_price
-        elif signal == "SELL_LIMIT":
-            if entry_price is None:
-                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
-                return False, f"Pending order uchun entry_price majburiy", None
-            action = self.mt5.TRADE_ACTION_PENDING
-            order_type = self.mt5.ORDER_TYPE_SELL_LIMIT
-            price = entry_price
-        elif signal == "BUY_STOP":
-            if entry_price is None:
-                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
-                return False, f"Pending order uchun entry_price majburiy", None
-            action = self.mt5.TRADE_ACTION_PENDING
-            order_type = self.mt5.ORDER_TYPE_BUY_STOP
-            price = entry_price
-        elif signal == "SELL_STOP":
-            if entry_price is None:
-                logger.warning(f"Pending order ({signal}) uchun entry_price berilmagan, o'tkazib yuborildi.")
-                return False, f"Pending order uchun entry_price majburiy", None
-            action = self.mt5.TRADE_ACTION_PENDING
-            order_type = self.mt5.ORDER_TYPE_SELL_STOP
+            # Auto-flip LIMIT<->STOP entry_price joriy narxga nisbatan mos kelmasa.
+            is_buy = "BUY" in signal
+            current = tick.ask if is_buy else tick.bid
+            wants_limit = "LIMIT" in signal
+            price_below = entry_price < current
+            # BUY_LIMIT quyida, BUY_STOP tepada; SELL_LIMIT tepada, SELL_STOP quyida.
+            correct_limit = (is_buy and price_below) or ((not is_buy) and (not price_below))
+            if wants_limit != correct_limit:
+                new_signal = signal.replace("LIMIT", "STOP") if wants_limit else signal.replace("STOP", "LIMIT")
+                logger.info(f"[{symbol}] pending auto-flip {signal} -> {new_signal} (entry={entry_price}, market={current})")
+                signal = new_signal
+            if signal == "BUY_LIMIT":
+                order_type = self.mt5.ORDER_TYPE_BUY_LIMIT
+            elif signal == "SELL_LIMIT":
+                order_type = self.mt5.ORDER_TYPE_SELL_LIMIT
+            elif signal == "BUY_STOP":
+                order_type = self.mt5.ORDER_TYPE_BUY_STOP
+            else:
+                order_type = self.mt5.ORDER_TYPE_SELL_STOP
             price = entry_price
         else:
             return False, f"Noto'g'ri signal turi: {signal}", None
+
 
         # SL va TP ni hisoblash (digits yuqorida allaqachon o'rnatildi)
         if "BUY" in signal:
