@@ -26,25 +26,34 @@ class MT5Client:
         pass
 
     def _check_connection(self):
-        if not mt5.terminal_info() or not mt5.terminal_info().connected:
-            self.logger.warning("MT5 disconnected, trying to reconnect...")
-            self.connect()
+        ti = mt5.terminal_info()
+        if ti and ti.connected:
+            return
+        self.logger.warning("MT5 disconnected, trying to reconnect...")
+        import time
+        for i in range(5):
+            if self.connect():
+                self.logger.info(f"MT5 reconnected (attempt {i+1})")
+                return
+            delay = min(30, 2 ** i)
+            self.logger.warning(f"MT5 reconnect failed, retrying in {delay}s...")
+            time.sleep(delay)
+        self.logger.error("MT5 reconnect failed after 5 attempts")
 
     def connect(self) -> bool:
-        if not mt5.initialize():
-            self.logger.error(f"MT5 initialize failed, error code: {mt5.last_error()}")
-            return False
-            
-        if self.config and self.config.mt5_login and self.config.mt5_password and self.config.mt5_server:
-            authorized = mt5.login(
-                self.config.mt5_login,
-                password=self.config.mt5_password,
-                server=self.config.mt5_server
-            )
-            if not authorized:
-                self.logger.error(f"MT5 login failed, error code: {mt5.last_error()}")
+        try:
+            if not mt5.initialize():
+                self.logger.error(f"MT5 initialize failed: {mt5.last_error()}")
                 return False
-        return True
+            if self.config and self.config.mt5_login and self.config.mt5_password and self.config.mt5_server:
+                if not mt5.login(self.config.mt5_login, password=self.config.mt5_password, server=self.config.mt5_server):
+                    self.logger.error(f"MT5 login failed: {mt5.last_error()}")
+                    return False
+            return True
+        except Exception as e:
+            self.logger.error(f"MT5 connect exception: {e}")
+            return False
+
 
     def disconnect(self):
         mt5.shutdown()
