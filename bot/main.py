@@ -760,3 +760,22 @@ def create_bot(env_path: str = ".env", config_path: str = "config.json") -> Trad
     """BotConfig yuklab TradingBot yaratish."""
     config = BotConfig.load(env_path, config_path)
     return TradingBot(config)
+
+
+def run_cli() -> None:
+    """Console entry point: `yuksalish` CLI command."""
+    import logging, os, sys
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
+    project_root = os.environ.get("YUKSALISH_HOME") or os.getcwd()
+    env_path = os.path.join(project_root, ".env")
+    config_path = os.path.join(project_root, "config.json")
+    if not os.path.exists(env_path):
+        print(f"[yuksalish] .env topilmadi: {env_path}")
+        print("YUKSALISH_HOME muhit o'zgaruvchisini loyiha katalogiga o'rnating.")
+        sys.exit(1)
+    bot = create_bot(env_path=env_path, config_path=config_path)
+    bot.start()
