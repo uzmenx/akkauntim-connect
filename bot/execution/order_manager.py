@@ -1,14 +1,51 @@
 import logging
-from typing import Tuple, Optional, Any, Callable
+import time
+from typing import Tuple, Optional, Any, Callable, Dict
 
 logger = logging.getLogger(__name__)
 
+
 class OrderManager:
+    # Portfolio guards (rejadagi qarorlar bo'yicha)
+    MAX_POSITIONS_PER_SYMBOL = 2
+    COOLDOWN_SECONDS = 60           # yopilgandan keyin 1 daqiqa
+    PENDING_TTL_SECONDS = 6 * 3600  # 6 soat
+    TP1_PORTION = 0.70              # umumiy hajmning 70% TP1'ga ketadi
+
     def __init__(self, mt5_client: Any, state_manager: Any, config: Any):
         self.mt5 = mt5_client
         self.state_manager = state_manager
         self.config = config
         self.magic_number = getattr(self.config, "magic_number", 234000)
+        # symbol -> yopilgan-vaqt (epoch) — cooldown uchun
+        self._last_closed: Dict[str, float] = {}
+
+    def _symbol_deviation(self, symbol: str) -> int:
+        """Symbol-aware slippage/deviation (points)."""
+        s = symbol.upper()
+        if "XAU" in s or "GOLD" in s or "BTC" in s:
+            return 50
+        if "JPY" in s:
+            return 30
+        return 20
+
+    def record_closed(self, symbol: str) -> None:
+        """Yopilgan pozitsiyadan keyin cooldown boshlash."""
+        self._last_closed[symbol] = time.time()
+
+    def _in_cooldown(self, symbol: str) -> bool:
+        ts = self._last_closed.get(symbol)
+        if not ts:
+            return False
+        return (time.time() - ts) < self.COOLDOWN_SECONDS
+
+    def _open_count(self, symbol: str) -> int:
+        try:
+            positions = self.mt5.positions_get(symbol=symbol) or []
+            return sum(1 for p in positions if p.magic == self.magic_number)
+        except Exception:
+            return 0
+
 
     def _get_filling_mode(self, symbol: str) -> int:
         """Broker qo'llab-quvvatlaydigan filling mode ni aniqlash."""
