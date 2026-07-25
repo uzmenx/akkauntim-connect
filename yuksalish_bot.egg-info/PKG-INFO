@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: yuksalish-bot
+Version: 1.0.0
+Summary: Akkauntim Connect — AI Forex Trading Bot
+Requires-Python: >=3.10
+Requires-Dist: MetaTrader5>=5.0.45
+Requires-Dist: anthropic>=0.39.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: requests>=2.31.0
+Requires-Dist: python-dateutil>=2.8.2

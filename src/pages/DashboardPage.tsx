@@ -4,7 +4,7 @@ import { guestMock } from "@/lib/guestMock";
 import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
-  Play, Pause, Settings, ArrowUpDown, ChevronRight, TrendingUp, TrendingDown,
+  Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
   ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -178,7 +178,7 @@ export function DashboardPage() {
   const pct = limit > 0 ? (remaining / limit) * 100 : 0;
 
   return (
-    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden bg-[#040914]">
+    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden">
       
       {/* Background Gradient to simulate the bottom green glow */}
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/30 to-transparent pointer-events-none" />
@@ -190,8 +190,28 @@ export function DashboardPage() {
            <BalanceTrendChart history={history.data || []} currentBalance={Number(equity || 0)} />
         </div>
 
-        {/* Card 30%: Main Blue Card */}
-        <div className="w-full h-[34dvh] min-h-[235px] max-h-[310px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-5 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        {/* Stats Row 5%: Minimalist, Modern, Premium Stats Bar */}
+        <div className="h-[5dvh] min-h-[40px] shrink-0 w-full bg-[#10192e]/45 border border-white/5 rounded-2xl flex items-center justify-around text-center px-4 animate-in fade-in slide-in-from-top-3 duration-600 backdrop-blur-md shadow-lg shadow-black/10">
+          <div className="flex flex-col">
+            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">SAVDOLAR</span>
+            <span className="text-xs font-black text-white/95 mt-0.5">{stats.todayCount}</span>
+          </div>
+          <div className="w-[1px] h-3.5 bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">UMUMIY P/L</span>
+            <span className={`text-xs font-black tabular-nums mt-0.5 ${stats.todayPL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
+              {stats.todayPL >= 0 ? "+" : ""}{fmtMoney(stats.todayPL)}
+            </span>
+          </div>
+          <div className="w-[1px] h-3.5 bg-white/10" />
+          <div className="flex flex-col">
+            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">WIN RATE</span>
+            <span className="text-xs font-black text-white/95 mt-0.5">{stats.wr != null ? `${stats.wr}%` : "0%"}</span>
+          </div>
+        </div>
+
+        {/* Card 20%: Main Blue Card */}
+        <div className="w-full h-[23dvh] min-h-[180px] max-h-[220px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Card Top Header */}
           <div className="flex justify-between items-center">
@@ -249,17 +269,14 @@ export function DashboardPage() {
           </div>
 
           {/* Balance Area */}
-          <div className="text-center flex flex-col items-center justify-center flex-1 py-1">
-            <span className="text-[9px] text-blue-200/80 font-bold tracking-widest uppercase bg-white/10 px-3 py-1 rounded-full inline-block backdrop-blur-sm mb-2">
-              Your Balance
-            </span>
+          <div className="text-center flex flex-col items-center justify-center flex-1 py-0.5">
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums drop-shadow-md">
               {equity != null ? fmtMoney(Number(equity), currency) : "$89,405.18"}
             </h1>
           </div>
 
           {/* Avatars Row */}
-          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-3 cursor-pointer">
+          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-1.5 cursor-pointer">
             {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
               <div key={seed} className={`w-8 h-8 rounded-full border-2 border-[#0052e0] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
                 <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
@@ -274,7 +291,14 @@ export function DashboardPage() {
             </Link>
             
             <Link to="/signals" className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Signals">
-              <ArrowUpDown size={18} className="group-hover:scale-110 transition-transform" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="group-hover:scale-110 transition-transform">
+                <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
+                  <path stroke="currentColor" d="M40 48v24"/>
+                  <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
+                  <path stroke="currentColor" d="M17.373 62.627A32 32 0 0 1 40 8m22.627 54.627A32 32 0 0 0 40 8"/>
+                  <path stroke="currentColor" d="M25.858 54.142A20 20 0 0 1 40 20m14.142 34.142A20 20 0 0 0 40 20"/>
+                </g>
+              </svg>
             </Link>
 
             <button onClick={toggleFilter} className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center transition-all border border-white/10 group shadow-md" aria-label="Filter Mode">

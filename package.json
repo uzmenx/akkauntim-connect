@@ -3,10 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bunx --bun vite --host 0.0.0.0 --port 8080",
-    "build": "bunx --bun vite build",
-    "build:dev": "bunx --bun vite build --mode development",
-    "preview": "bunx --bun vite preview --host 0.0.0.0 --port 8080",
+    "dev": "vite --host 0.0.0.0 --port 8080",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
+    "preview": "vite preview --host 0.0.0.0 --port 8080",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open android"
   },

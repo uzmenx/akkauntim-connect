@@ -211,7 +211,7 @@ export function SettingsPage() {
     const handleReset = async () => {
       if (window.confirm("Haqiqatan ham barcha sozlamalarni standart holatga qaytarmoqchimisiz?")) {
         const defaults = {
-          symbols: ["EURUSD", "GBPUSD", "XAUUSD"],
+          symbols: ["AUTO"],
           risk_per_trade: 0.02,
           max_daily_loss: 0.10,
           min_confidence: 50,
@@ -273,23 +273,49 @@ export function SettingsPage() {
         
         <div className="space-y-4">
           <div>
-            <label className="mb-2 block text-xs font-semibold text-fg-muted">Faol savdo juftliklari (Maks: 3)</label>
-            <div 
-              onClick={() => setIsSymbolModalOpen(true)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-fg cursor-pointer hover:bg-white/5 transition-all flex items-center justify-between"
-            >
-              <div className="flex-1 truncate">
-                {(form.symbols?.length || 0) > 0 
-                  ? form.symbols?.join(", ") 
-                  : <span className="text-fg-muted">Juftliklarni tanlang...</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full">
-                  {form.symbols?.length || 0}/3
-                </span>
-                <ListPlus size={16} className="text-brand opacity-80" />
-              </div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-semibold text-fg-muted">Smart Scanner (Avto-qidiruv)</label>
+              <button 
+                type="button"
+                onClick={() => {
+                  const isAuto = form.symbols?.includes("AUTO");
+                  setForm(f => ({ ...f, symbols: isAuto ? ["EURUSD", "GBPUSD", "XAUUSD"] : ["AUTO"] }));
+                }}
+                className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 ease-in-out ${form.symbols?.includes("AUTO") ? 'bg-brand' : 'bg-white/10'}`}
+              >
+                <span className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${form.symbols?.includes("AUTO") ? 'translate-x-[14px]' : 'translate-x-1'}`} />
+              </button>
             </div>
+            
+            {form.symbols?.includes("AUTO") ? (
+              <div className="w-full rounded-xl border border-brand/30 bg-brand/10 px-4 py-3 text-sm text-brand-soft flex items-center gap-3">
+                <div className="w-2 h-2 rounded-full bg-brand animate-pulse shrink-0"></div>
+                <div className="flex-1 text-xs">
+                  <p className="font-semibold text-brand mb-0.5">Avtomatik qidiruv FAOL</p>
+                  <p className="text-brand-soft/70 leading-relaxed">Bot MT5 dagi barcha ruxsat etilgan juftliklarni 3 tadan aylanib tahlil qilmoqda. Holatni Dashboard ekranidan jonli kuzatishingiz mumkin.</p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-2 mt-3 block text-[10px] font-semibold text-fg-muted">Qo'lda tanlash (Maks: 3)</label>
+                <div 
+                  onClick={() => setIsSymbolModalOpen(true)}
+                  className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-fg cursor-pointer hover:bg-white/5 transition-all flex items-center justify-between"
+                >
+                  <div className="flex-1 truncate">
+                    {(form.symbols?.filter(s => s !== "AUTO").length || 0) > 0 
+                      ? form.symbols?.filter(s => s !== "AUTO").join(", ") 
+                      : <span className="text-fg-muted">Juftliklarni tanlang...</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full">
+                      {form.symbols?.filter(s => s !== "AUTO").length || 0}/3
+                    </span>
+                    <ListPlus size={16} className="text-brand opacity-80" />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

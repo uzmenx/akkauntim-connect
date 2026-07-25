@@ -138,6 +138,22 @@ class MT5Client:
             
         return result
 
+    def get_tradeable_symbols(self) -> List[str]:
+        """MT5 dan barcha savdo qilish mumkin bo'lgan (FULL ruxsatli) juftliklarni oladi."""
+        self._check_connection()
+        symbols = mt5.symbols_get()
+        if symbols is None:
+            self.logger.error(f"Failed to get symbols, error code: {mt5.last_error()}")
+            return []
+            
+        tradeable = []
+        for s in symbols:
+            # Faqat savdo qilish to'liq ruxsat etilgan va ko'rinadigan juftliklarni olamiz
+            if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL and s.visible:
+                tradeable.append(s.name)
+                
+        return tradeable
+
     # === Alias methods for backward compatibility ===
     # OrderManager va boshqa modullar to'g'ridan-to'g'ri MT5 metodlarini chaqiradi
     def symbol_info(self, symbol: str):

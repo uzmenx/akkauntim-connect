@@ -107,13 +107,25 @@ class AIClient:
                     last_exception = e
                     if attempt < retries:
                         time.sleep(4)  # Wait longer for rate limits
+                except anthropic.NotFoundError as e:
+                    # Model mavjud emas, darhol keyingi modelga o'tish (qayta urinmasdan)
+                    self.logger.warning(f"Model {model} topilmadi (404). Keyingi modelga o'tilmoqda...")
+                    last_exception = e
+                    break
                 except Exception as e:
-                    self.logger.warning(f"Model {model} failed: {e}")
+                    # Boshqa xatoliklar (masalan API key xato bo'lsa yoki 500 error)
+                    # not_found_error bo'lsa tekshiramiz
+                    if "not_found_error" in str(e):
+                        self.logger.warning(f"Model {model} mavjud emas. Keyingi modelga o'tilmoqda...")
+                        last_exception = e
+                        break
+                        
+                    self.logger.warning(f"Model {model} bilan ulanishda xato: {e}")
                     last_exception = e
                     if attempt < retries:
                         time.sleep(2)
                 
-        self.logger.error(f"All models failed for get_decision. Last error: {last_exception}")
+        self.logger.error(f"Hech qaysi AI modeli ishlamadi. Oxirgi xato: {last_exception}")
         return None
 
     def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:

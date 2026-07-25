@@ -60,8 +60,44 @@ class RiskManager:
             return False, f"Ishonch darajasi past: {confidence}% (minimal {min_conf}% kerak)"
         return True, "OK"
 
-    def calculate_lot_size(self, symbol: str, stop_loss_pips: float, risk_pct: Optional[float] = None) -> Tuple[Optional[float], str]:
-        """Risk foiziga asoslanib lot hajmini hisoblaydi"""
+    def check_max_positions(self, symbol: str) -> Tuple[bool, str]:
+        """Bitta juftlik uchun maksimal ochiq pozitsiyalar sonini tekshiradi."""
+        open_positions = self.mt5.get_positions(symbol=symbol)
+        # Config dan olamiz, topilmasa standart 10
+        max_pos = getattr(self.config, "max_positions_per_symbol", 10)
+        
+        if open_positions and len(open_positions) >= max_pos:
+            return False, f"Max ochiq pozitsiyalar limitiga yetildi: {len(open_positions)} (Limit: {max_pos})"
+            
+        return True, "OK"
+
+    def check_signal_cooldown(self, symbol: str, signal: str) -> Tuple[bool, str]:
+        """Oxirgi marta shu juftlikda savdo ochilganiga qancha vaqt bo'lganini tekshiradi (cooldown)."""
+        open_positions = self.mt5.get_positions(symbol=symbol)
+        if not open_positions:
+            return True, "OK"
+            
+        import time
+        current_time = time.time()
+        # Config dan olamiz, topilmasa standart 15 daqiqa
+        cooldown_minutes = getattr(self.config, "signal_cooldown_minutes", 15)
+        cooldown_seconds = cooldown_minutes * 60
+        
+        # BUY yoki BUY_LIMIT/BUY_STOP farqi yo'q asosiy yo'nalishni olamiz
+        is_buy = "BUY" in signal.upper()
+        signal_type = self.mt5.ORDER_TYPE_BUY if is_buy else self.mt5.ORDER_TYPE_SELL
+        
+        for pos in open_positions:
+            if pos.type == signal_type:
+                time_since_open = current_time - pos.time
+                if time_since_open < cooldown_seconds:
+                    minutes_passed = int(time_since_open / 60)
+                    return False, f"Anti-spam: Aynan shu yo'nalishda {minutes_passed} daqiqa oldin bitim ochilgan. (Kutish kerak: {cooldown_minutes} daqiqa)"
+                    
+        return True, "OK"
+
+    def calculate_lot_size(self, symbol: str, stop_loss_price_diff: float, risk_pct: Optional[float] = None) -> Tuple[Optional[float], str]:
+        """Risk foiziga asoslanib lot hajmini hisoblaydi (Aniq formula)"""
         if risk_pct is None:
             risk_pct = getattr(self.config, "risk_per_trade", 0.02)
             
@@ -79,27 +115,19 @@ class RiskManager:
             return None, "Symbol ma'lumoti topilmadi"
 
         tick_value = symbol_info.trade_tick_value
-        digits = symbol_info.digits
+        tick_size = symbol_info.trade_tick_size
         
-        # 2. 1 pip qiymatini hisoblash (1 lot uchun)
-        # MT5 da tick_value bu 1 ta point (tick) o'zgarishining 1 lot uchun qiymati.
-        # Bizda stop_loss_pips berilgan, shuning uchun pip qadrini topishimiz kerak.
-        if digits == 3 or digits == 5:  # JPY (masalan 150.123) yoki standart Forex (1.10543)
-            # 1 pip = 10 point (tick)
-            pip_value_per_lot = tick_value * 10
-        elif digits == 2:  # Oltin (XAUUSD - 2400.50)
-            # Oltin uchun pip divisor odatda 0.1 (ya'ni 1 pip = 0.1)
-            # Tick o'lchami esa 0.01. Demak 1 pip = 10 tick.
-            pip_value_per_lot = tick_value * 10
-        else:
-            pip_value_per_lot = tick_value * 10 # Standart fallback
+        if tick_size <= 0 or tick_value <= 0 or stop_loss_price_diff <= 0:
+            return None, "Noto'g'ri parametrlar: tick_size, tick_value yoki SL masofasi 0."
 
-        if pip_value_per_lot <= 0 or stop_loss_pips <= 0:
-            return None, "Noto'g'ri SL yoki Pip Value parametrlar"
+        # 2. 1 lot uchun risk qilinayotgan zarar
+        loss_for_1_lot = (stop_loss_price_diff / tick_size) * tick_value
+        
+        if loss_for_1_lot <= 0:
+            return None, "1 lot uchun zarar 0 yoki undan kichik chiqdi."
 
         # 3. Lot formulasini qo'llash
-        # Lot = Risk Summasi / (SL pips * 1 lot uchun Pip Value)
-        raw_lot_size = risk_amount / (stop_loss_pips * pip_value_per_lot)
+        raw_lot_size = risk_amount / loss_for_1_lot
 
         # 4. Broker cheklovlariga (volume step) aniq moslashtirish
         volume_step = symbol_info.volume_step
@@ -119,17 +147,20 @@ class RiskManager:
 
         logger.info(
             f"[{symbol}] Risk Hisob-kitobi: Balans=${balance:.2f}, Risk={risk_pct*100:.2f}% (${risk_amount:.2f}), "
-            f"SL={stop_loss_pips} pip, Pip Value=${pip_value_per_lot:.2f} -> "
+            f"SL Masofasi={stop_loss_price_diff:.5f}, 1 Lot SL Zarari=${loss_for_1_lot:.2f} -> "
             f"Kerakli Lot: {raw_lot_size:.4f}, Yaxlitlangan Lot: {lot_size}"
         )
 
         return lot_size, "OK"
 
-    def validate_trade(self, symbol: str, signal: str, confidence: int, stop_loss_pips: float, risk_pct: Optional[float] = None) -> Tuple[bool, str, Optional[float]]:
+    def validate_trade(self, symbol: str, signal: str, confidence: int, stop_loss_price_diff: float, risk_pct: Optional[float] = None) -> Tuple[bool, str, Optional[float]]:
         """
         Barcha risk tekshiruvlarini birlashtiradi.
         Qaytaradi: (ruxsat_bermi: bool, xabar: str, lot_size: float yoki None)
         """
+        if signal == "HOLD":
+            return False, "Signal HOLD — savdo qilinmaydi", None
+
         ok, msg = self.check_daily_loss_limit()
         if not ok:
             logger.warning(f"Risk tekshiruvi xatosi: {msg}")
@@ -140,10 +171,19 @@ class RiskManager:
             logger.warning(f"Risk tekshiruvi xatosi: {msg}")
             return False, msg, None
 
-        if signal == "HOLD":
-            return False, "Signal HOLD — savdo qilinmaydi", None
+        # Max bitimlar tekshiruvi
+        ok, msg = self.check_max_positions(symbol)
+        if not ok:
+            logger.warning(f"Risk tekshiruvi xatosi (Max Positions): {msg}")
+            return False, msg, None
 
-        lot_size, msg = self.calculate_lot_size(symbol, stop_loss_pips, risk_pct=risk_pct)
+        # Cooldown / Anti-spam tekshiruvi
+        ok, msg = self.check_signal_cooldown(symbol, signal)
+        if not ok:
+            logger.warning(f"Risk tekshiruvi xatosi (Cooldown): {msg}")
+            return False, msg, None
+
+        lot_size, msg = self.calculate_lot_size(symbol, stop_loss_price_diff, risk_pct=risk_pct)
         if lot_size is None:
             logger.warning(f"Risk tekshiruvi xatosi (Lot hisoblash): {msg}")
             return False, msg, None

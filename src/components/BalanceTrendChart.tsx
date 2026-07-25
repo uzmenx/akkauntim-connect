@@ -8,7 +8,7 @@ interface BalanceTrendChartProps {
 }
 
 export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChartProps) {
-  const { points, startBalance, endBalance, startTime, endTime, path, fillPath } = useMemo(() => {
+  const { points, startBalance, endBalance, startTime, endTime, path, fillPath, segments = [] } = useMemo(() => {
     if (!history || history.length === 0) {
       return {
         points: [],
@@ -17,7 +17,8 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
         startTime: new Date(),
         endTime: new Date(),
         path: "",
-        fillPath: ""
+        fillPath: "",
+        segments: []
       };
     }
 
@@ -87,6 +88,26 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
       pathData += ` C ${cp1X.toFixed(2)},${cp1Y.toFixed(2)} ${cp2X.toFixed(2)},${cp2Y.toFixed(2)} ${nextX.toFixed(2)},${nextY.toFixed(2)}`;
     }
 
+    const segments = [];
+    for (let i = 0; i < dataPoints.length - 1; i++) {
+      const currentX = getX(i);
+      const currentY = getY(dataPoints[i].balance);
+      const nextX = getX(i + 1);
+      const nextY = getY(dataPoints[i + 1].balance);
+      
+      const cp1X = currentX + (nextX - currentX) / 2;
+      const cp1Y = currentY;
+      const cp2X = currentX + (nextX - currentX) / 2;
+      const cp2Y = nextY;
+      
+      const segmentPath = `M ${currentX.toFixed(2)},${currentY.toFixed(2)} C ${cp1X.toFixed(2)},${cp1Y.toFixed(2)} ${cp2X.toFixed(2)},${cp2Y.toFixed(2)} ${nextX.toFixed(2)},${nextY.toFixed(2)}`;
+      const isSegmentProfit = dataPoints[i + 1].balance >= dataPoints[i].balance;
+      segments.push({
+        path: segmentPath,
+        color: isSegmentProfit ? "#34d399" : "#fb7185"
+      });
+    }
+
     const fillData = `${pathData} L ${w},${h} L 0,${h} Z`;
 
     return {
@@ -96,10 +117,57 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
       startTime,
       endTime,
       path: pathData,
-      fillPath: fillData
+      fillPath: fillData,
+      segments
     };
 
   }, [history, currentBalance]);
+
+  const [hoveredPoint, setHoveredPoint] = React.useState<{ time: number; balance: number } | null>(null);
+  const [hoveredX, setHoveredX] = React.useState<number | null>(null);
+  const [hoveredY, setHoveredY] = React.useState<number | null>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMove = (clientX: number) => {
+    if (!containerRef.current || points.length === 0) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const width = rect.width;
+    const pct = Math.max(0, Math.min(1, x / width));
+    const closestIdx = Math.round(pct * (points.length - 1));
+    const point = points[closestIdx];
+    
+    if (point) {
+      setHoveredPoint(point);
+      const svgX = (closestIdx / (points.length - 1)) * 300;
+      setHoveredX(svgX);
+
+      const minBalance = Math.min(...points.map(p => p.balance));
+      const maxBalance = Math.max(...points.map(p => p.balance));
+      const yPad = (maxBalance - minBalance) * 0.15 || 10;
+      const minY = minBalance - yPad;
+      const maxY = maxBalance + yPad;
+      const yRange = Math.max(maxY - minY, 1);
+      const svgY = 50 - ((point.balance - minY) / yRange) * 50;
+      setHoveredY(svgY);
+    }
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    handleMove(e.clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches[0]) {
+      handleMove(e.touches[0].clientX);
+    }
+  };
+
+  const onMouseLeave = () => {
+    setHoveredPoint(null);
+    setHoveredX(null);
+    setHoveredY(null);
+  };
 
   if (points.length === 0) {
     return (
@@ -116,11 +184,32 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
   const isProfit = endBalance >= startBalance;
 
   return (
-    <div className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg">
+    <div 
+      ref={containerRef}
+      onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchMove}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onMouseLeave}
+      className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
+    >
       {/* Background SVG Grid / Glow */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>
       </div>
+      
+      {/* Tooltip Overlay */}
+      {hoveredPoint && (
+        <div className="absolute top-1.5 left-1/2 -translate-x-1/2 z-20 bg-black/85 backdrop-blur-md px-2.5 py-0.5 rounded-full border border-white/10 flex items-center gap-2 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
+          <span className="text-[8px] text-white/50 font-bold tracking-tight">
+            {formatShortTime(new Date(hoveredPoint.time))}
+          </span>
+          <div className="w-[1px] h-2 bg-white/20" />
+          <span className={`text-[9px] font-black tabular-nums ${hoveredPoint.balance >= startBalance ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {fmtMoney(hoveredPoint.balance)}
+          </span>
+        </div>
+      )}
       
       {/* The Chart */}
       <div className="absolute inset-0 pt-4 pb-2 px-0 w-full h-full pointer-events-none opacity-80 flex items-center">
@@ -143,31 +232,43 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
             fill="url(#trendGradient)" 
             className="transition-all duration-1000 ease-in-out"
           />
-          <path 
-            d={path} 
-            fill="none" 
-            stroke={isProfit ? "#34d399" : "#fb7185"} 
-            strokeWidth="1.5" 
-            strokeLinejoin="round" 
-            strokeLinecap="round"
-            filter="url(#glow)"
-            className="transition-all duration-1000 ease-in-out"
-          />
+          {segments.map((seg, idx) => (
+            <path 
+              key={idx}
+              d={seg.path} 
+              fill="none" 
+              stroke={seg.color} 
+              strokeWidth="1.5" 
+              strokeLinejoin="round" 
+              strokeLinecap="round"
+              filter="url(#glow)"
+            />
+          ))}
+          
+          {/* Interactive guideline and hover dot */}
+          {hoveredX !== null && (
+            <>
+              <line 
+                x1={hoveredX} 
+                y1={0} 
+                x2={hoveredX} 
+                y2={50} 
+                stroke="rgba(255,255,255,0.2)" 
+                strokeWidth="0.8" 
+                strokeDasharray="2 2"
+              />
+              <circle 
+                cx={hoveredX} 
+                cy={hoveredY !== null ? hoveredY : 25} 
+                r="3" 
+                fill="#ffffff" 
+                stroke={hoveredPoint && hoveredPoint.balance >= startBalance ? "#34d399" : "#fb7185"} 
+                strokeWidth="1.5" 
+                filter="url(#glow)"
+              />
+            </>
+          )}
         </svg>
-      </div>
-
-      {/* Stats overlay */}
-      <div className="relative z-10 flex justify-between items-end h-full py-2">
-        <div className="flex flex-col text-left">
-          <span className="text-[9px] text-white/50 font-medium tracking-wide uppercase">{formatShortTime(startTime)}</span>
-          <span className="text-xs font-bold text-white/80 tabular-nums">{fmtMoney(startBalance)}</span>
-        </div>
-        <div className="flex flex-col text-right">
-          <span className="text-[9px] text-white/50 font-medium tracking-wide uppercase">{formatShortTime(endTime)}</span>
-          <span className={`text-sm font-black tabular-nums drop-shadow-sm ${isProfit ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {fmtMoney(endBalance)}
-          </span>
-        </div>
       </div>
     </div>
   );

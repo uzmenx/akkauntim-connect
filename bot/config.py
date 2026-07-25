@@ -15,6 +15,8 @@ class BotConfig:
     supabase_url: str = ""
     supabase_key: str = ""
     bot_sync_secret: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     # config.json values
     trading_symbols: List[str] = field(default_factory=list)
@@ -24,7 +26,7 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model: str = "claude-sonnet-4-5"
+    ai_model: str = "claude-3-5-sonnet-20241022"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -41,6 +43,10 @@ class BotConfig:
     news_lookback_hours: int = 24
     max_spread_multiplier: float = 4.0
     ai_max_tokens: int = 2000
+    
+    # Yangi xususiyatlar
+    auto_discover_symbols: bool = True
+    batch_size: int = 3
     ai_models_fallback: List[str] = field(default_factory=lambda: [
         "claude-sonnet-4-5",
         "claude-3-5-sonnet-20241022",
@@ -69,6 +75,8 @@ class BotConfig:
         self.supabase_url = os.environ.get("SUPABASE_URL", os.environ.get("VITE_SUPABASE_URL", ""))
         self.supabase_key = os.environ.get("SUPABASE_PUBLISHABLE_KEY", os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY", ""))
         self.bot_sync_secret = os.environ.get("BOT_SYNC_SECRET", "")
+        self.telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        self.telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "@avlodona")
 
     def load_config(self, config_path: str = "config.json") -> None:
         try:
@@ -88,6 +96,8 @@ class BotConfig:
                     ai = data.get("ai", {})
                     self.ai_model = ai.get("model", self.ai_model)
                     self.ai_system_prompt = ai.get("system_prompt", self.ai_system_prompt)
+                    if "models_fallback" in ai and isinstance(ai["models_fallback"], list):
+                        self.ai_models_fallback = ai["models_fallback"]
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
@@ -99,6 +109,10 @@ class BotConfig:
             
         if "symbols" in data and isinstance(data["symbols"], list):
             self.trading_symbols = data["symbols"]
+            if "AUTO" in [s.upper() for s in self.trading_symbols]:
+                self.auto_discover_symbols = True
+            else:
+                self.auto_discover_symbols = False
             
         if "timeframe_major" in data:
             self.timeframe_major = data["timeframe_major"]

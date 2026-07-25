@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 yuksalish = "bot.main:run_cli"
+yuksal = "bot.main:run_cli"
 
 [tool.setuptools]
 packages = ["bot", "bot.core", "bot.engine", "bot.execution", "bot.strategy",

@@ -430,7 +430,7 @@ class OrderManager:
                     # Kelajakda M5 tuzilishi asosida suriladi, hozircha STEP kabi ishlaydi
                     pass
 
-    def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "News Straddle") -> Tuple[bool, str, Optional[dict]]:
+    def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "Pending Order", expiration_minutes: Optional[int] = None) -> Tuple[bool, str, Optional[dict]]:
         symbol_info = self.mt5.symbol_info(symbol)
         if symbol_info is None:
             return False, f"{symbol} topilmadi", None
@@ -457,8 +457,16 @@ class OrderManager:
             order_type = self.mt5.ORDER_TYPE_SELL_STOP
             sl = round(price + stop_loss_pips * pip_size, digits)
             tp = round(price - take_profit_pips * pip_size, digits)
+        elif order_type_str == "BUY_LIMIT":
+            order_type = self.mt5.ORDER_TYPE_BUY_LIMIT
+            sl = round(price - stop_loss_pips * pip_size, digits)
+            tp = round(price + take_profit_pips * pip_size, digits)
+        elif order_type_str == "SELL_LIMIT":
+            order_type = self.mt5.ORDER_TYPE_SELL_LIMIT
+            sl = round(price + stop_loss_pips * pip_size, digits)
+            tp = round(price - take_profit_pips * pip_size, digits)
         else:
-            return False, "Noto'g'ri pending order turi", None
+            return False, f"Noto'g'ri pending order turi: {order_type_str}", None
 
         request = {
             "action": self.mt5.TRADE_ACTION_PENDING,
@@ -471,9 +479,15 @@ class OrderManager:
             "deviation": 20,
             "magic": magic,
             "comment": comment,
-            "type_time": self.mt5.ORDER_TIME_GTC,
             "type_filling": self._get_filling_mode(symbol),
         }
+        
+        if expiration_minutes:
+            import time
+            request["type_time"] = self.mt5.ORDER_TIME_SPECIFIED
+            request["expiration"] = int(time.time() + (expiration_minutes * 60))
+        else:
+            request["type_time"] = self.mt5.ORDER_TIME_GTC
 
         result = self.mt5.order_send(request)
 

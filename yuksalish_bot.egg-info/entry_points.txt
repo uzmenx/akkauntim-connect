@@ -1,0 +1,3 @@
+[console_scripts]
+yuksal = bot.main:run_cli
+yuksalish = bot.main:run_cli
