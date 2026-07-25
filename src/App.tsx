@@ -149,6 +149,7 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/pricing" element={<SubscriptionPage />} />
           <Route path="/backtest" element={<BacktestPage />} />
+          <Route path="/connectors" element={<ConnectorsPage />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
