@@ -22,10 +22,10 @@ const MINOR_TIMEFRAME_OPTIONS = [
 ];
 
 const AI_MODEL_OPTIONS = [
-  { value: "auto", label: "Avtomatik (Sonnet -> Haiku)" },
-  { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet (Tavsiya)" },
-  { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (Tezkor)" },
-  { value: "claude-3-opus-20240229", label: "Claude 3 Opus (Murakkab)" },
+  { value: "auto", label: "Avtomatik (Sonnet 5 -> Fable 5)" },
+  { value: "claude-sonnet-5", label: "Claude 5 Sonnet (Tavsiya)" },
+  { value: "claude-fable-5", label: "Claude 5 Fable (Tezkor)" },
+  { value: "claude-opus-5", label: "Claude 5 Opus (Murakkab)" },
 ];
 
 const ASSET_CATEGORIES: Record<string, string[]> = {
