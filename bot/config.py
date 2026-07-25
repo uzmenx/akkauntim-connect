@@ -26,7 +26,7 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model: str = "claude-3-5-sonnet-20241022"
+    ai_model: str = "claude-sonnet-5"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -48,8 +48,8 @@ class BotConfig:
     auto_discover_symbols: bool = True
     batch_size: int = 3
     ai_models_fallback: List[str] = field(default_factory=lambda: [
-        "claude-3-5-sonnet-20241022",
-        "claude-3-5-haiku-20241022",
+        "claude-sonnet-5",
+        "claude-fable-5",
     ])
 
     @classmethod

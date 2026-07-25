@@ -61,10 +61,9 @@ class AIClient:
             preferred = "claude-3-5-sonnet-20241022"
         fallbacks = list(getattr(self.config, "ai_models_fallback", []) or [])
         default_stack = [
-            "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022",
-            "claude-3-5-sonnet-20240620",
-            "claude-3-haiku-20240307",
+            "claude-sonnet-5",
+            "claude-fable-5",
+            "claude-opus-5",
         ]
         seen, models_to_try = set(), []
         for m in [preferred, *fallbacks, *default_stack]:
@@ -133,7 +132,7 @@ class AIClient:
 
     def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:
         # Typically use haiku for simple responses like trailing decisions
-        model = "claude-3-haiku-20240307"
+        model = "claude-fable-5"
         try:
             kwargs = {
                 "model": model,
