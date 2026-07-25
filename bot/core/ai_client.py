@@ -90,7 +90,7 @@ class AIClient:
                         
                     response = self.client.messages.create(**kwargs)
                     
-                    content = response.content[0].text
+                    content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
                     
                     # Tracking tokens and cost
                     in_tok = response.usage.input_tokens
@@ -143,7 +143,8 @@ class AIClient:
                 kwargs["system"] = system_prompt
                 
             response = self.client.messages.create(**kwargs)
-            return response.content[0].text.strip()
+            content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
+            return content.strip()
         except Exception as e:
             self.logger.error(f"Failed to get simple response: {e}")
             return ""
