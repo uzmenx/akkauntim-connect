@@ -23,6 +23,10 @@ export type Database = {
           reasoning: string | null
           rejection_reason: string | null
           signal: string
+          entry_price: number | null
+          sl_price: number | null
+          tp_price: number | null
+          rr_ratio: number | null
           stop_loss_pips: number | null
           symbol: string
           take_profit_pips: number | null
@@ -36,6 +40,10 @@ export type Database = {
           reasoning?: string | null
           rejection_reason?: string | null
           signal: string
+          entry_price?: number | null
+          sl_price?: number | null
+          tp_price?: number | null
+          rr_ratio?: number | null
           stop_loss_pips?: number | null
           symbol: string
           take_profit_pips?: number | null
@@ -49,6 +57,10 @@ export type Database = {
           reasoning?: string | null
           rejection_reason?: string | null
           signal?: string
+          entry_price?: number | null
+          sl_price?: number | null
+          tp_price?: number | null
+          rr_ratio?: number | null
           stop_loss_pips?: number | null
           symbol?: string
           take_profit_pips?: number | null

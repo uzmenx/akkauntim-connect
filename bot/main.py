@@ -453,8 +453,11 @@ class TradingBot:
         )
 
         try:
+            rr_ratio = round(tp_pips / sl_pips, 2) if sl_pips and sl_pips > 0 else 0.0
             self.sync.log_ai_signal(
-                symbol=symbol, signal=final_decision, confidence=80, reasoning=ai_decision.get("reasoning", "")
+                symbol=symbol, signal=final_decision, confidence=80, reasoning=ai_decision.get("reasoning", ""),
+                entry_price=entry_price, sl_price=sl_price, tp_price=tp_price, rr_ratio=rr_ratio,
+                stop_loss_pips=sl_pips, take_profit_pips=tp_pips
             )
             self.sync.log_claude_cost(self.ai.total_cost)
         except Exception as e:
@@ -539,14 +542,23 @@ class TradingBot:
                     except Exception as e:
                         logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
 
-                    # Juftliklarni aniqlash va guruhlash (Batching)
-                    if getattr(self.config, "auto_discover_symbols", True):
-                        all_symbols = self.mt5.get_tradeable_symbols()
+                    # Juftliklarni aniqlash (Dam olish kuni vs Ish kuni)
+                    import datetime
+                    is_weekend = datetime.datetime.utcnow().weekday() >= 5
+                    
+                    if is_weekend:
+                        all_symbols = self.mt5.get_crypto_symbols()
                         if not all_symbols:
-                            logger.warning("MT5 dan juftliklar topilmadi. Config dagi juftliklardan foydalanamiz.")
-                            all_symbols = self.config.trading_symbols
+                            logger.warning("MT5 dan Kripto juftliklar topilmadi! Dam olish kuni ishlash imkonsiz.")
+                        # else log yozmaymiz, chunki tsikl har marta aylanadi
                     else:
-                        all_symbols = self.config.trading_symbols
+                        if getattr(self.config, "auto_discover_symbols", True):
+                            all_symbols = self.mt5.get_tradeable_symbols()
+                            if not all_symbols:
+                                logger.warning("MT5 dan juftliklar topilmadi. Config dagi juftliklardan foydalanamiz.")
+                                all_symbols = self.config.trading_symbols
+                        else:
+                            all_symbols = self.config.trading_symbols
 
                     if not all_symbols:
                         logger.warning("Tahlil uchun hech qanday juftlik yo'q.")
@@ -572,6 +584,12 @@ class TradingBot:
 
                     # Ochiq pozitsiyalarni boshqarish
                     self.manage_positions()
+                    
+                    # Virtual Stop Loss va Spread himoyasi
+                    try:
+                        self.orders.manage_virtual_sl()
+                    except Exception as e:
+                        logger.error(f"Virtual SL boshqarishda xatolik: {e}")
                     
                     # AI Review tekshiruvi (Har safar chaqiriladi, ichkarida o'zi 10 taga to'lganini tekshiradi)
                     try:

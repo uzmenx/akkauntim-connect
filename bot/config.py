@@ -48,7 +48,6 @@ class BotConfig:
     auto_discover_symbols: bool = True
     batch_size: int = 3
     ai_models_fallback: List[str] = field(default_factory=lambda: [
-        "claude-sonnet-4-5",
         "claude-3-5-sonnet-20241022",
         "claude-3-5-haiku-20241022",
     ])

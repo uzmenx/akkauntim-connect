@@ -76,6 +76,10 @@ export type AISignal = {
   signal: "BUY" | "SELL" | "HOLD" | string;
   confidence: number;
   reasoning: string | null;
+  entry_price: number | null;
+  sl_price: number | null;
+  tp_price: number | null;
+  rr_ratio: number | null;
   stop_loss_pips: number | null;
   take_profit_pips: number | null;
   executed: boolean;

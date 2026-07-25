@@ -57,9 +57,10 @@ class AIClient:
 
         # Faqat haqiqiy Anthropic model-slug'lariga tayanamiz.
         preferred = getattr(self.config, "ai_model", "") or ""
+        if preferred == "auto":
+            preferred = "claude-3-5-sonnet-20241022"
         fallbacks = list(getattr(self.config, "ai_models_fallback", []) or [])
         default_stack = [
-            "claude-sonnet-4-5",
             "claude-3-5-sonnet-20241022",
             "claude-3-5-haiku-20241022",
         ]

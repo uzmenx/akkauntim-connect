@@ -178,15 +178,30 @@ function SignalCard({ s }: { s: AISignal }) {
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-        <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
-          SL {fmtNum(s.stop_loss_pips, 0)} pip
-        </span>
-        <span className="rounded-full bg-white/10 px-2 py-1 text-fg-muted">
-          TP {fmtNum(s.take_profit_pips, 0)} pip
-        </span>
+      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+        <div className="rounded-lg bg-black/20 py-2 border border-white/5 flex flex-col justify-center">
+          <div className="text-[10px] text-fg-dim uppercase tracking-wider">Entry</div>
+          <div className="font-bold mt-0.5">{s.entry_price ? s.entry_price : "—"}</div>
+        </div>
+        <div className="rounded-lg bg-danger/10 py-2 border border-danger/20 flex flex-col justify-center">
+          <div className="text-[10px] text-danger/80 uppercase tracking-wider">Stop Loss</div>
+          <div className="font-bold text-danger mt-0.5">{s.sl_price ? s.sl_price : "—"}</div>
+          {s.stop_loss_pips != null && <div className="text-[9px] text-danger/70">({fmtNum(s.stop_loss_pips, 0)} pip)</div>}
+        </div>
+        <div className="rounded-lg bg-success/10 py-2 border border-success/20 flex flex-col justify-center">
+          <div className="text-[10px] text-success/80 uppercase tracking-wider">Take Profit</div>
+          <div className="font-bold text-success mt-0.5">{s.tp_price ? s.tp_price : "—"}</div>
+          {s.take_profit_pips != null && <div className="text-[9px] text-success/70">({fmtNum(s.take_profit_pips, 0)} pip)</div>}
+        </div>
+        <div className="rounded-lg bg-brand-soft/10 py-2 border border-brand-soft/20 flex flex-col justify-center">
+          <div className="text-[10px] text-brand-soft uppercase tracking-wider">R:R Ratio</div>
+          <div className="font-bold text-brand-soft mt-0.5">{s.rr_ratio ? `1:${s.rr_ratio}` : "—"}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between text-[11px]">
         <span
-          className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-1 font-semibold ${
+          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold ${
             s.executed
               ? "bg-success/20 text-success"
               : s.rejection_reason
@@ -197,11 +212,10 @@ function SignalCard({ s }: { s: AISignal }) {
           <StatusIcon size={12} />
           {s.executed ? "Bajarildi" : s.rejection_reason ? "Rad etildi" : "HOLD"}
         </span>
+        {s.rejection_reason && (
+          <span className="text-[11px] text-danger ml-2 truncate">Sabab: {s.rejection_reason}</span>
+        )}
       </div>
-
-      {s.rejection_reason && (
-        <p className="mt-2 text-[11px] text-danger">Sabab: {s.rejection_reason}</p>
-      )}
     </Card>
   );
 }

@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.uzmenx.akkauntimconnect',
-  appName: 'Akkauntim Connect',
+  appName: 'Akcume AI',
   webDir: 'dist'
 };
 

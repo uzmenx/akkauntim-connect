@@ -22,6 +22,7 @@ const MINOR_TIMEFRAME_OPTIONS = [
 ];
 
 const AI_MODEL_OPTIONS = [
+  { value: "auto", label: "Avtomatik (Sonnet -> Haiku)" },
   { value: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet (Tavsiya)" },
   { value: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku (Tezkor)" },
   { value: "claude-3-opus-20240229", label: "Claude 3 Opus (Murakkab)" },
@@ -62,8 +63,11 @@ export function SettingsPage() {
   });
 
   const [form, setForm] = useState<Partial<BotSettings>>({});
+  const [initialForm, setInitialForm] = useState<Partial<BotSettings> | null>(null);
   const [claudeLimit, setClaudeLimit] = useState<number>(20.0);
+  const [initialClaudeLimit, setInitialClaudeLimit] = useState<number>(20.0);
   const [claudeUsed, setClaudeUsed] = useState<number>(0.0);
+  const [initialClaudeUsed, setInitialClaudeUsed] = useState<number>(0.0);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -91,8 +95,9 @@ export function SettingsPage() {
   useEffect(() => {
     if (data) {
       setForm(data);
+      setInitialForm(data);
     } else {
-      setForm({
+      const defaults = {
         symbols: ["EURUSD", "GBPUSD", "XAUUSD"],
         risk_per_trade: 0.02,
         max_daily_loss: 0.10,
@@ -111,7 +116,9 @@ export function SettingsPage() {
         strategy_weight_smc: 60,
         strategy_weight_pattern: 60,
         strategy_weight_news: 60
-      });
+      };
+      setForm(defaults);
+      setInitialForm(defaults);
     }
   }, [data]);
 
@@ -119,6 +126,8 @@ export function SettingsPage() {
     if (statusQuery.data) {
       setClaudeLimit(Number(statusQuery.data.claude_limit ?? 20.0));
       setClaudeUsed(Number(statusQuery.data.claude_used ?? 0.0));
+      setInitialClaudeLimit(Number(statusQuery.data.claude_limit ?? 20.0));
+      setInitialClaudeUsed(Number(statusQuery.data.claude_used ?? 0.0));
     }
   }, [statusQuery.data]);
 
@@ -154,40 +163,46 @@ export function SettingsPage() {
         claude_used: Number(claudeUsed)
       });
     } else {
-      await supabase.from("bot_settings").upsert(
-        {
-          user_id: user.id,
-          symbols: form.symbols ?? ["EURUSD"],
-          risk_per_trade: Number(form.risk_per_trade ?? 0.02),
-          max_daily_loss: Number(form.max_daily_loss ?? 0.10),
-          min_confidence: Number(form.min_confidence ?? 50),
-          max_lot_size: Number(form.max_lot_size ?? 5.0),
-          timeframe_major: form.timeframe_major ?? "H1",
-          timeframe_minor: form.timeframe_minor ?? "M5",
-          loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
-          ai_enabled: form.ai_enabled ?? true,
-          ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
-          prompt_identity: form.prompt_identity ?? "",
-          prompt_strategy: form.prompt_strategy ?? "",
-          prompt_output: form.prompt_output ?? "",
-          risk_level_single_confirmation: Number(form.risk_level_single_confirmation ?? 0.01),
-          risk_level_multiple_confirmation: Number(form.risk_level_multiple_confirmation ?? 0.02),
-          strategy_weight_smc: Number(form.strategy_weight_smc ?? 60),
-          strategy_weight_pattern: Number(form.strategy_weight_pattern ?? 60),
-          strategy_weight_news: Number(form.strategy_weight_news ?? 60)
-        },
-        { onConflict: "user_id" },
-      );
+      const payload = {
+        user_id: user.id,
+        symbols: form.symbols ?? ["EURUSD"],
+        risk_per_trade: Number(form.risk_per_trade ?? 0.02),
+        max_daily_loss: Number(form.max_daily_loss ?? 0.10),
+        min_confidence: Number(form.min_confidence ?? 50),
+        max_lot_size: Number(form.max_lot_size ?? 5.0),
+        timeframe_major: form.timeframe_major ?? "H1",
+        timeframe_minor: form.timeframe_minor ?? "M5",
+        loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
+        ai_enabled: form.ai_enabled ?? true,
+        ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
+        prompt_identity: form.prompt_identity ?? "",
+        prompt_strategy: form.prompt_strategy ?? "",
+        prompt_output: form.prompt_output ?? "",
+        risk_level_single_confirmation: Number(form.risk_level_single_confirmation ?? 0.01),
+        risk_level_multiple_confirmation: Number(form.risk_level_multiple_confirmation ?? 0.02),
+        strategy_weight_smc: Number(form.strategy_weight_smc ?? 60),
+        strategy_weight_pattern: Number(form.strategy_weight_pattern ?? 60),
+        strategy_weight_news: Number(form.strategy_weight_news ?? 60)
+      };
 
-      // Save Claude status limit update
-      await supabase.from("bot_status").upsert(
-        {
-          user_id: user.id,
-          claude_limit: Number(claudeLimit),
-          claude_used: Number(claudeUsed)
-        },
-        { onConflict: "user_id" }
-      );
+      // Safe update/insert for bot_settings
+      const { data: existing } = await supabase.from("bot_settings").select("id").eq("user_id", user.id).maybeSingle();
+      if (existing) {
+        const { error } = await supabase.from("bot_settings").update(payload).eq("id", existing.id);
+        if (error) alert("Sozlamalarni saqlashda xatolik: " + error.message);
+      } else {
+        const { error } = await supabase.from("bot_settings").insert(payload);
+        if (error) alert("Sozlamalarni saqlashda xatolik: " + error.message);
+      }
+
+      // Safe update/insert for bot_status
+      const { data: existingStatus } = await supabase.from("bot_status").select("id").eq("user_id", user.id).maybeSingle();
+      const statusPayload = { user_id: user.id, claude_limit: Number(claudeLimit), claude_used: Number(claudeUsed) };
+      if (existingStatus) {
+        await supabase.from("bot_status").update(statusPayload).eq("id", existingStatus.id);
+      } else {
+        await supabase.from("bot_status").insert(statusPayload);
+      }
     }
 
     await qc.invalidateQueries({ queryKey: ["bot_settings"] });
@@ -203,9 +218,11 @@ export function SettingsPage() {
     saveRef.current = save;
   }, [save]);
 
+  const hasChanges = JSON.stringify(form) !== JSON.stringify(initialForm) || claudeLimit !== initialClaudeLimit || claudeUsed !== initialClaudeUsed;
+
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent("settingsState", { detail: { busy, saved } }));
-  }, [busy, saved]);
+    window.dispatchEvent(new CustomEvent("settingsState", { detail: { busy, saved, hasChanges } }));
+  }, [busy, saved, hasChanges]);
 
   useEffect(() => {
     const handleReset = async () => {

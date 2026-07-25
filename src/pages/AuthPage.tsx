@@ -2,7 +2,7 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { Bot, Loader2, KeyRound, Server, User, UserCheck } from "lucide-react";
+import { Bot, Loader2, KeyRound, Server, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { mt5LoginToEmail, useAuth } from "@/hooks/useAuth";
 
 type Mode = "signin" | "signup";
@@ -12,6 +12,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<Mode>("signin");
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [server, setServer] = useState("MetaQuotes-Demo");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -101,13 +102,23 @@ export function AuthPage() {
             <label className="text-xs font-semibold text-white/60 mb-2 flex items-center gap-1.5">
               <KeyRound size={12} className="text-blue-400" /> MT5 Paroli
             </label>
-            <input
-              type="password" required minLength={6}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password} onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-brand/60"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"} required minLength={6}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password} onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/20 focus:border-brand/60"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-blue-400 hover:text-blue-300 transition-colors"
+                aria-label={showPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           {mode === "signup" && (

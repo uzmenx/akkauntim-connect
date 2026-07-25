@@ -48,6 +48,10 @@ type Body = {
     signal: string;
     confidence: number;
     reasoning?: string;
+    entry_price?: number;
+    sl_price?: number;
+    tp_price?: number;
+    rr_ratio?: number;
     stop_loss_pips?: number;
     take_profit_pips?: number;
   };

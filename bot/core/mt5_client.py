@@ -154,6 +154,21 @@ class MT5Client:
                 
         return tradeable
 
+    def get_crypto_symbols(self) -> List[str]:
+        """MT5 dan faqat Kriptovalyuta juftliklarini oladi (path xossasi orqali)."""
+        self._check_connection()
+        symbols = mt5.symbols_get()
+        if symbols is None:
+            self.logger.error(f"Failed to get symbols for crypto, error code: {mt5.last_error()}")
+            return []
+            
+        crypto = []
+        for s in symbols:
+            if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL and s.visible:
+                if "crypto" in s.path.lower():
+                    crypto.append(s.name)
+        return crypto
+
     # === Alias methods for backward compatibility ===
     # OrderManager va boshqa modullar to'g'ridan-to'g'ri MT5 metodlarini chaqiradi
     def symbol_info(self, symbol: str):

@@ -46,6 +46,25 @@ class OrderManager:
         except Exception:
             return 0
 
+    def _is_near_market_close(self, symbol: str) -> bool:
+        """
+        Bozor yopilishiga 2 soat (yoki undan kam) qolganini tekshiradi.
+        """
+        tick = self.mt5.symbol_info_tick(symbol)
+        if not tick:
+            return False
+            
+        import datetime
+        # tick.time broker server vaqti hisoblanadi (Epoch formatida)
+        broker_time = datetime.datetime.utcfromtimestamp(tick.time)
+        
+        # Forexda odatda broker soati bo'yicha 23:59 da rollover bo'ladi.
+        # Demak broker soati bo'yicha 22:00 va 23:59 oralig'ida trade ochishni bloklaymiz.
+        if broker_time.hour >= 22:
+            return True
+            
+        return False
+
 
     def _get_filling_mode(self, symbol: str) -> int:
         """Broker qo'llab-quvvatlaydigan filling mode ni aniqlash."""
@@ -81,6 +100,8 @@ class OrderManager:
             return False, f"[{symbol}] cooldown ({self.COOLDOWN_SECONDS}s) ichida", None
         if self._open_count(symbol) >= self.MAX_POSITIONS_PER_SYMBOL:
             return False, f"[{symbol}] {self.MAX_POSITIONS_PER_SYMBOL} pozitsiya limiti to'ldi", None
+        if self._is_near_market_close(symbol):
+            return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli bitim rad etildi", None
 
         symbol_info = self.mt5.symbol_info(symbol)
         if symbol_info is None:
@@ -171,13 +192,16 @@ class OrderManager:
 
         # SL va TP ni hisoblash (digits yuqorida allaqachon o'rnatildi)
         if "BUY" in signal:
-            sl = round(price - stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
             tp1 = round(price + take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
         else:  # SELL*
-            sl = round(price + stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price + stop_loss_pips * pip_size, digits)
             tp = round(price - take_profit_pips * pip_size, digits)
             tp1 = round(price - take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
+            
+        # Virtual SL tizimi uchun haqiqiy SL ni brokerdan yashiramiz
+        broker_sl = 0.0
 
         # TP1 broker-side: hajmni 70/30 ga bo'lib ikki alohida order yuboramiz.
         vol_step = getattr(symbol_info, "volume_step", 0.01) or 0.01
@@ -208,7 +232,7 @@ class OrderManager:
                 "volume": vol,
                 "type": order_type,
                 "price": price,
-                "sl": sl,
+                "sl": broker_sl,
                 "tp": tp_price,
                 "deviation": self._symbol_deviation(symbol),
                 "magic": self.magic_number,
@@ -239,6 +263,7 @@ class OrderManager:
                 "partial_closed": tp_price == tp1,  # TP1 leg — kichik hajmli qism
                 "trailing_mode": None,
                 "current_sl_level": 0,
+                "virtual_sl": virtual_sl,
             })
 
         order_info = {
@@ -248,7 +273,7 @@ class OrderManager:
             "signal": signal,
             "volume": lot_size,
             "price": price,
-            "sl": sl,
+            "sl": virtual_sl,
             "tp": tp,
             "tp1": tp1,
         }
@@ -317,7 +342,11 @@ class OrderManager:
         }
         result = self.mt5.order_send(request)
         if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
-            return False, "SL update error"
+            # SL ni brokerdan yashirganimiz uchun (Virtual SL), SL o'zgartirish broker tomonida amalga oshmaydi.
+            # Biz Virtual SL ni o'zimizning state_manager da yangilashimiz kerak.
+            pass
+            
+        self.state_manager.set_trade_info(ticket, {"virtual_sl": new_sl})
         return True, "SL surildi"
 
     def manage_open_trades(self, trailing_decision_fn: Callable[[str], str]):
@@ -438,6 +467,9 @@ class OrderManager:
         if not symbol_info.visible:
             if not self.mt5.symbol_select(symbol, True):
                 return False, f"{symbol} tanlab bo'lmadi", None
+                
+        if self._is_near_market_close(symbol):
+            return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli pending order rad etildi", None
 
         point = symbol_info.point
         pip_size = point * 10
@@ -451,22 +483,24 @@ class OrderManager:
 
         if order_type_str == "BUY_STOP":
             order_type = self.mt5.ORDER_TYPE_BUY_STOP
-            sl = round(price - stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
         elif order_type_str == "SELL_STOP":
             order_type = self.mt5.ORDER_TYPE_SELL_STOP
-            sl = round(price + stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price + stop_loss_pips * pip_size, digits)
             tp = round(price - take_profit_pips * pip_size, digits)
         elif order_type_str == "BUY_LIMIT":
             order_type = self.mt5.ORDER_TYPE_BUY_LIMIT
-            sl = round(price - stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price - stop_loss_pips * pip_size, digits)
             tp = round(price + take_profit_pips * pip_size, digits)
         elif order_type_str == "SELL_LIMIT":
             order_type = self.mt5.ORDER_TYPE_SELL_LIMIT
-            sl = round(price + stop_loss_pips * pip_size, digits)
+            virtual_sl = round(price + stop_loss_pips * pip_size, digits)
             tp = round(price - take_profit_pips * pip_size, digits)
         else:
             return False, f"Noto'g'ri pending order turi: {order_type_str}", None
+            
+        broker_sl = 0.0
 
         request = {
             "action": self.mt5.TRADE_ACTION_PENDING,
@@ -474,7 +508,7 @@ class OrderManager:
             "volume": lot_size,
             "type": order_type,
             "price": price,
-            "sl": sl,
+            "sl": broker_sl,
             "tp": tp,
             "deviation": 20,
             "magic": magic,
@@ -503,7 +537,7 @@ class OrderManager:
             "signal": order_type_str,
             "volume": lot_size,
             "price": price,
-            "sl": sl,
+            "sl": virtual_sl,
             "tp": tp,
             "1r_dist": stop_loss_pips * pip_size
         }
@@ -516,7 +550,8 @@ class OrderManager:
             "partial_closed": False,
             "trailing_mode": None,
             "current_sl_level": 0,
-            "is_straddle": True
+            "is_straddle": True,
+            "virtual_sl": virtual_sl
         })
 
         return True, "Pending order muvaffaqiyatli qo'yildi", order_info
@@ -580,3 +615,106 @@ class OrderManager:
                     if tick.bid >= sl:
                         logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
+
+    def manage_virtual_sl(self):
+        """
+        Virtual Stop Loss ni doimiy tekshirish va spred filtri yordamida himoyalanish.
+        Agar narx Virtual SL ga yetgan bo'lsa va joriy spred me'yordan oshmagan bo'lsa, bitim to'liq yopiladi.
+        """
+        positions = self.mt5.positions_get()
+        if not positions:
+            return
+
+        for pos in positions:
+            if pos.magic != self.magic_number:
+                continue
+
+            ticket = pos.ticket
+            info = self.state_manager.get_trade_info(ticket)
+            if not info:
+                continue
+                
+            signal = info.get("signal")
+            virtual_sl = info.get("virtual_sl")
+            
+            if not virtual_sl or virtual_sl == 0:
+                continue
+
+            symbol = pos.symbol
+            tick = self.mt5.symbol_info_tick(symbol)
+            if not tick:
+                continue
+                
+            symbol_info = self.mt5.symbol_info(symbol)
+            if not symbol_info:
+                continue
+                
+            # Spred filtri
+            point = symbol_info.point
+            current_spread_points = round((tick.ask - tick.bid) / point) if point > 0 else 0
+            
+            # O'rtacha spredni olish (M15 oxirgi 10 sham)
+            max_multiplier = getattr(self.config, "max_spread_multiplier", 4.0)
+            rates = self.mt5.copy_rates_from_pos(symbol, self.mt5.TIMEFRAME_M15, 1, 10)
+            is_spread_high = False
+            
+            if rates is not None and len(rates) > 0:
+                avg_spread_points = sum(r['spread'] for r in rates) / len(rates)
+                if avg_spread_points > 0:
+                    if current_spread_points > (avg_spread_points * max_multiplier):
+                        is_spread_high = True
+
+            # Narx SL ga yetdimi?
+            sl_hit = False
+            disaster_hit = False
+            close_price = 0.0
+            order_type = None
+            
+            # Disaster masofasi (masalan, joriy spredning o'rtachasidan 3 baravar katta harakat bo'lsa yoki 20 pip = 200 point)
+            # Default qilib 300 point (30 pip) beramiz, narx shu darajada SL dan o'tib ketsa spredga qaramay yopadi.
+            disaster_threshold_points = 300 
+            
+            if signal == "BUY":
+                if tick.bid <= virtual_sl:
+                    sl_hit = True
+                    if tick.bid <= (virtual_sl - disaster_threshold_points * point):
+                        disaster_hit = True
+                close_price = tick.bid
+                order_type = self.mt5.ORDER_TYPE_SELL
+            else: # SELL
+                if tick.ask >= virtual_sl:
+                    sl_hit = True
+                    if tick.ask >= (virtual_sl + disaster_threshold_points * point):
+                        disaster_hit = True
+                close_price = tick.ask
+                order_type = self.mt5.ORDER_TYPE_BUY
+
+            if sl_hit:
+                if is_spread_high and not disaster_hit:
+                    logger.warning(f"[{symbol}] Virtual SL ga yetdi, lekin Spread yopish uchun juda katta ({current_spread_points} pt). Yopilmaydi, kutilmoqda...")
+                else:
+                    if disaster_hit:
+                        logger.critical(f"[{symbol}] DISASTER HIT! Narx SL dan juda uzoqlashib ketdi. Spredga qaramay majburiy yopilmoqda!")
+                    else:
+                        logger.info(f"[{symbol}] Virtual SL urildi (Narx: {close_price}, V-SL: {virtual_sl}). Bitim yopilmoqda...")
+                    
+                    request = {
+                        "action": self.mt5.TRADE_ACTION_DEAL,
+                        "symbol": symbol,
+                        "volume": pos.volume,
+                        "type": order_type,
+                        "position": ticket,
+                        "price": close_price,
+                        "deviation": 20,
+                        "magic": self.magic_number,
+                        "comment": "Virtual SL Closed",
+                        "type_time": self.mt5.ORDER_TIME_GTC,
+                        "type_filling": self._get_filling_mode(symbol),
+                    }
+                    result = self.mt5.order_send(request)
+                    if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
+                        error_msg = self.mt5.last_error() if hasattr(self.mt5, 'last_error') else "Unknown"
+                        logger.error(f"[{symbol}] Virtual SL yopishda xatolik: {error_msg}")
+                    else:
+                        self.state_manager.set_trade_info(ticket, {"status": "CLOSED_VIRTUAL_SL"})
+                        logger.info(f"[{symbol}] Bitim muvaffaqiyatli yopildi.")

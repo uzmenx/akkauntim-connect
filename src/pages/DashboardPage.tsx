@@ -110,6 +110,24 @@ export function DashboardPage() {
 
   const [filterMode, setFilterMode] = useState<"all" | "profit" | "loss">("all");
   const [activeTab, setActiveTab] = useState<"positions" | "limits" | "history">("positions");
+  const tabContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleTabClick = (tab: "positions" | "limits" | "history") => {
+    setActiveTab(tab);
+    const index = tab === "positions" ? 0 : tab === "limits" ? 1 : 2;
+    if (tabContainerRef.current) {
+      tabContainerRef.current.scrollTo({ left: index * tabContainerRef.current.clientWidth, behavior: "smooth" });
+    }
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const scrollRatio = el.scrollLeft / el.clientWidth;
+    const index = Math.round(scrollRatio);
+    if (index === 0 && activeTab !== "positions") setActiveTab("positions");
+    else if (index === 1 && activeTab !== "limits") setActiveTab("limits");
+    else if (index === 2 && activeTab !== "history") setActiveTab("history");
+  };
   const [showPrompt, setShowPrompt] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
@@ -178,15 +196,15 @@ export function DashboardPage() {
   const pct = limit > 0 ? (remaining / limit) * 100 : 0;
 
   return (
-    <div className="flex flex-col items-center h-[100dvh] w-full font-sans overflow-hidden">
+    <div className="flex flex-col items-center h-full w-full font-sans overflow-hidden">
       
       {/* Background Gradient to simulate the bottom green glow */}
       <div className="fixed bottom-0 left-0 right-0 h-[40vh] bg-gradient-to-t from-[#8cb369]/30 to-transparent pointer-events-none" />
 
-      <div className="w-full h-full max-w-md mx-auto px-4 pt-3 pb-2 relative z-10 flex flex-col gap-3">
+      <div className="w-full h-full mx-auto px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)] relative z-10 flex flex-col gap-2">
         
-        {/* Top 10%: Balance Trend Chart */}
-        <div className="h-[10dvh] min-h-[65px] shrink-0 w-full animate-in fade-in slide-in-from-top-4 duration-500">
+        {/* Top 8%: Balance Trend Chart */}
+        <div className="h-[8dvh] min-h-[50px] shrink-0 w-full animate-in fade-in slide-in-from-top-4 duration-500">
            <BalanceTrendChart history={history.data || []} currentBalance={Number(equity || 0)} />
         </div>
 
@@ -210,8 +228,8 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Card 20%: Main Blue Card */}
-        <div className="w-full h-[23dvh] min-h-[180px] max-h-[220px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        {/* Card 22%: Main Blue Card */}
+        <div className="w-full h-[22dvh] min-h-[200px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Card Top Header */}
           <div className="flex justify-between items-center">
@@ -276,9 +294,9 @@ export function DashboardPage() {
           </div>
 
           {/* Avatars Row */}
-          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-1.5 cursor-pointer">
+          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-2 cursor-pointer">
             {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
-              <div key={seed} className={`w-8 h-8 rounded-full border-2 border-[#0052e0] bg-white shadow-lg overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
+              <div key={seed} className={`w-8 h-8 rounded-full border-[2px] border-[#004ade] bg-white shadow-xl overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
                 <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
               </div>
             ))}
@@ -286,12 +304,14 @@ export function DashboardPage() {
 
           {/* 4 Action Buttons Row */}
           <div className="flex gap-2 w-full items-center justify-between mt-auto px-1">
-            <Link to="/settings" className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Settings">
-              <Settings size={18} className="group-hover:rotate-90 transition-transform duration-500" />
+            {/* Button 1: Settings */}
+            <Link to="/settings" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center text-white/90 transition-all group" aria-label="Settings">
+              <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
-            <Link to="/signals" className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center text-white/80 transition-all border border-white/10 group shadow-md" aria-label="Signals">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="group-hover:scale-110 transition-transform">
+            {/* Button 2: Signals */}
+            <Link to="/signals" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center text-white/90 transition-all group" aria-label="Signals">
+              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 80 80" className="group-hover:scale-110 transition-transform">
                 <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
                   <path stroke="currentColor" d="M40 48v24"/>
                   <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
@@ -301,32 +321,35 @@ export function DashboardPage() {
               </svg>
             </Link>
 
-            <button onClick={toggleFilter} className="flex-shrink-0 w-12 h-12 rounded-full bg-black/20 hover:bg-black/35 active:scale-95 flex items-center justify-center transition-all border border-white/10 group shadow-md" aria-label="Filter Mode">
-              {filterMode === "all" && (
-                <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
-                  <TrendingUp size={12} className="text-emerald-400 absolute top-0 left-0" />
-                  <TrendingDown size={12} className="text-rose-400 absolute bottom-0 right-0" />
-                </div>
-              )}
-              {filterMode === "profit" && <TrendingUp size={18} className="text-emerald-400 group-hover:scale-110 transition-transform" />}
-              {filterMode === "loss" && <TrendingDown size={18} className="text-rose-400 group-hover:scale-110 transition-transform" />}
+            {/* Button 3: Filter */}
+            <button onClick={toggleFilter} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center gap-2 transition-all group" aria-label="Filter Mode">
+              <div className="flex items-center justify-center w-5 h-5">
+                {filterMode === "all" && (
+                  <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
+                    <TrendingUp size={12} className="text-emerald-400 absolute top-0 left-0" />
+                    <TrendingDown size={12} className="text-rose-400 absolute bottom-0 right-0" />
+                  </div>
+                )}
+                {filterMode === "profit" && <TrendingUp size={18} className="text-emerald-400 group-hover:scale-110 transition-transform" />}
+                {filterMode === "loss" && <TrendingDown size={18} className="text-rose-400 group-hover:scale-110 transition-transform" />}
+              </div>
             </button>
 
-            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-600 to-violet-600 hover:opacity-95 active:scale-95 flex items-center justify-center text-white transition-all shadow-lg shadow-blue-500/25 border border-white/10 group" aria-label="AI Send">
-              <Sparkles size={18} className="group-hover:scale-110 transition-transform text-white" />
+            {/* Button 4: AI Send */}
+            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#1a73e8] shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(26,115,232,0.6)] hover:brightness-125 active:scale-95 flex items-center justify-center gap-2 text-white transition-all group border border-white/20" aria-label="AI Send">
+              <Sparkles size={20} className="group-hover:scale-110 transition-transform text-white" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable List Section (Remaining Height) */}
-        <div className="flex-1 overflow-y-auto pb-4 space-y-4 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex-1 overflow-y-auto pb-4 space-y-2 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
           
           {/* Tab Selector */}
-          <div className="flex bg-[#10192e]/60 border border-white/5 rounded-2xl p-1 shrink-0 sticky top-0 backdrop-blur-md z-30">
+          <div className="flex bg-[#10192e]/60 border border-white/5 rounded-xl p-0.5 shrink-0 sticky top-0 backdrop-blur-md z-30 overflow-x-auto no-scrollbar">
             <button 
-              onClick={() => setActiveTab("positions")}
+              onClick={() => handleTabClick("positions")}
               className={cn(
-                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "positions" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
@@ -336,9 +359,9 @@ export function DashboardPage() {
               </span>
             </button>
             <button 
-              onClick={() => setActiveTab("limits")}
+              onClick={() => handleTabClick("limits")}
               className={cn(
-                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "limits" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
@@ -348,9 +371,9 @@ export function DashboardPage() {
               </span>
             </button>
             <button 
-              onClick={() => setActiveTab("history")}
+              onClick={() => handleTabClick("history")}
               className={cn(
-                "flex-1 py-2.5 text-[11px] min-[375px]:text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
@@ -358,46 +381,55 @@ export function DashboardPage() {
             </button>
           </div>
 
-          {/* Tab Contents */}
-          {activeTab === "positions" && (
-            <div className="space-y-2 animate-in fade-in duration-200">
-              {positions.isLoading ? (
-                <SkeletonRows />
-              ) : filteredPositions && filteredPositions.length > 0 ? (
-                filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)
-              ) : (
-                <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
-              )}
-            </div>
-          )}
-
-          {activeTab === "limits" && (
-            <div className="space-y-2 animate-in fade-in duration-200">
-              {pending.isLoading ? (
-                <SkeletonRows count={2} />
-              ) : pending.data && pending.data.length > 0 ? (
-                pending.data.map((o) => <PendingRow key={o.id} o={o} />)
-              ) : (
-                <EmptyBox text="Hozircha kutilayotgan order yo'q" />
-              )}
-            </div>
-          )}
-
-          {activeTab === "history" && (
-            <div className="space-y-2 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between px-2 mb-1">
-                <span className="text-[10px] text-white/40 font-bold">SAVDO TARIXI</span>
-                <Link to="/history" className="text-[10px] text-blue-400 hover:underline">Barchasi</Link>
+          {/* Swipeable Tab Contents */}
+          <div 
+            ref={tabContainerRef}
+            onScroll={handleScroll}
+            className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth w-full h-full pb-10"
+          >
+            {/* Positions Tab */}
+            <div className="w-full shrink-0 snap-center px-1">
+              <div className="space-y-2">
+                {positions.isLoading ? (
+                  <SkeletonRows />
+                ) : filteredPositions && filteredPositions.length > 0 ? (
+                  filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)
+                ) : (
+                  <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
+                )}
               </div>
-              {history.isLoading ? (
-                <SkeletonRows count={2} />
-              ) : history.data && history.data.length > 0 ? (
-                history.data.slice(0, 15).map((t) => <HistoryRow key={t.id} t={t} />)
-              ) : (
-                <EmptyBox text="Hozircha yopilgan savdo yo'q" />
-              )}
             </div>
-          )}
+
+            {/* Limits Tab */}
+            <div className="w-full shrink-0 snap-center px-1">
+              <div className="space-y-2">
+                {pending.isLoading ? (
+                  <SkeletonRows count={2} />
+                ) : pending.data && pending.data.length > 0 ? (
+                  pending.data.map((o) => <PendingRow key={o.id} o={o} />)
+                ) : (
+                  <EmptyBox text="Hozircha kutilayotgan order yo'q" />
+                )}
+              </div>
+            </div>
+
+            {/* History Tab */}
+            <div className="w-full shrink-0 snap-center px-1">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between px-2 mb-1">
+                  <span className="text-[10px] text-white/40 font-bold">SAVDO TARIXI</span>
+                  <Link to="/history" className="text-[10px] text-blue-400 hover:underline">Barchasi</Link>
+                </div>
+                {history.isLoading ? (
+                  <SkeletonRows count={2} />
+                ) : history.data && history.data.length > 0 ? (
+                  history.data.slice(0, 15).map((t) => <HistoryRow key={t.id} t={t} />)
+                ) : (
+                  <EmptyBox text="Hozircha yopilgan savdo yo'q" />
+                )}
+              </div>
+            </div>
+          </div>
           
         </div>
 

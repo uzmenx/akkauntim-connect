@@ -18,15 +18,12 @@
     "allow_single_strategy_trade": true
   },
   "ai": {
-    "model": "claude-sonnet-4-6",
+    "model": "claude-3-5-sonnet-20241022",
     "system_prompt": "Sen professional Forex treyderi va fundamental tahlilchisisan. Texnik SMC va Garmonik patternlar hamda iqtisodiy yangiliklarni birlashtirib, optimal savdo qarorini qabul qilasan.",
     "max_tokens": 2000,
     "models_fallback": [
-      "claude-sonnet-4-6",
-      "claude-sonnet-5",
-      "claude-sonnet-4-5-20250929",
-      "claude-haiku-4-5-20251001",
-      "claude-fable-5"
+      "claude-3-5-sonnet-20241022",
+      "claude-3-5-haiku-20241022"
     ]
   },
   "news": {

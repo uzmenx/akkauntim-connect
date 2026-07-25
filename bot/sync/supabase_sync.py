@@ -134,10 +134,14 @@ class SupabaseSync:
             logger.info(f"Sync OK: bal={info.balance} pos={len(pos_rows)} pending={len(pending_rows)} history={len(closed_rows)}")
 
     def log_ai_signal(self, symbol: str, signal: str, confidence: int, reasoning: str = "",
+                      entry_price: Optional[float] = None, sl_price: Optional[float] = None,
+                      tp_price: Optional[float] = None, rr_ratio: Optional[float] = None,
                       stop_loss_pips: Optional[float] = None, take_profit_pips: Optional[float] = None) -> None:
         self._post({"ai_signal": {
             "symbol": symbol, "signal": signal, "confidence": confidence,
             "reasoning": reasoning,
+            "entry_price": entry_price, "sl_price": sl_price,
+            "tp_price": tp_price, "rr_ratio": rr_ratio,
             "stop_loss_pips": stop_loss_pips, "take_profit_pips": take_profit_pips,
         }})
 

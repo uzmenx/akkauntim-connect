@@ -29,7 +29,7 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [settingsState, setSettingsState] = useState({ busy: false, saved: false });
+  const [settingsState, setSettingsState] = useState({ busy: false, saved: false, hasChanges: false });
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -92,7 +92,7 @@ export default function App() {
   const isDashboard = location.pathname === "/";
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col pb-[max(env(safe-area-inset-bottom),1.5rem)]">
+    <div className="mx-auto flex h-[100dvh] w-full flex-col overflow-hidden">
       {!isDashboard && (
         <header className="sticky top-0 z-40 flex items-center justify-between px-5 py-4 pt-[max(env(safe-area-inset-top),1rem)] bg-bg-deep/85 backdrop-blur-lg border-b border-white/5">
           <div className="flex items-center gap-3">
@@ -105,40 +105,37 @@ export default function App() {
             </button>
             <h1 className="text-base font-bold text-white">{title}</h1>
           </div>
-          {location.pathname === "/settings" && (
+          {location.pathname === "/settings" && settingsState.hasChanges && (
             <div className="flex items-center gap-2">
               <button 
                 onClick={() => window.dispatchEvent(new Event('saveSettings'))}
                 disabled={settingsState.busy}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer border",
+                  "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-lg",
                   settingsState.saved 
-                    ? "bg-green-500/10 text-green-400 border-green-500/20"
-                    : "bg-brand/10 text-brand border-brand/20 hover:bg-brand/20"
+                    ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                    : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20"
                 )}
               >
                 {settingsState.busy ? (
                   <Loader2 className="animate-spin" size={14} />
-                ) : settingsState.saved ? (
-                  <Check size={14} />
                 ) : (
-                  <Save size={14} />
+                  <Check size={16} strokeWidth={3} />
                 )}
                 <span>{settingsState.saved ? "Saqlandi" : "Saqlash"}</span>
               </button>
 
               <button 
                 onClick={() => window.dispatchEvent(new Event('resetSettings'))}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold border border-red-500/20 active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/60 transition-all text-xs font-bold active:scale-95 cursor-pointer"
               >
-                <RotateCcw size={14} />
-                <span>Reset</span>
+                <span>Standart</span>
               </button>
             </div>
           )}
         </header>
       )}
-      <main className="flex-1 px-4">
+      <main className="flex-1 w-full overflow-y-auto no-scrollbar relative">
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/positions" element={<PositionsPage />} />
