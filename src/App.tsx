@@ -8,6 +8,8 @@ import { HistoryPage } from "@/pages/HistoryPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { BacktestPage } from "@/pages/BacktestPage";
+import { LandingPage } from "@/pages/LandingPage";
+import { ConnectorsPage } from "@/pages/ConnectorsPage";
 import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +24,7 @@ const titles: Record<string, string> = {
   "/settings": "Bot settings",
   "/pricing": "Ta'riflar va Obuna",
   "/backtest": "Backtest Tizimi",
+  "/connectors": "Connectors Hub",
 };
 
 export default function App() {
