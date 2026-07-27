@@ -132,6 +132,8 @@ class SupabaseSync:
         res = self._post(payload)
         if res:
             logger.info(f"Sync OK: bal={info.balance} pos={len(pos_rows)} pending={len(pending_rows)} history={len(closed_rows)}")
+        
+        return closed_rows
 
     def log_ai_signal(self, symbol: str, signal: str, confidence: int, reasoning: str = "",
                       entry_price: Optional[float] = None, sl_price: Optional[float] = None,

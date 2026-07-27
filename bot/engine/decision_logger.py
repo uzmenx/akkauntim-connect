@@ -48,6 +48,18 @@ class DecisionLogger:
             except sqlite3.OperationalError:
                 pass
                 
+            # Shadow Learner ustunlarini qo'shish
+            try:
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN ticket INTEGER")
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN outcome_profit REAL")
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN outcome_label TEXT")
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN closed_at TEXT")
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN shadow_prediction TEXT")
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN shadow_confidence REAL")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+                
         except Exception as e:
             logger.error(f"Error initializing DB schema: {e}")
         finally:
@@ -57,7 +69,7 @@ class DecisionLogger:
     def log(self, pair: str, timeframe: str, context: Dict[str, Any], prompt: str, 
             response: Any, decision: str, risk_pct: float, 
             hash_val: Optional[str] = None, tokens: Optional[Dict[str, int]] = None, 
-            cost: Optional[float] = None):
+            cost: Optional[float] = None, ticket: Optional[int] = None):
         """Logs a trading decision to SQLite."""
         
         input_tokens = tokens.get("input_tokens") if tokens else None
@@ -68,8 +80,8 @@ class DecisionLogger:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO ai_decisions 
-                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 datetime.now().isoformat(),
                 pair,
@@ -82,11 +94,33 @@ class DecisionLogger:
                 hash_val,
                 input_tokens,
                 output_tokens,
-                cost
+                cost,
+                ticket
             ))
             conn.commit()
         except Exception as e:
             logger.error(f"Error logging decision: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def update_outcome(self, ticket: int, profit: float) -> None:
+        """Updates the trade outcome for shadow learning."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            outcome_label = 'WIN' if profit > 0 else 'LOSS'
+            closed_at = datetime.now().isoformat()
+            
+            cursor.execute('''
+                UPDATE ai_decisions 
+                SET outcome_profit = ?, outcome_label = ?, closed_at = ?
+                WHERE ticket = ?
+            ''', (profit, outcome_label, closed_at, ticket))
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error updating outcome for ticket {ticket}: {e}")
         finally:
             if 'conn' in locals():
                 conn.close()

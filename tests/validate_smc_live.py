@@ -34,7 +34,7 @@ except ImportError:
     sys.exit(1)
 
 import pandas as pd
-from smc_engine import analyze_market_structure
+from bot.strategy.smc.engine import analyze_market_structure
 
 
 def get_mt5_data(symbol: str, timeframe, bars: int = 500) -> pd.DataFrame:

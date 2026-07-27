@@ -24,14 +24,14 @@ except ImportError:
 import pandas as pd
 import numpy as np
 
-from smc_engine import (
+from bot.strategy.smc.engine import (
     analyze_market_structure,
     OrderBlockDetector,
     FVGDetector,
     LiquidityDetector,
     DEFAULT_CONFIG,
 )
-from smc_structure import SMCStructure
+from bot.strategy.smc.engine import SMCStructure
 
 
 # ====================================================================

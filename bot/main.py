@@ -467,16 +467,6 @@ class TradingBot:
             logger.info(f"[{symbol}] Risk manager rad etdi: {msg}")
             return
             
-        # Log to db
-        self.decision_logger.log(
-            pair=symbol, timeframe=self.config.timeframe_major,
-            context=context, prompt="AUTONOMOUS_AI",
-            response=ai_decision, decision=final_decision,
-            risk_pct=risk_pct, hash_val=self._get_state_hash(context),
-            tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
-            cost=self.ai.total_cost
-        )
-
         try:
             rr_ratio = round(tp_pips / sl_pips, 2) if sl_pips and sl_pips > 0 else 0.0
             self.sync.log_ai_signal(
@@ -511,6 +501,18 @@ class TradingBot:
                 take_profit_pips=tp_pips,
                 entry_price=entry_price
             )
+
+        # Log to db
+        ticket = order_info.get("ticket") if isinstance(order_info, dict) else None
+        self.decision_logger.log(
+            pair=symbol, timeframe=self.config.timeframe_major,
+            context=context, prompt="AUTONOMOUS_AI",
+            response=ai_decision, decision=final_decision,
+            risk_pct=risk_pct, hash_val=self._get_state_hash(context),
+            tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
+            cost=self.ai.total_cost,
+            ticket=ticket
+        )
 
         if success:
             logger.info(
@@ -627,7 +629,10 @@ class TradingBot:
                         status_msg = "Bot is running"
                         if getattr(self.config, "auto_discover_symbols", True) and 'all_symbols' in locals() and 'current_batch' in locals():
                             status_msg = f"Avto-qidiruv yoniq. Ruxsat: {len(all_symbols)} ta juftlik. Joriy tahlil: {', '.join(current_batch)}"
-                        self.sync.sync_all(self.mt5, is_running=True, message=status_msg)
+                        closed_trades = self.sync.sync_all(self.mt5, is_running=True, message=status_msg)
+                        if closed_trades:
+                            for ct in closed_trades:
+                                self.decision_logger.update_outcome(ct["ticket"], ct["profit"])
                     except Exception as e:
                         logger.warning(f"Cloud sync xatolik: {e}")
 

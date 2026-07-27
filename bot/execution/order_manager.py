@@ -191,17 +191,16 @@ class OrderManager:
 
 
         # SL va TP ni hisoblash (digits yuqorida allaqachon o'rnatildi)
-        if "BUY" in signal:
+        if order_type in [self.mt5.ORDER_TYPE_BUY, self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_BUY_STOP]:
             virtual_sl = round(price - stop_loss_pips * pip_size, digits)
+            broker_sl = round(price - (stop_loss_pips * 2) * pip_size, digits) # Catastrophic SL
             tp = round(price + take_profit_pips * pip_size, digits)
             tp1 = round(price + take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
         else:  # SELL*
             virtual_sl = round(price + stop_loss_pips * pip_size, digits)
+            broker_sl = round(price + (stop_loss_pips * 2) * pip_size, digits) # Catastrophic SL
             tp = round(price - take_profit_pips * pip_size, digits)
             tp1 = round(price - take_profit_1_pips * pip_size, digits) if take_profit_1_pips else None
-            
-        # Virtual SL tizimi uchun haqiqiy SL ni brokerdan yashiramiz
-        broker_sl = 0.0
 
         # TP1 broker-side: hajmni 70/30 ga bo'lib ikki alohida order yuboramiz.
         vol_step = getattr(symbol_info, "volume_step", 0.01) or 0.01
@@ -500,7 +499,10 @@ class OrderManager:
         else:
             return False, f"Noto'g'ri pending order turi: {order_type_str}", None
             
-        broker_sl = 0.0
+        if order_type in [self.mt5.ORDER_TYPE_BUY, self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_BUY_STOP]:
+            broker_sl = round(price - (stop_loss_pips * 2) * pip_size, digits)
+        else:
+            broker_sl = round(price + (stop_loss_pips * 2) * pip_size, digits)
 
         request = {
             "action": self.mt5.TRADE_ACTION_PENDING,

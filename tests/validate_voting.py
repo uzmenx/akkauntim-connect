@@ -1,4 +1,4 @@
-from voting_engine import aggregate_signals
+from bot.engine.voting import aggregate_signals
 
 print("=== Test 1: 3/3 kelishuvi ===")
 res1 = aggregate_signals(
