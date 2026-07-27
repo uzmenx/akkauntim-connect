@@ -28,6 +28,7 @@ class BotConfig:
     ai_enabled: bool = True
     ai_model_medium: str = "claude-sonnet-5"
     ai_model_weak: str = "claude-haiku-4-5-20251001"
+    ai_model: str = "auto"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -120,6 +121,9 @@ class BotConfig:
             
         if "ai_enabled" in data:
             self.ai_enabled = bool(data["ai_enabled"])
+            
+        if "ai_model" in data:
+            self.ai_model = data["ai_model"]
             
         if "ai_model_medium" in data:
             self.ai_model_medium = data["ai_model_medium"]

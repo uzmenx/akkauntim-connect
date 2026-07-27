@@ -53,10 +53,16 @@ class AIClient:
         sys_prompt = system_prompt or self.config.ai_system_prompt
         max_tok = max_tokens or self.config.ai_max_tokens
 
-        models_to_try = [
-            getattr(self.config, "ai_model_medium", "claude-sonnet-5"),
-            getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
-        ]
+        selected_model = getattr(self.config, "ai_model", "auto")
+        medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
+        weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
+        
+        if selected_model == "claude-sonnet-5":
+            models_to_try = [medium]
+        elif selected_model == "claude-haiku-4-5":
+            models_to_try = [weak]
+        else: # "auto" or anything else
+            models_to_try = [medium, weak]
 
         import time
         import anthropic
@@ -144,10 +150,16 @@ class AIClient:
                 self.logger.error(f"Supabase alert xatosi: {e}")
 
     def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:
-        models_to_try = [
-            getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001"),
-            getattr(self.config, "ai_model_medium", "claude-sonnet-5")
-        ]
+        selected_model = getattr(self.config, "ai_model", "auto")
+        medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
+        weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
+        
+        if selected_model == "claude-sonnet-5":
+            models_to_try = [medium]
+        elif selected_model == "claude-haiku-4-5":
+            models_to_try = [weak]
+        else: # "auto"
+            models_to_try = [weak, medium]
         import time
         import anthropic
         

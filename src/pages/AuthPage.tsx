@@ -48,7 +48,7 @@ export function AuthPage() {
               max_lot_size: 5.0,
               timeframe_major: "H1",
               timeframe_minor: "M5",
-              ai_model: "claude-3-5-sonnet-20241022",
+              ai_model: "auto",
               system_prompt: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
               risk_level_single_confirmation: 0.01,
               risk_level_multiple_confirmation: 0.02,

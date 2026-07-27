@@ -22,10 +22,9 @@ const MINOR_TIMEFRAME_OPTIONS = [
 ];
 
 const AI_MODEL_OPTIONS = [
-  { value: "auto", label: "Avtomatik (Sonnet 5 -> Fable 5)" },
-  { value: "claude-sonnet-5", label: "Claude 5 Sonnet (Tavsiya)" },
-  { value: "claude-fable-5", label: "Claude 5 Fable (Tezkor)" },
-  { value: "claude-opus-5", label: "Claude 5 Opus (Murakkab)" },
+  { value: "auto", label: "Avto" },
+  { value: "claude-sonnet-5", label: "Faqat - Claude Sonnet 5" },
+  { value: "claude-haiku-4-5", label: "Faqat - Claude Haiku 4.5" },
 ];
 
 const ASSET_CATEGORIES: Record<string, string[]> = {
@@ -107,7 +106,7 @@ export function SettingsPage() {
         timeframe_minor: "M5",
         loop_interval_minutes: 5,
         ai_enabled: true,
-        ai_model: "claude-3-5-sonnet-20241022",
+        ai_model: "auto",
         prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
         prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
         prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
@@ -147,7 +146,7 @@ export function SettingsPage() {
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
         ai_enabled: form.ai_enabled ?? true,
-        ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
+        ai_model: form.ai_model ?? "auto",
         prompt_identity: form.prompt_identity ?? "",
         prompt_strategy: form.prompt_strategy ?? "",
         prompt_output: form.prompt_output ?? "",
@@ -174,7 +173,7 @@ export function SettingsPage() {
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
         ai_enabled: form.ai_enabled ?? true,
-        ai_model: form.ai_model ?? "claude-3-5-sonnet-20241022",
+        ai_model: form.ai_model ?? "auto",
         prompt_identity: form.prompt_identity ?? "",
         prompt_strategy: form.prompt_strategy ?? "",
         prompt_output: form.prompt_output ?? "",
@@ -237,7 +236,7 @@ export function SettingsPage() {
           timeframe_minor: "M5",
           loop_interval_minutes: 5,
           ai_enabled: true,
-          ai_model: "claude-3-5-sonnet-20241022",
+          ai_model: "auto",
           prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
           prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
           prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
@@ -393,7 +392,7 @@ export function SettingsPage() {
             <p className="text-xs font-semibold text-white/90 mb-2">AI Modeli</p>
             <CustomSelect
               options={AI_MODEL_OPTIONS}
-              value={form.ai_model ?? "claude-3-5-sonnet-20241022"}
+              value={form.ai_model ?? "auto"}
               onChange={(v) => setForm((f) => ({ ...f, ai_model: v }))}
               placeholder="Modelni tanlang..."
             />

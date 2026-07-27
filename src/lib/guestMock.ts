@@ -170,7 +170,7 @@ const defaultSettings = (): BotSettings => ({
   max_lot_size: 5.0,
   timeframe_major: "H1",
   timeframe_minor: "M5",
-  ai_model: "claude-3-5-sonnet-20241022",
+  ai_model: "auto",
   ai_enabled: true,
   prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
   prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
