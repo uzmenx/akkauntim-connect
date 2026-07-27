@@ -45,8 +45,6 @@ class AIClient:
             in_price, out_price = 0.25, 1.25
         elif "haiku" in m:  # Haiku 4.x
             in_price, out_price = 0.80, 4.00
-        elif "opus" in m:
-            in_price, out_price = 15.0, 75.0
         else:  # Sonnet 3.5 / 4.x default
             in_price, out_price = 3.0, 15.0
         return (input_tokens * in_price / 1_000_000.0) + (output_tokens * out_price / 1_000_000.0)
