@@ -11,6 +11,25 @@ class TelegramSync:
         if not self.enabled:
             logger.info("Telegram notification is disabled (missing token or chat_id).")
 
+    def send_message(self, text: str):
+        if not self.enabled:
+            return
+
+        url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
+        payload = {
+            "chat_id": self.config.telegram_chat_id,
+            "text": text,
+            "parse_mode": "HTML"
+        }
+        try:
+            response = requests.post(url, json=payload, timeout=10)
+            if response.status_code == 200:
+                logger.info("Telegram ga xabar yuborildi.")
+            else:
+                logger.warning(f"Telegram ga yuborishda xatolik: {response.status_code} - {response.text}")
+        except Exception as e:
+            logger.error(f"Telegram bilan aloqada xatolik: {e}")
+
     def send_signal(self, symbol: str, signal: str, confidence: int, sl: float, tp: float, reasoning: str):
         if not self.enabled:
             return

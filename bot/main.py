@@ -368,9 +368,19 @@ class TradingBot:
             return
 
         final_decision = ai_decision.get("decision", "HOLD")
-        logger.info(f"[{symbol}] AI Xulosasi: {final_decision} | Sabab: {ai_decision.get('reasoning', '')[:200]}")
+        reasoning_text = ai_decision.get("reasoning", "")
+        logger.info(f"[{symbol}] AI Xulosasi: {final_decision} | Sabab: {reasoning_text[:200]}")
 
         if final_decision == "HOLD":
+            reasoning_lower = reasoning_text.lower()
+            if "limit order" in reasoning_lower or "limit_buy" in reasoning_lower or "limit_sell" in reasoning_lower:
+                warn_msg = f"⚠️ <b>AI DIQQAT:</b> decision/reasoning nomuvofiqligi aniqlandi!\n<b>Symbol:</b> #{symbol}\n<b>Qaror:</b> HOLD\n<b>Sabab (reasoning):</b> {reasoning_text}"
+                logger.warning(warn_msg)
+                try:
+                    self.telegram.send_message(warn_msg)
+                except Exception as e:
+                    logger.error(f"Telegram ga xatolik xabarini yuborishda muammo: {e}")
+
             try:
                 self.sync.log_ai_signal(
                     symbol=symbol, signal="HOLD", confidence=80, reasoning=ai_decision.get("reasoning", ""),
