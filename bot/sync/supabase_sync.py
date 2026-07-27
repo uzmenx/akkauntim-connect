@@ -105,8 +105,19 @@ class SupabaseSync:
         for d in deals:
             if d.entry in (1, 2) and d.symbol:
                 side = "BUY" if d.type == mt5.DEAL_TYPE_BUY else "SELL"
+                
+                # Original order ticket ni topish (Pending orderlar uchung)
+                original_ticket = int(d.position_id or d.ticket)
+                if d.position_id:
+                    pos_deals = mt5.history_deals_get(position=d.position_id)
+                    if pos_deals:
+                        for pd in pos_deals:
+                            if pd.entry == 0:  # DEAL_ENTRY_IN
+                                original_ticket = int(pd.order)
+                                break
+
                 closed_rows.append({
-                    "ticket": int(d.position_id or d.ticket),
+                    "ticket": original_ticket,
                     "symbol": d.symbol,
                     "side": side,
                     "volume": float(d.volume),
