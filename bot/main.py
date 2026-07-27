@@ -636,6 +636,19 @@ class TradingBot:
                     except Exception as e:
                         logger.warning(f"Cloud sync xatolik: {e}")
 
+                    # Database backup
+                    try:
+                        last_backup = self.state.get_trade_info("system_last_backup") or {}
+                        last_backup_time = last_backup.get("time", 0)
+                        import time
+                        if time.time() - last_backup_time > 86400: # 24 soat
+                            logger.info("24 soatlik ma'lumotlar bazasi zaxirasi boshlandi...")
+                            from bot.utils.backup_databases import backup_databases
+                            if backup_databases(self.config):
+                                self.state.set_trade_info("system_last_backup", {"time": time.time()})
+                    except Exception as e:
+                        logger.error(f"Backup tekshirish jarayonida xatolik: {e}")
+
                     if not self._running:
                         break
 
