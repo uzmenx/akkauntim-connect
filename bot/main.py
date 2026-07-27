@@ -371,6 +371,14 @@ class TradingBot:
         logger.info(f"[{symbol}] AI Xulosasi: {final_decision} | Sabab: {ai_decision.get('reasoning', '')[:200]}")
 
         if final_decision == "HOLD":
+            try:
+                self.sync.log_ai_signal(
+                    symbol=symbol, signal="HOLD", confidence=80, reasoning=ai_decision.get("reasoning", ""),
+                    entry_price=None, sl_price=None, tp_price=None, rr_ratio=0.0,
+                    stop_loss_pips=0.0, take_profit_pips=0.0
+                )
+            except Exception as e:
+                logger.warning(f"Supabase sync xatolik (HOLD signal): {e}")
             return
             
         pip_divisor = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
