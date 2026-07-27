@@ -65,6 +65,10 @@ class TradingBot:
         # Sync
         self.sync = SupabaseSync(config)
         self.telegram = TelegramSync(config)
+        
+        # Inyect dependencies into AIClient
+        self.ai.sync = self.sync
+        self.ai.telegram = self.telegram
 
         # Batch Processing holati
         self.current_symbol_index = 0
@@ -398,10 +402,13 @@ class TradingBot:
             entry_price = current_price
         
         sl_price = ai_decision.get("stop_loss")
+        if not sl_price:
+            logger.warning(f"[{symbol}] AI stop_loss bermadi! Savdo bekor qilinmoqda. (Bank-grade xavfsizlik)")
+            return
+            
         tp_price = ai_decision.get("take_profit")
         
-        sl_price_diff = abs(entry_price - sl_price) if sl_price else 50 * pip_divisor
-        
+        sl_price_diff = abs(entry_price - sl_price)        
         # --- O'rganish moduli moslashuvlari ---
         avoid_symbols = active_adjustments.get("avoid_symbols", [])
         if symbol in avoid_symbols:

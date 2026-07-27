@@ -55,21 +55,10 @@ class AIClient:
         sys_prompt = system_prompt or self.config.ai_system_prompt
         max_tok = max_tokens or self.config.ai_max_tokens
 
-        # Faqat haqiqiy Anthropic model-slug'lariga tayanamiz.
-        preferred = getattr(self.config, "ai_model", "") or ""
-        if preferred == "auto":
-            preferred = "claude-3-5-sonnet-20241022"
-        fallbacks = list(getattr(self.config, "ai_models_fallback", []) or [])
-        default_stack = [
-            "claude-sonnet-5",
-            "claude-fable-5",
-            "claude-opus-5",
+        models_to_try = [
+            getattr(self.config, "ai_model_medium", "claude-sonnet-5"),
+            getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
         ]
-        seen, models_to_try = set(), []
-        for m in [preferred, *fallbacks, *default_stack]:
-            if m and m not in seen:
-                seen.add(m)
-                models_to_try.append(m)
 
         import time
         import anthropic
@@ -128,23 +117,64 @@ class AIClient:
                         time.sleep(2)
                 
         self.logger.error(f"Hech qaysi AI modeli ishlamadi. Oxirgi xato: {last_exception}")
+        self._trigger_all_models_failed_alert(last_exception)
         return None
 
-    def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:
-        # Typically use haiku for simple responses like trailing decisions
-        model = "claude-fable-5"
-        try:
-            kwargs = {
-                "model": model,
-                "max_tokens": max_tokens,
-                "messages": [{"role": "user", "content": prompt}],
-            }
-            if system_prompt:
-                kwargs["system"] = system_prompt
+    def _trigger_all_models_failed_alert(self, last_exception: Optional[Exception]):
+        medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
+        weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
+        msg = f"Ikkala model (o'rta: {medium}, kuchsiz: {weak}) ham ishlamadi — savdo qarorlari to'xtatildi"
+        
+        self.logger.critical(msg)
+        
+        telegram = getattr(self, "telegram", None)
+        if telegram:
+            try:
+                telegram.send_message(f"🚨 IKKALA AI MODEL ISHLAMAYAPTI (o'rta va kuchsiz) — savdo qarorlari to'xtatildi\nXato: {last_exception}")
+            except Exception as e:
+                self.logger.error(f"Telegram alert xatosi: {e}")
                 
-            response = self.client.messages.create(**kwargs)
-            content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
-            return content.strip()
-        except Exception as e:
-            self.logger.error(f"Failed to get simple response: {e}")
-            return ""
+        sync = getattr(self, "sync", None)
+        if sync:
+            try:
+                sync.insert("ai_signals", {
+                    "symbol": "SYSTEM",
+                    "signal": "AI_OFFLINE",
+                    "reasoning": f"{msg}: {last_exception}"
+                })
+            except Exception as e:
+                self.logger.error(f"Supabase alert xatosi: {e}")
+
+    def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:
+        models_to_try = ["claude-fable-5", "claude-sonnet-5", "claude-opus-5"]
+        import time
+        import anthropic
+        
+        last_exception = None
+        for model in models_to_try:
+            retries = 2
+            for attempt in range(retries):
+                try:
+                    kwargs = {
+                        "model": model,
+                        "max_tokens": max_tokens,
+                        "messages": [{"role": "user", "content": prompt}],
+                    }
+                    if system_prompt:
+                        kwargs["system"] = system_prompt
+                        
+                    response = self.client.messages.create(**kwargs)
+                    content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
+                    return content.strip()
+                except anthropic.RateLimitError as e:
+                    self.logger.warning(f"Rate limit for {model}: {e}")
+                    last_exception = e
+                    time.sleep(3)
+                except Exception as e:
+                    self.logger.error(f"Failed to get simple response with {model} (attempt {attempt+1}): {e}")
+                    last_exception = e
+                    if attempt < retries - 1:
+                        time.sleep(2)
+        
+        self.logger.error(f"Hech qaysi AI modeli oddiy javob bera olmadi. Oxirgi xato: {last_exception}")
+        return ""
