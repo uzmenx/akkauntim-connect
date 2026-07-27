@@ -377,23 +377,40 @@ class TradingBot:
 
         if final_decision == "HOLD":
             reasoning_lower = reasoning_text.lower()
-            if "limit order" in reasoning_lower or "limit_buy" in reasoning_lower or "limit_sell" in reasoning_lower:
-                warn_msg = f"⚠️ <b>AI DIQQAT:</b> decision/reasoning nomuvofiqligi aniqlandi!\n<b>Symbol:</b> #{symbol}\n<b>Qaror:</b> HOLD\n<b>Sabab (reasoning):</b> {reasoning_text}"
+            overridden_decision = None
+            if "limit_buy" in reasoning_lower or ("limit" in reasoning_lower and "buy" in reasoning_lower):
+                overridden_decision = "LIMIT_BUY"
+            elif "limit_sell" in reasoning_lower or ("limit" in reasoning_lower and "sell" in reasoning_lower):
+                overridden_decision = "LIMIT_SELL"
+
+            has_prices = ai_decision.get("entry_price") and ai_decision.get("stop_loss") and ai_decision.get("take_profit")
+
+            if overridden_decision and has_prices:
+                warn_msg = f"⚠️ <b>AI DIQQAT:</b> decision='HOLD' lekin matnda '{overridden_decision}' aytilgan. Bot qarorni avtomatik '{overridden_decision}' ga o'zgartirdi.\n<b>Symbol:</b> #{symbol}\n<b>Sabab:</b> {reasoning_text}"
                 logger.warning(warn_msg)
                 try:
                     self.telegram.send_message(warn_msg)
                 except Exception as e:
                     logger.error(f"Telegram ga xatolik xabarini yuborishda muammo: {e}")
+                final_decision = overridden_decision
+            else:
+                if "limit order" in reasoning_lower or "limit_buy" in reasoning_lower or "limit_sell" in reasoning_lower:
+                    warn_msg = f"⚠️ <b>AI DIQQAT:</b> decision/reasoning nomuvofiqligi aniqlandi!\n<b>Symbol:</b> #{symbol}\n<b>Qaror:</b> HOLD\n<b>Sabab (reasoning):</b> {reasoning_text}"
+                    logger.warning(warn_msg)
+                    try:
+                        self.telegram.send_message(warn_msg)
+                    except Exception as e:
+                        logger.error(f"Telegram ga xatolik xabarini yuborishda muammo: {e}")
 
-            try:
-                self.sync.log_ai_signal(
-                    symbol=symbol, signal="HOLD", confidence=80, reasoning=ai_decision.get("reasoning", ""),
-                    entry_price=None, sl_price=None, tp_price=None, rr_ratio=0.0,
-                    stop_loss_pips=0.0, take_profit_pips=0.0
-                )
-            except Exception as e:
-                logger.warning(f"Supabase sync xatolik (HOLD signal): {e}")
-            return
+                try:
+                    self.sync.log_ai_signal(
+                        symbol=symbol, signal="HOLD", confidence=80, reasoning=ai_decision.get("reasoning", ""),
+                        entry_price=None, sl_price=None, tp_price=None, rr_ratio=0.0,
+                        stop_loss_pips=0.0, take_profit_pips=0.0
+                    )
+                except Exception as e:
+                    logger.warning(f"Supabase sync xatolik (HOLD signal): {e}")
+                return
             
         pip_divisor = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
         
