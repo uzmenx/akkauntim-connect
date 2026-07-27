@@ -146,7 +146,10 @@ class AIClient:
                 self.logger.error(f"Supabase alert xatosi: {e}")
 
     def get_simple_response(self, prompt: str, system_prompt: Optional[str] = None, max_tokens: int = 10) -> str:
-        models_to_try = ["claude-fable-5", "claude-sonnet-5", "claude-opus-5"]
+        models_to_try = [
+            getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001"),
+            getattr(self.config, "ai_model_medium", "claude-sonnet-5")
+        ]
         import time
         import anthropic
         
