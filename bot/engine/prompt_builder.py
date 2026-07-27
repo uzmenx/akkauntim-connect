@@ -129,17 +129,20 @@ Quyidagi tavsiyalar avvalgi xatolaringdan o'rganilgan:
 
 === VAZIFA ===
 Bozor holatini to'liq o'rgan. 
-QAT'IY QOIDA ("SMART ENTRY"): Hozirgi bozor narxida (Market Execution - BUY/SELL) savdo ochish TAQIQLANADI! Chunki bu slippage (sirpanish) va yomon narxda kirishga sabab bo'ladi.
-Sen doimo narxning orqaga qaytishini (pullback) kutishing va faqat "Smart Entry" qilishing kerak. Barcha strategiyalarni (SMC OB/FVG, Harmonic PRZ, SR Volume) birlashtirib, eng kuchli va xavfsiz "Kirish Zonasi"ni aniqla.
-1. Qat'iy ravishda FAQAT `LIMIT_BUY` yoki `LIMIT_SELL` ishlat! `entry_price` ni o'sha kuchli zonalar (OB/FVG/Support/Resistance) ustiga aniq joylashtir. 
-2. Agar bozor sening LIMIT orderinga kelmasdan ketib qolsa, hech qisi yo'q, xavfsizlik birinchi o'rinda.
-3. Agar bozor beqaror, juda xavfli yoki turli strategiyalar bir-biriga zid signal bersa - "HOLD".
-Barcha strategiyalar xulosasiga asoslanib, o'zing kirish narxini (entry_price), SL va TP (aniq narx ko'rinishida) hamda Risk foizini (0.01 - 0.05 atrofida) belgilagin. LIMIT orderlar uchun albatta kutilayotgan limit narxini yoz.
+Kirish turini bozor narxining sening eng kuchli "Kirish Zonasi" (OB/FVG/Support/Resistance) ga nisbatan joylashuviga qarab belgilagin:
+1. YAQIN (Market Entry): Agar bozor narxi sening tanlagan kuchli kirish zonang ichida yoki unga juda yaqin (masalan 5 pip atrofida) joylashgan bo'lsa — qarorni `BUY` yoki `SELL` (LIMIT prefiksisiz) deb qaytar va `entry_price` ni joriy narxga yaqin joylashtir.
+2. UZOQ (Pending Limit): Agar bozor narxi sening kirish zonangdan uzoqda bo'lsa — qarorni `LIMIT_BUY` yoki `LIMIT_SELL` deb qaytar va `entry_price` ni zonaning ustiga aniq joylashtir.
+
+ZAIF TASDIQ QOIDASI: Agar eng asosiy strategiyalar (SMC va Auto Patterns) bir yo'nalishda signal bersa-yu, faqat qo'shimcha strategiyalardan biri (Wyckoff yoki Kill Zone) HOLD yoki qarshi signal bersa — bu qat'iy ziddiyat hisoblanmaydi! Bunday holatda ham (BUY/SELL/LIMIT_BUY/LIMIT_SELL) qarorini bergin, lekin xavfsizlik uchun kirish narxini odatdagidan ehtiyotkorroq (chuqurroq OB/FVG yoki kengroq SL bilan) tanla.
+
+QAT'IY ZIDDIYAT (HOLD): Faqatgina SMC va Auto Patterns ning IKKALASI ham HOLD desa yoki bir-biriga mutlaqo qarama-qarshi signal (biri BUY, ikkinchisi SELL) bersa, yoxud bozor aniq yo'nalishga ega bo'lmay haddan tashqari beqaror bo'lsa — "HOLD" qarorini qaytar.
+
+Barcha strategiyalar xulosasiga asoslanib, kirish narxini (entry_price), SL va TP (aniq narx ko'rinishida) hamda Risk foizini (0.01 - 0.05 atrofida) belgilagin.
 
 JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn (masalan markdown ```json) yozma! Sof JSON qaytar:
 {{
-  "decision": "LIMIT_BUY", // yoki "LIMIT_SELL", "HOLD"
-  "entry_price": 1.05000, // HOLD bo'lsa null. O'zing kutilayotgan limit narxni yoz.
+  "decision": "BUY", // yoki "SELL", "LIMIT_BUY", "LIMIT_SELL", "HOLD"
+  "entry_price": 1.05000, // HOLD bo'lsa null. O'zing belgilagan kirish narxini yoz.
   "stop_loss": 1.04500, // null agar HOLD bo'lsa
   "take_profit": 1.06000, // null agar HOLD bo'lsa
   "expiration_minutes": 240, // faqat LIMIT orderlar uchun: ushbu limit order qancha daqiqadan so'ng bekor qilinishi kerak? O'zing vaziyatga qarab belgilagin, agar MARKET order bo'lsa null.
