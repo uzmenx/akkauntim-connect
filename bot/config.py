@@ -26,7 +26,8 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model: str = "claude-sonnet-5"
+    ai_model_medium: str = "claude-sonnet-5"
+    ai_model_weak: str = "claude-haiku-4-5-20251001"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -39,7 +40,7 @@ class BotConfig:
     strategy_weight_smc: int = 60
     strategy_weight_pattern: int = 60
     strategy_weight_news: int = 60
-    allow_single_strategy_trade: bool = True
+    allow_single_strategy_trade: bool = False
     news_lookback_hours: int = 24
     max_spread_multiplier: float = 4.0
     ai_max_tokens: int = 2000
@@ -47,10 +48,6 @@ class BotConfig:
     # Yangi xususiyatlar
     auto_discover_symbols: bool = True
     batch_size: int = 3
-    ai_models_fallback: List[str] = field(default_factory=lambda: [
-        "claude-sonnet-5",
-        "claude-fable-5",
-    ])
 
     @classmethod
     def load(cls, env_path: str = ".env", config_path: str = "config.json") -> "BotConfig":
@@ -93,10 +90,9 @@ class BotConfig:
                     self.risk_level_multiple_confirmation = trading.get("risk_level_multiple_confirmation", self.risk_level_multiple_confirmation)
                     
                     ai = data.get("ai", {})
-                    self.ai_model = ai.get("model", self.ai_model)
+                    self.ai_model_medium = ai.get("model_medium", self.ai_model_medium)
+                    self.ai_model_weak = ai.get("model_weak", self.ai_model_weak)
                     self.ai_system_prompt = ai.get("system_prompt", self.ai_system_prompt)
-                    if "models_fallback" in ai and isinstance(ai["models_fallback"], list):
-                        self.ai_models_fallback = ai["models_fallback"]
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
@@ -125,8 +121,11 @@ class BotConfig:
         if "ai_enabled" in data:
             self.ai_enabled = bool(data["ai_enabled"])
             
-        if "ai_model" in data:
-            self.ai_model = data["ai_model"]
+        if "ai_model_medium" in data:
+            self.ai_model_medium = data["ai_model_medium"]
+            
+        if "ai_model_weak" in data:
+            self.ai_model_weak = data["ai_model_weak"]
             
         if "max_daily_loss" in data:
             self.max_daily_loss_pct = float(data["max_daily_loss"])
