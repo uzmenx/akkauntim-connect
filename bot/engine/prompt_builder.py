@@ -93,7 +93,7 @@ class PromptBuilder:
         
         prompt = f"""{system_prompt}
 Sening maqsading: quyidagi bozordagi barcha fundamental, texnik, SMC, va hajmiy (Wyckoff, SR) holatlarni tahlil qilib, MUSTAQIL ravishda xulosa chiqarish.
-Sen boshqa barcha algoritmlardan ustunsan. Senga hech qanday qaror majburlanmagan. Sen "BUY", "SELL", "LIMIT_BUY", "LIMIT_SELL" yoki "HOLD" xulosasini berishing kerak.
+Sen boshqa barcha algoritmlardan ustunsan. Senga hech qanday qaror majburlanmagan. Sen "LIMIT_BUY", "LIMIT_SELL" yoki "HOLD" xulosasini berishing kerak.
 
 === 1. JORIY HOLAT ({pair}) ===
 Hozirgi narx: {current_price}
@@ -138,8 +138,8 @@ Barcha strategiyalar xulosasiga asoslanib, o'zing kirish narxini (entry_price), 
 
 JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn (masalan markdown ```json) yozma! Sof JSON qaytar:
 {{
-  "decision": "BUY", // yoki "SELL", "LIMIT_BUY", "LIMIT_SELL", "HOLD"
-  "entry_price": 1.05000, // HOLD bo'lsa null. LIMIT orderlar uchun o'zing kutilayotgan limit narxni yoz, BUY/SELL uchun hozirgi narx.
+  "decision": "LIMIT_BUY", // yoki "LIMIT_SELL", "HOLD"
+  "entry_price": 1.05000, // HOLD bo'lsa null. O'zing kutilayotgan limit narxni yoz.
   "stop_loss": 1.04500, // null agar HOLD bo'lsa
   "take_profit": 1.06000, // null agar HOLD bo'lsa
   "expiration_minutes": 240, // faqat LIMIT orderlar uchun: ushbu limit order qancha daqiqadan so'ng bekor qilinishi kerak? O'zing vaziyatga qarab belgilagin, agar MARKET order bo'lsa null.
