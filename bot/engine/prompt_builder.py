@@ -17,7 +17,9 @@ class PromptBuilder:
                               wyckoff: Optional[Dict[str, Any]] = None,
                               sr_volume: Optional[Dict[str, Any]] = None,
                               auto_patterns: Optional[Dict[str, Any]] = None,
-                              kill_zones: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                              kill_zones: Optional[Dict[str, Any]] = None,
+                              anti_manipulation: Optional[str] = None,
+                              trap_detector: Optional[str] = None) -> Dict[str, Any]:
         """
         Gathers context components into a structured dictionary.
         Voting argumenti eski moslashuvchanlik uchun qoldirildi, lekin u ignor qilinishi mumkin.
@@ -30,7 +32,9 @@ class PromptBuilder:
             "wyckoff": wyckoff or {},
             "sr_volume": sr_volume or {},
             "auto_patterns": auto_patterns or {},
-            "kill_zones": kill_zones or {}
+            "kill_zones": kill_zones or {},
+            "anti_manipulation": anti_manipulation or "",
+            "trap_detector": trap_detector or ""
         }
 
     def build_trading_prompt(self, context: Dict[str, Any], pair: str, current_price: float) -> str:
@@ -77,6 +81,9 @@ class PromptBuilder:
         kz = context.get('kill_zones', {})
         kz_summary = f"Active sessions: {', '.join(kz.get('active_sessions', []))}, Signal: {kz.get('signal', 'HOLD')}"
 
+        anti_manip = context.get('anti_manipulation', "")
+        trap_detect = context.get('trap_detector', "")
+
         memory_bank = context.get('memory_bank', "SMC Memory Bank: Joriy narx atrofida kuchli tarixiy zonalar topilmadi.\n")
         
         system_prompt = getattr(self.config, "ai_system_prompt", "Sen to'liq avtonom AI Treyder Agentisan.")
@@ -120,6 +127,9 @@ Wyckoff: {wyckoff_summary}
 SR Volume: {sr_summary}
 Auto Patterns: {auto_pat_summary}
 Kill Zones: {kz_summary}
+
+{anti_manip}
+{trap_detect}
 
 === 6. AI TRADE REVIEWER (O'RGANISH MODULI) XULOSASI ===
 Quyidagi tavsiyalar avvalgi xatolaringdan o'rganilgan:

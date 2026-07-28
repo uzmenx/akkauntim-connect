@@ -75,6 +75,8 @@ export function useAuth() {
   };
 
   const logout = async () => {
+    localStorage.removeItem("guest_has_visited");
+    sessionStorage.removeItem("guest_session_redirected");
     if (localStorage.getItem("guest_user")) {
       localStorage.removeItem("guest_user");
       window.dispatchEvent(new Event("auth-change"));

@@ -33,7 +33,6 @@ export function LandingPage() {
           </div>
           <nav className="hidden items-center gap-8 text-sm text-white/70 md:flex">
             <a href="#features" className="hover:text-white transition">Features</a>
-            <a href="#connectors" className="hover:text-white transition">Connectors</a>
             <Link to="/auth" className="hover:text-white transition">Sign in</Link>
           </nav>
           <Link
@@ -69,12 +68,6 @@ export function LandingPage() {
             <span className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
             Start Connecting <ArrowRight size={18} />
           </Link>
-          <a
-            href="#connectors"
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-8 py-4 text-base font-semibold text-white/90 backdrop-blur-md transition hover:bg-white/10"
-          >
-            View Connectors
-          </a>
         </div>
 
         {/* Floating preview */}
@@ -119,27 +112,6 @@ export function LandingPage() {
               </div>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* Connectors CTA */}
-      <section id="connectors" className="relative mx-auto max-w-5xl px-6 py-24 text-center">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-violet-500/10 via-sky-500/5 to-emerald-400/10 p-12 backdrop-blur-2xl">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(120,80,255,0.25),transparent_60%)]" />
-          <div className="relative">
-            <h2 className="text-4xl font-black tracking-tight md:text-5xl">
-              Ready to <span className="bg-gradient-to-r from-emerald-300 to-violet-400 bg-clip-text text-transparent">connect everything?</span>
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-white/60">
-              Launch your Connectors Hub and manage every integration in a single, unified dashboard.
-            </p>
-            <Link
-              to="/auth"
-              className="mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-500 via-sky-500 to-emerald-400 px-8 py-4 text-base font-bold text-white shadow-[0_0_50px_rgba(120,80,255,0.6)] transition-transform hover:scale-105"
-            >
-              Open Dashboard <ArrowRight size={18} />
-            </Link>
-          </div>
         </div>
       </section>
 

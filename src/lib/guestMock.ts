@@ -45,44 +45,36 @@ const defaultPositions = (): Position[] => {
   });
 };
 
-const defaultHistory = (): TradeHistory[] => [
-  {
-    id: "mock-hist-1",
-    ticket: 11112222,
-    symbol: "GBPUSD",
-    side: "BUY",
-    volume: 1.0,
-    open_price: 1.27200,
-    close_price: 1.27850,
-    profit: 650.00,
-    opened_at: new Date(Date.now() - 25000000).toISOString(),
-    closed_at: new Date(Date.now() - 18000000).toISOString(),
-  },
-  {
-    id: "mock-hist-2",
-    ticket: 33334444,
-    symbol: "EURUSD",
-    side: "SELL",
-    volume: 1.0,
-    open_price: 1.08900,
-    close_price: 1.08650,
-    profit: 250.00,
-    opened_at: new Date(Date.now() - 50000000).toISOString(),
-    closed_at: new Date(Date.now() - 43200000).toISOString(),
-  },
-  {
-    id: "mock-hist-3",
-    ticket: 55556666,
-    symbol: "XAUUSD",
-    side: "BUY",
-    volume: 1.5,
-    open_price: 2340.00,
-    close_price: 2335.00,
-    profit: -750.00,
-    opened_at: new Date(Date.now() - 80000000).toISOString(),
-    closed_at: new Date(Date.now() - 72000000).toISOString(),
+const defaultHistory = (): TradeHistory[] => {
+  const symbols = ["GBPUSD", "XAUUSD", "EURUSD", "USDJPY", "AUDUSD", "USDCAD"];
+  const list: TradeHistory[] = [];
+  let currentBalance = 15000; // Simulating growth starting from $15,000
+  
+  for (let i = 1; i <= 25; i++) {
+    const isWin = i % 5 !== 0; // 80% Win Rate (20 wins, 5 losses)
+    const symbol = symbols[i % symbols.length];
+    const isBuy = i % 2 === 0;
+    
+    // Compounding growth: profits scale up as simulated history progresses
+    const rate = isWin ? (0.04 + (i * 0.003)) : -(0.015 + (i * 0.001));
+    const profit = Number((currentBalance * rate).toFixed(2));
+    currentBalance = Number((currentBalance + profit).toFixed(2));
+    
+    list.unshift({
+      id: `mock-hist-${i}`,
+      ticket: 11110000 + i,
+      symbol,
+      side: isBuy ? "BUY" : "SELL",
+      volume: Number((0.5 + (i * 0.15)).toFixed(2)),
+      open_price: symbol.includes("JPY") ? 150.0 : (symbol.includes("XAU") ? 2300.0 : 1.0500),
+      close_price: symbol.includes("JPY") ? 151.2 : (symbol.includes("XAU") ? 2318.0 : 1.0620),
+      profit,
+      opened_at: new Date(Date.now() - 3600000 * (26 - i) * 3 - 3600000).toISOString(),
+      closed_at: new Date(Date.now() - 3600000 * (26 - i) * 3).toISOString(),
+    });
   }
-];
+  return list;
+};
 
 const defaultSignals = (): AISignal[] => [
   {
@@ -192,8 +184,8 @@ export const guestMock = {
     } else {
       val = JSON.parse(item);
     }
-    // Simulate real-time equity tick
-    const tick = (Math.random() - 0.5) * 5.5; // +/- 2.75 change
+    // Simulate minor live equity fluctuations between trade closures
+    const tick = (Math.random() - 0.5) * 15.5; 
     val.account_equity = Number((val.account_equity + tick).toFixed(2));
     localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(val));
     return val;
@@ -207,22 +199,86 @@ export const guestMock = {
 
   getPositions: (): Position[] => {
     const item = localStorage.getItem(MOCK_POSITIONS_KEY);
-    let val;
+    let val: Position[];
     if (!item) {
       val = defaultPositions();
     } else {
       val = JSON.parse(item);
     }
+
     // Simulate real-time position price ticks
     val = val.map((p: Position) => {
       const isJPY = p.symbol.includes("JPY");
       const tickSize = isJPY ? 0.01 : 0.0001;
       const move = (Math.random() - 0.5) * tickSize * 10;
       p.current_price = Number(((p.current_price ?? p.open_price ?? 0) + move).toFixed(5));
-      const profitChange = (Math.random() - 0.5) * 2;
+      const profitChange = (Math.random() - 0.5) * 10;
       p.profit = Number(((p.profit ?? 0) + profitChange).toFixed(2));
       return p;
     });
+
+    // 15% chance to close a position and execute a compound interest trade
+    if (Math.random() < 0.15 && val.length > 0) {
+      const indexToClose = val.findIndex(p => p.profit > 0) !== -1 
+        ? val.findIndex(p => p.profit > 0) 
+        : 0;
+      
+      const closedPos = val[indexToClose];
+      
+      // Get current bot status to update balance
+      const statusItem = localStorage.getItem(MOCK_STATUS_KEY);
+      if (statusItem) {
+        const botStatus = JSON.parse(statusItem);
+        
+        // Compound profit: 2% to 6% of current balance (making it larger as balance grows)
+        const compoundFactor = 0.02 + Math.random() * 0.04;
+        const profit = Number((botStatus.account_balance * compoundFactor).toFixed(2));
+        
+        botStatus.account_balance = Number((botStatus.account_balance + profit).toFixed(2));
+        botStatus.account_equity = Number((botStatus.account_balance + 850).toFixed(2)); 
+        localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(botStatus));
+
+        // Add to history
+        const histItem = localStorage.getItem(MOCK_HISTORY_KEY);
+        const historyList = histItem ? JSON.parse(histItem) : [];
+        const newHist: TradeHistory = {
+          id: `mock-hist-${Date.now()}`,
+          ticket: closedPos.ticket,
+          symbol: closedPos.symbol,
+          side: closedPos.side,
+          volume: closedPos.volume,
+          open_price: closedPos.open_price,
+          close_price: closedPos.current_price,
+          profit: profit, 
+          opened_at: closedPos.opened_at,
+          closed_at: new Date().toISOString(),
+        };
+        historyList.unshift(newHist);
+        localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(historyList.slice(0, 50)));
+      }
+
+      // Remove closed position
+      val.splice(indexToClose, 1);
+      
+      // Spawn new position to keep it active
+      const symbols = ["EURUSD", "XAUUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"];
+      const newSym = symbols[Math.floor(Math.random() * symbols.length)];
+      const openPrice = newSym.includes("JPY") ? 150.0 : (newSym.includes("XAU") ? 2300.0 : 1.0500);
+      val.push({
+        id: `mock-pos-${Date.now()}`,
+        ticket: 10000000 + Math.floor(Math.random() * 900000),
+        symbol: newSym,
+        side: Math.random() > 0.5 ? "BUY" : "SELL",
+        volume: Number((Math.random() * 1.5 + 0.1).toFixed(2)),
+        open_price: openPrice,
+        current_price: openPrice,
+        stop_loss: openPrice - 0.02,
+        take_profit: openPrice + 0.04,
+        profit: Number(((Math.random() - 0.4) * 20).toFixed(2)),
+        opened_at: new Date().toISOString()
+      });
+    }
+
     localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(val));
     return val;
   },
@@ -232,7 +288,7 @@ export const guestMock = {
 
   getHistory: (): TradeHistory[] => {
     const item = localStorage.getItem(MOCK_HISTORY_KEY);
-    if (!item) {
+    if (!item || JSON.parse(item).length < 25) {
       const val = defaultHistory();
       localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(val));
       return val;

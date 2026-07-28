@@ -9,7 +9,6 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { BacktestPage } from "@/pages/BacktestPage";
 import { LandingPage } from "@/pages/LandingPage";
-import { ConnectorsPage } from "@/pages/ConnectorsPage";
 import { ShadowLearningPage } from "@/pages/ShadowLearningPage";
 import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -25,7 +24,6 @@ const titles: Record<string, string> = {
   "/settings": "Bot settings",
   "/pricing": "Ta'riflar va Obuna",
   "/backtest": "Backtest Tizimi",
-  "/connectors": "Connectors Hub",
   "/shadow-learning": "Shadow Learning AI",
 };
 
@@ -89,7 +87,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="/connectors" element={<ConnectorsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -104,7 +101,13 @@ export default function App() {
         <header className="sticky top-0 z-40 flex items-center justify-between px-5 py-4 pt-[max(env(safe-area-inset-top),1rem)] bg-bg-deep/85 backdrop-blur-lg border-b border-white/5">
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => navigate(-1)} 
+              onClick={() => {
+                if (location.pathname === "/signals") {
+                  navigate("/");
+                } else {
+                  navigate(-1);
+                }
+              }} 
               className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white border border-white/10"
               aria-label="Go back"
             >
@@ -151,7 +154,6 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/pricing" element={<SubscriptionPage />} />
           <Route path="/backtest" element={<BacktestPage />} />
-          <Route path="/connectors" element={<ConnectorsPage />} />
           <Route path="/shadow-learning" element={<ShadowLearningPage />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

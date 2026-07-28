@@ -32,7 +32,7 @@ import uuid
 import chromadb
 from chromadb.config import Settings
 
-from file_reader import extract_text
+from bot.learning.file_reader import extract_text
 
 
 class AIStrategist:

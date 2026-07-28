@@ -165,6 +165,26 @@ class TradingBot:
             logger.error(f"Kill Zones tahlil xatosi: {e}")
             return {}
 
+    def _get_anti_manipulation_analysis(self, df: pd.DataFrame, smc_data: Dict[str, Any], current_price: float) -> str:
+        """Stop-Hunter Shield tahlili (Anti-Manipulation)."""
+        try:
+            from bot.strategy.anti_manipulation.engine import analyze_stop_hunting_risk
+            from bot.engine.confluence import compute_atr
+            atr = compute_atr(df)
+            return analyze_stop_hunting_risk(df, smc_data, current_price, atr)
+        except Exception as e:
+            logger.error(f"Anti-Manipulation tahlil xatosi: {e}")
+            return "Stop-Hunter Shield: Xatolik yuz berdi."
+
+    def _get_trap_detection_analysis(self, df: pd.DataFrame) -> str:
+        """Trap Detector tahlili (Fakeout va Rejection)."""
+        try:
+            from bot.strategy.trap_detector.engine import analyze_trap_detector
+            return analyze_trap_detector(df)
+        except Exception as e:
+            logger.error(f"Trap Detector tahlil xatosi: {e}")
+            return "Trap Detector: Xatolik yuz berdi."
+
     def _get_memory_bank_alerts(self, symbol: str, current_price: float) -> str:
         """SMC Memory Bank — tarixiy zonalar."""
         try:
@@ -340,6 +360,8 @@ class TradingBot:
         sr_volume_result = self._get_sr_volume_analysis(df_major)
         auto_patterns_result = self._get_auto_patterns_analysis(df_major, current_price)
         kill_zones_result = self._get_kill_zones_analysis(df_major)
+        anti_manipulation_result = self._get_anti_manipulation_analysis(df_major, smc_result or smc_context, current_price)
+        trap_detector_result = self._get_trap_detection_analysis(df_major)
 
         # ============================================================
         # 3. CONFLUENCE ENGINE — ball tizimi asosida savdo qarori
@@ -371,7 +393,9 @@ class TradingBot:
             wyckoff=wyckoff_result,
             sr_volume=sr_volume_result,
             auto_patterns=auto_patterns_result,
-            kill_zones=kill_zones_result
+            kill_zones=kill_zones_result,
+            anti_manipulation=anti_manipulation_result,
+            trap_detector=trap_detector_result
         )
         context["pair"] = symbol
         context["regime"] = current_regime.value

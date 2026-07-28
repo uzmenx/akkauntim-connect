@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Brain, UploadCloud, BookOpen, Activity, Target, ShieldAlert, Loader2, Sparkles, CheckCircle2, Lightbulb, BarChart3, Zap } from "lucide-react";
 import { cn, timeAgo } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Icon } from "@iconify/react";
 
 type StrategyInsight = {
   id: string;
@@ -44,6 +45,7 @@ type StrategyPerf = {
 };
 
 export function ShadowLearningPage() {
+  const [activeTab, setActiveTab] = useState<'overview' | 'memory'>('overview');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -257,42 +259,74 @@ export function ShadowLearningPage() {
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-600/10 rounded-full blur-[120px]" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]" />
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20" />
       </div>
 
-      <div className="w-full h-full mx-auto px-4 pt-6 relative z-10 flex flex-col gap-6">
+      <div className="w-full h-full mx-auto px-3 sm:px-4 pt-4 sm:pt-6 relative z-10 flex flex-col gap-4 sm:gap-6">
         
         {/* Header Area */}
-        <div className="flex items-center gap-4">
-          <div className={cn(
-            "w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center border shrink-0 transition-all duration-500",
-            isLearning 
-              ? "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/40 border-blue-400/50 animate-pulse" 
-              : "bg-gradient-to-br from-emerald-500 to-emerald-700 shadow-emerald-500/20 border-emerald-400/30"
-          )}>
-            <Brain className="text-white" size={28} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-black text-white tracking-tight">Shadow Learning</h1>
-            <p className={cn(
-              "text-sm font-medium flex items-center gap-1.5 transition-colors duration-500",
-              isLearning ? "text-blue-400" : "text-emerald-400/80"
-            )}>
-              {isLearning ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" /> AI ma'lumotlarni tahlil qilmoqda...
-                </>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "w-12 h-12 rounded-[16px] flex items-center justify-center border shrink-0 transition-all duration-500",
+                isLearning 
+                  ? "bg-blue-500/10 border-blue-400/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] animate-pulse" 
+                  : "bg-emerald-500/10 border-emerald-400/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+              )}>
+                <Brain className={isLearning ? "text-blue-400" : "text-emerald-400"} size={24} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">Shadow AI</h1>
+                <p className={cn(
+                  "text-xs font-medium flex items-center gap-1.5 transition-colors duration-500",
+                  isLearning ? "text-blue-400" : "text-white/40"
+                )}>
+                  {isLearning ? (
+                    <><Loader2 size={12} className="animate-spin" /> Tahlil qilinmoqda...</>
+                  ) : (
+                    <><Sparkles size={12} className="text-emerald-400/70" /> Faol o'rganish</>
+                  )}
+                </p>
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="px-4 h-11 rounded-[14px] bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-[#070b13] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:shadow-[0_0_30px_rgba(16,185,129,0.55)] active:scale-95 transition-all duration-300 shrink-0 border border-emerald-300/30 group"
+              title="Fayl yuklash"
+            >
+              {uploading ? (
+                <Loader2 size={20} className="animate-spin text-[#070b13]" />
               ) : (
                 <>
-                  <Sparkles size={14} /> AI doimiy ravishda o'rganmoqda
+                  <Icon icon="pixel:machine-learning" className="w-[20px] h-[20px] transition-transform group-hover:scale-110" />
+                  <Icon icon="mage:file-upload-fill" className="w-[20px] h-[20px] transition-transform group-hover:scale-110" />
                 </>
               )}
-            </p>
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-1 min-[360px]:gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 overflow-x-auto no-scrollbar w-fit">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'overview' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+            >
+              Asosiy
+            </button>
+            <button 
+              onClick={() => setActiveTab('memory')}
+              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'memory' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+            >
+              Xotira
+            </button>
           </div>
         </div>
 
         {/* === AI O'RGANISH JARAYONI VIZUALIZATSIYASI === */}
-        <div className="w-full bg-[#10192e]/80 backdrop-blur-xl border border-white/10 rounded-[28px] p-5 shadow-2xl relative overflow-hidden">
+        {activeTab === 'overview' && (
+        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-40 h-40 bg-violet-500/10 blur-[60px] rounded-full pointer-events-none" />
           <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
           
@@ -302,8 +336,8 @@ export function ShadowLearningPage() {
               AI O'rganish Jarayoni
             </h2>
             {learningData && (
-              <div className="bg-violet-500/20 px-3 py-1 rounded-full">
-                <span className="text-violet-300 text-[12px] font-black tracking-wider">
+              <div className="bg-violet-500/20 px-2 py-0.5 min-[360px]:px-3 min-[360px]:py-1 rounded-full">
+                <span className="text-violet-300 text-[10px] min-[360px]:text-[12px] font-black tracking-wider">
                   SAVDO #{learningData.totalTrades}
                 </span>
               </div>
@@ -426,23 +460,23 @@ export function ShadowLearningPage() {
           )}
 
           {/* Stats Row */}
-          <div className="grid grid-cols-4 gap-2">
-            <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/5">
-              <div className="text-[10px] text-white/40 font-bold uppercase mb-1">Savdolar</div>
-              <div className="text-white font-black text-lg">{learningData?.totalTrades || 0}</div>
+          <div className="grid grid-cols-4 gap-1 min-[360px]:gap-2">
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Savdolar</div>
+              <div className="text-white font-black text-sm min-[360px]:text-lg">{learningData?.totalTrades || 0}</div>
             </div>
-            <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/5">
-              <div className="text-[10px] text-white/40 font-bold uppercase mb-1">Win Rate</div>
-              <div className="text-emerald-400 font-black text-lg">{learningData?.overallWR || 0}%</div>
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Win Rate</div>
+              <div className="text-emerald-400 font-black text-sm min-[360px]:text-lg">{learningData?.overallWR || 0}%</div>
             </div>
-            <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/5">
-              <div className="text-[10px] text-white/40 font-bold uppercase mb-1">Bilimlar</div>
-              <div className="text-violet-400 font-black text-lg">{networkData.knowledge}</div>
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Bilimlar</div>
+              <div className="text-violet-400 font-black text-sm min-[360px]:text-lg">{networkData.knowledge}</div>
             </div>
-            <div className="bg-black/30 rounded-xl p-2.5 text-center border border-white/5">
-              <div className="text-[10px] text-white/40 font-bold uppercase mb-1">O'sish</div>
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">O'sish</div>
               <div className={cn(
-                "font-black text-lg",
+                "font-black text-sm min-[360px]:text-lg",
                 (learningData?.improvement || 0) > 0 ? "text-emerald-400" : 
                 (learningData?.improvement || 0) < 0 ? "text-rose-400" : "text-white/50"
               )}>
@@ -458,9 +492,11 @@ export function ShadowLearningPage() {
             </p>
           </div>
         </div>
+        )}
 
         {/* Upload Zone */}
-        <div className="w-full bg-[#10192e]/80 backdrop-blur-xl border border-white/10 rounded-[28px] p-5 shadow-2xl relative overflow-hidden">
+        {activeTab === 'overview' && (
+        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
           
           <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
@@ -549,8 +585,11 @@ export function ShadowLearningPage() {
             </div>
           )}
         </div>
+        )}
 
         {/* AI Insights List */}
+        {activeTab === 'memory' && (
+        <div className="flex flex-col gap-6">
         <div>
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 px-1">
             <Activity size={20} className="text-blue-400" />
@@ -682,10 +721,12 @@ export function ShadowLearningPage() {
             )}
           </div>
         </div>
+        </div>
+        )}
 
         {/* Strategiya Samaradorligi */}
-        {stratPerf.data && stratPerf.data.length > 0 && (
-          <div>
+        {activeTab === 'overview' && stratPerf.data && stratPerf.data.length > 0 && (
+          <div className="mt-2">
             <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 px-1">
               <BarChart3 size={20} className="text-violet-400" />
               Strategiya Samaradorligi

@@ -69,38 +69,48 @@ export function AuthPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-10">
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-10 relative z-10">
+      {/* Nature background for realistic Glossmorphism reflections */}
+      <div className="fixed inset-0 pointer-events-none -z-10">
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url('/nature_bg.jpg')" }}
+        />
+        <div className="absolute inset-0 bg-black/5" />
+      </div>
+
       <div className="mb-8 flex flex-col items-center gap-3 text-center">
-        <div className="h-16 w-16 overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a4ed6] to-[#041a5a] shadow-2xl shadow-blue-500/40 border border-white/10 flex items-center justify-center">
+        <div className="h-16 w-16 overflow-hidden rounded-[20px] bg-gradient-to-br from-blue-500 to-indigo-700 shadow-[0_0_25px_rgba(59,130,246,0.3)] border border-white/20 flex items-center justify-center">
           <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
         </div>
-        <h1 className="text-3xl font-black tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white to-blue-200">Akcume Trading AI Bot</h1>
-        <p className="max-w-xs text-xs text-white/50">
+        <h1 className="text-2xl font-extrabold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-blue-100 to-blue-300">Akcume Trading AI</h1>
+        <p className="max-w-xs text-[11px] font-black text-white/90 uppercase tracking-wider shadow-sm bg-black/20 px-3 py-1 rounded-full backdrop-blur-md border border-white/10">
           {mode === "signup"
-            ? "MT5 hisobingizni ro'yxatdan o'tkazing — faqat siz o'zingiznikini ko'rasiz."
-            : "Ro'yxatdan o'tgan MT5 login va parolingiz bilan kiring."}
+            ? "MT5 hisobingizni ro'yxatdan o'tkazing"
+            : "Ro'yxatdan o'tgan MT5 hisobi orqali kiring"}
         </p>
       </div>
 
-      <Card className="glass p-6 rounded-[28px] border border-white/10 relative overflow-hidden">
-        <div className="absolute top-[-50px] right-[-50px] w-24 h-24 rounded-full bg-blue-500/20 blur-xl pointer-events-none" />
+      <Card className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-[32px] backdrop-saturate-[150%] border-t border-l border-white/30 border-r border-b border-white/5 p-8 rounded-[42px] shadow-[0_30px_60px_rgba(0,0,0,0.3),inset_1px_1px_15px_rgba(255,255,255,0.2),inset_-1px_-1px_15px_rgba(0,0,0,0.1)] relative overflow-hidden">
+        {/* Crisp curved reflection (glare) at the top for 3D liquid glass effect */}
+        <div className="absolute top-[-25%] left-[-20%] w-[140%] h-[60%] bg-gradient-to-b from-white/30 to-transparent rounded-[100%] pointer-events-none transform -rotate-12 blur-[1px]" />
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5 relative z-10">
           <div>
-            <label className="text-xs font-semibold text-white/60 mb-2 flex items-center gap-1.5">
-              <User size={12} className="text-blue-400" /> MT5 Login
+            <label className="text-xs font-black text-white/90 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+              <User size={12} className="text-white/90" /> MT5 Login
             </label>
             <input
               type="text" required autoComplete="username"
               value={login} onChange={(e) => setLogin(e.target.value)}
               placeholder="Masalan: 109545213"
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-brand/60"
+              className="w-full rounded-[16px] border-t border-l border-white/20 border-r border-b border-white/5 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/40 focus:bg-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.1),inset_0_2px_5px_rgba(0,0,0,0.1)] transition-all duration-300"
             />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-white/60 mb-2 flex items-center gap-1.5">
-              <KeyRound size={12} className="text-blue-400" /> MT5 Paroli
+            <label className="text-xs font-black text-white/90 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+              <KeyRound size={12} className="text-white/90" /> MT5 Paroli
             </label>
             <div className="relative">
               <input
@@ -108,45 +118,45 @@ export function AuthPage() {
                 autoComplete={mode === "signup" ? "new-password" : "current-password"}
                 value={password} onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/20 focus:border-brand/60"
+                className="w-full rounded-[16px] border-t border-l border-white/20 border-r border-b border-white/5 bg-white/5 px-4 py-3 pr-12 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/40 focus:bg-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.1),inset_0_2px_5px_rgba(0,0,0,0.1)] transition-all duration-300"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-blue-400 hover:text-blue-300 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-white/50 hover:text-white/90 transition-colors"
                 aria-label={showPassword ? "Parolni yashirish" : "Parolni ko'rsatish"}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
           {mode === "signup" && (
             <div>
-              <label className="text-xs font-semibold text-white/60 mb-2 flex items-center gap-1.5">
-                <Server size={12} className="text-blue-400" /> MT5 Server
+              <label className="text-xs font-black text-white/90 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
+                <Server size={12} className="text-white/90" /> MT5 Server
               </label>
               <input
                 type="text" required
                 value={server} onChange={(e) => setServer(e.target.value)}
                 placeholder="Masalan: MetaQuotes-Demo"
-                className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-brand/60"
+                className="w-full rounded-[16px] border-t border-l border-white/20 border-r border-b border-white/5 bg-white/5 px-4 py-3 text-sm text-white outline-none placeholder:text-white/30 focus:border-white/40 focus:bg-white/10 focus:shadow-[0_0_20px_rgba(255,255,255,0.1),inset_0_2px_5px_rgba(0,0,0,0.1)] transition-all duration-300"
               />
             </div>
           )}
 
           {err && (
-            <div className="rounded-xl bg-danger/10 border border-danger/20 px-3 py-2 text-xs text-rose-400">{err}</div>
+            <div className="rounded-xl bg-red-500/10 border-t border-l border-red-500/30 border-r border-b border-red-500/10 px-3 py-2.5 text-xs text-rose-200">{err}</div>
           )}
 
-          <Button type="submit" size="lg" className="mt-2 w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg animate-pulse" disabled={busy}>
-            {busy ? <Loader2 className="animate-spin" size={18} /> : mode === "signup" ? "Ro'yxatdan o'tish" : "Kirish"}
+          <Button type="submit" size="lg" className="mt-4 w-full bg-gradient-to-br from-white/25 to-white/5 border-t border-l border-white/40 border-r border-b border-white/10 hover:bg-white/20 text-white font-bold py-4 rounded-[16px] shadow-[0_10px_20px_rgba(0,0,0,0.2),inset_1px_1px_5px_rgba(255,255,255,0.5)] hover:shadow-[0_15px_25px_rgba(0,0,0,0.3),inset_1px_1px_8px_rgba(255,255,255,0.6)] hover:scale-[1.02] active:scale-95 transition-all duration-300 backdrop-blur-md" disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" size={18} /> : mode === "signup" ? "Ro'yxatdan o'tish" : "Tizimga kirish"}
           </Button>
 
           <button
             type="button"
             onClick={() => loginAsGuest()}
-            className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:bg-white/10 active:scale-[0.98] text-white/90 hover:text-white font-semibold py-3 rounded-xl transition-all shadow-md mt-1"
+            className="w-full flex items-center justify-center gap-2 bg-black/20 border-t border-l border-white/10 border-r border-b border-black/20 hover:bg-black/30 hover:border-white/20 active:scale-[0.98] text-white/90 font-semibold py-3.5 rounded-[16px] transition-all duration-300 shadow-inner mt-2"
           >
             <UserCheck size={16} className="text-blue-400" />
             <span>Mehmon bo'lib kirish</span>
@@ -155,15 +165,16 @@ export function AuthPage() {
           <button
             type="button"
             onClick={() => { setMode(mode === "signup" ? "signin" : "signup"); setErr(null); }}
-            className="w-full text-center text-xs text-white/50 hover:text-white/80 transition-colors pt-2"
+            className="w-full text-center text-xs text-[#0d2f25] hover:text-[#16423c] font-black transition-all pt-2 underline underline-offset-4"
           >
             {mode === "signup" ? "Hisobingiz bormi? Kirish" : "Hisob yo'qmi? Ro'yxatdan o'ting"}
           </button>
         </form>
       </Card>
 
-      <p className="mt-8 text-center text-[10px] text-white/30">
-        Har bir foydalanuvchi faqat o'zining MT5 hisob ma'lumotlarini ko'radi. Ma'lumotlar xavfsiz saqlanadi.
+      <p className="mt-8 text-center text-[10px] text-white/30 leading-relaxed">
+        Har bir foydalanuvchi faqat o'zining MT5 hisob ma'lumotlarini ko'radi.
+        <br />Ma'lumotlar xavfsiz saqlanadi.
       </p>
     </div>
   );

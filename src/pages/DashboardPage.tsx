@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BalanceTrendChart } from "@/components/BalanceTrendChart";
+import { PaywallModal } from "@/components/PaywallModal";
 
 const MoneyCoinDuoIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
@@ -132,9 +133,27 @@ export function DashboardPage() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isSendingPrompt, setIsSendingPrompt] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showFirstTimePaywall, setShowFirstTimePaywall] = useState(false);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isGuest) {
+      const hasVisited = localStorage.getItem("guest_has_visited");
+      const hasRedirected = sessionStorage.getItem("guest_session_redirected");
+      if (hasVisited === "true") {
+        if (!hasRedirected) {
+          sessionStorage.setItem("guest_session_redirected", "true");
+          navigate("/signals", { replace: true });
+        }
+      } else {
+        localStorage.setItem("guest_has_visited", "true");
+        sessionStorage.setItem("guest_session_redirected", "true");
+        setShowFirstTimePaywall(true);
+      }
+    }
+  }, [isGuest, navigate]);
 
   // Clicks outside of dropdown close it
   useEffect(() => {
@@ -228,8 +247,18 @@ export function DashboardPage() {
           </div>
         </div>
 
+        {isGuest && (
+          <Link to="/pricing" className="h-[4dvh] min-h-[30px] shrink-0 w-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 rounded-2xl flex items-center justify-between px-4 animate-in fade-in slide-in-from-top-3 duration-500 backdrop-blur-md shadow-lg cursor-pointer hover:brightness-110 transition-all">
+            <span className="text-[9px] font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+              Siz Mehmon (Demo) rejadasiz. To'liq faollashtirish
+            </span>
+            <ChevronRight size={12} className="text-amber-300 shrink-0" />
+          </Link>
+        )}
+
         {/* Card 22%: Main Blue Card */}
-        <div className="w-full h-[22dvh] min-h-[200px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        <div className="w-full h-[25dvh] min-h-[235px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Card Top Header */}
           <div className="flex justify-between items-center">
@@ -291,6 +320,11 @@ export function DashboardPage() {
             <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums drop-shadow-md">
               {equity != null ? fmtMoney(Number(equity), currency) : "$89,405.18"}
             </h1>
+            {isGuest && (
+              <span className="mt-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-extrabold uppercase tracking-widest backdrop-blur-md">
+                Demo Reja (Taqdimot Balansi)
+              </span>
+            )}
           </div>
 
           {/* Avatars Row */}
@@ -303,15 +337,15 @@ export function DashboardPage() {
           </a>
 
           {/* 4 Action Buttons Row */}
-          <div className="flex gap-2 w-full items-center justify-between mt-auto px-1">
+          <div className="flex gap-1.5 min-[360px]:gap-2 w-full items-center justify-between mt-auto px-1">
             {/* Button 1: Settings */}
-            <Link to="/settings" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),inset_0_-2px_4px_rgba(0,0,0,0.3),0_4px_12px_rgba(71,85,105,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white/90 transition-all group border border-slate-500/50" aria-label="Settings">
-              <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+            <Link to="/settings" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),inset_0_-2px_4px_rgba(0,0,0,0.3),0_4px_12px_rgba(71,85,105,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white/90 transition-all group border border-slate-500/50" aria-label="Settings">
+              <Settings size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
             {/* Button 2: Signals */}
-            <Link to="/signals" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(249,115,22,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-orange-300/50" aria-label="Signals">
-              <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 80 80" className="group-hover:scale-110 transition-transform">
+            <Link to="/signals" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(249,115,22,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-orange-300/50" aria-label="Signals">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="min-[360px]:w-[22px] min-[360px]:h-[22px] group-hover:scale-110 transition-transform">
                 <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
                   <path stroke="currentColor" d="M40 48v24"/>
                   <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
@@ -322,27 +356,27 @@ export function DashboardPage() {
             </Link>
 
             {/* Button 3: Filter */}
-            <button onClick={toggleFilter} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 transition-all group border border-violet-400/50" aria-label="Filter Mode">
+            <button onClick={toggleFilter} className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center transition-all group border border-violet-400/50" aria-label="Filter Mode">
               <div className="flex items-center justify-center w-5 h-5">
                 {filterMode === "all" && (
-                  <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
-                    <TrendingUp size={12} className="text-emerald-400 absolute top-0 left-0" />
-                    <TrendingDown size={12} className="text-rose-400 absolute bottom-0 right-0" />
+                  <div className="relative w-[16px] h-[16px] min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform">
+                    <TrendingUp size={10} className="text-emerald-400 absolute top-0 left-0" />
+                    <TrendingDown size={10} className="text-rose-400 absolute bottom-0 right-0" />
                   </div>
                 )}
-                {filterMode === "profit" && <TrendingUp size={18} className="text-emerald-400 group-hover:scale-110 transition-transform" />}
-                {filterMode === "loss" && <TrendingDown size={18} className="text-rose-400 group-hover:scale-110 transition-transform" />}
+                {filterMode === "profit" && <TrendingUp size={16} className="text-emerald-400 min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform" />}
+                {filterMode === "loss" && <TrendingDown size={16} className="text-rose-400 min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform" />}
               </div>
             </button>
 
             {/* Button 4: AI Send */}
-            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(251,191,36,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 text-white transition-all group border border-amber-300/50" aria-label="AI Send">
-              <Sparkles size={20} className="group-hover:scale-110 transition-transform text-white" />
+            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(251,191,36,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-amber-300/50" aria-label="AI Send">
+              <Sparkles size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
             </button>
 
             {/* Button 5: Shadow Learning AI */}
-            <Link to="/shadow-learning" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(20,184,166,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-teal-300/50" aria-label="Shadow Learning AI">
-              <Brain size={20} className="group-hover:scale-110 transition-transform text-white" />
+            <Link to="/shadow-learning" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(20,184,166,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-teal-300/50" aria-label="Shadow Learning AI">
+              <Brain size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
             </Link>
           </div>
         </div>
@@ -442,19 +476,22 @@ export function DashboardPage() {
 
       {/* AI Prompt Modal */}
       {showPrompt && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center px-4">
-          <div className="bg-[#1e1a1d] border border-white/10 rounded-[28px] w-full max-w-sm p-6 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-[-50px] right-[-50px] w-24 h-24 rounded-full bg-blue-600/20 blur-xl pointer-events-none" />
-            <h3 className="text-white font-bold mb-2">AI'ga ko'rsatma yuborish</h3>
-            <p className="text-[11px] text-white/50 mb-4">Trading qarorini yaxshilash uchun nima qilish kerakligini yozing.</p>
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center px-4">
+          <div className="bg-white/[0.03] border border-white/15 rounded-[32px] w-full max-w-sm p-6 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.7),inset_0_1px_2px_rgba(255,255,255,0.25)] relative overflow-hidden backdrop-blur-3xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Liquid glass background glow blobs */}
+            <div className="absolute top-[-50px] left-[-50px] w-40 h-40 rounded-full bg-indigo-500/25 blur-3xl pointer-events-none animate-pulse" />
+            <div className="absolute bottom-[-50px] right-[-50px] w-40 h-40 rounded-full bg-pink-500/20 blur-3xl pointer-events-none animate-pulse" />
+            
+            <h3 className="text-white font-extrabold text-lg mb-1 drop-shadow-md relative z-10">AI'ga ko'rsatma yuborish</h3>
+            <p className="text-[11px] text-white/50 mb-4 relative z-10 leading-normal">Trading qarorini yaxshilash uchun nima qilish kerakligini yozing.</p>
             <textarea 
               value={aiPrompt}
               onChange={(e) => setAiPrompt(e.target.value)}
-              className="w-full h-24 bg-black/40 border border-white/10 rounded-xl p-3 text-sm text-white placeholder:text-white/30 outline-none focus:border-blue-500 transition-colors resize-none mb-4"
+              className="w-full h-28 bg-black/45 backdrop-blur-xl border border-white/10 rounded-2xl p-3.5 text-xs text-white placeholder:text-white/20 outline-none focus:border-indigo-500/60 focus:ring-1 focus:ring-indigo-500/20 transition-all resize-none mb-4 relative z-10 shadow-[inset_0_4px_12px_rgba(0,0,0,0.5)]"
               placeholder="Masalan: Faqat trend bo'yicha savdo qiling, GBP juftliklariga tegma..."
             />
-            <div className="flex gap-2">
-              <button onClick={() => setShowPrompt(false)} disabled={isSendingPrompt} className="flex-1 py-3 rounded-xl bg-white/5 text-white/70 font-bold text-xs hover:bg-white/10 transition-colors disabled:opacity-50">Bekor qilish</button>
+            <div className="flex gap-2.5 relative z-10">
+              <button onClick={() => setShowPrompt(false)} disabled={isSendingPrompt} className="flex-1 py-3 rounded-xl bg-white/5 border border-white/5 text-white/70 font-bold text-xs hover:bg-white/10 hover:border-white/10 hover:text-white transition-all duration-300 disabled:opacity-50 active:scale-95">Bekor qilish</button>
               <button 
                 disabled={isSendingPrompt || !aiPrompt.trim()}
                 onClick={async () => {
@@ -496,7 +533,7 @@ export function DashboardPage() {
                     setIsSendingPrompt(false);
                   }
                 }} 
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold text-xs hover:opacity-90 transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-xs hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSendingPrompt ? <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : "Yuborish"}
               </button>
@@ -505,6 +542,7 @@ export function DashboardPage() {
         </div>
       )}
 
+      <PaywallModal isOpen={showFirstTimePaywall} onClose={() => setShowFirstTimePaywall(false)} />
     </div>
   );
 }
