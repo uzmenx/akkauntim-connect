@@ -1,10 +1,18 @@
+import random
+
 class MockBroker:
-    def __init__(self, initial_balance: float = 10000.0):
+    def __init__(self, initial_balance: float = 10000.0, config: dict = None):
         self.balance = initial_balance
         self.equity = initial_balance
         self.open_positions = []
         self.trade_history = []
         self.current_price = 0.0
+        
+        self.config = config or {
+            'spread_pips': 1.5,
+            'commission_per_lot': 3.0,
+            'slippage_pips': 0.5
+        }
 
     def update_price(self, row):
         """Kandelstik narxlarini yangilash va StopLoss/TakeProfit larni tekshirish"""
@@ -12,40 +20,72 @@ class MockBroker:
         
         # Ochiq pozitsiyalarni tekshirish (SL/TP)
         for pos in self.open_positions[:]:
-            if pos['type'] == 'BUY':
-                if pos['sl'] and row['low'] <= pos['sl']:
-                    self._close_position(pos, pos['sl'], "SL", row['time'])
-                elif pos['tp'] and row['high'] >= pos['tp']:
-                    self._close_position(pos, pos['tp'], "TP", row['time'])
+            is_buy = pos['type'] == 'BUY'
+            sl_hit = False
+            tp_hit = False
             
-            elif pos['type'] == 'SELL':
+            if is_buy:
+                if pos['sl'] and row['low'] <= pos['sl']:
+                    sl_hit = True
+                if pos['tp'] and row['high'] >= pos['tp']:
+                    tp_hit = True
+            else:
                 if pos['sl'] and row['high'] >= pos['sl']:
-                    self._close_position(pos, pos['sl'], "SL", row['time'])
-                elif pos['tp'] and row['low'] <= pos['tp']:
-                    self._close_position(pos, pos['tp'], "TP", row['time'])
+                    sl_hit = True
+                if pos['tp'] and row['low'] <= pos['tp']:
+                    tp_hit = True
+                    
+            if sl_hit and tp_hit:
+                # Ikkalasi ham urilgan bo'lsa, konservativ taxmin: SL birinchi urilgan
+                self._close_position(pos, pos['sl'], "SL", row['time'])
+            elif sl_hit:
+                self._close_position(pos, pos['sl'], "SL", row['time'])
+            elif tp_hit:
+                self._close_position(pos, pos['tp'], "TP", row['time'])
 
     def open_order(self, symbol: str, order_type: str, volume: float, price: float, sl: float = None, tp: float = None, time=None):
+        pip = 0.0001 if "JPY" not in symbol else 0.01
+        spread_cost = (self.config['spread_pips'] / 2) * pip
+        
+        # Ochilishda spread qo'llash (foydalanuvchi foydasiga emas)
+        if order_type == 'BUY':
+            execution_price = price + spread_cost
+        else:
+            execution_price = price - spread_cost
+            
         pos = {
             'id': len(self.trade_history) + len(self.open_positions) + 1,
             'symbol': symbol,
             'type': order_type,
             'volume': volume,
-            'open_price': price,
+            'open_price': execution_price,
             'sl': sl,
             'tp': tp,
             'open_time': time
         }
         self.open_positions.append(pos)
-        print(f"[MockBroker] {order_type} ochildi: {symbol} @ {price}")
+        print(f"[MockBroker] {order_type} ochildi: {symbol} @ {execution_price:.5f} (Spread hisobga olindi)")
 
     def _close_position(self, pos, close_price, reason, time):
         """Pozitsiyani yopish va foyda/zararni hisoblash"""
-        is_buy = pos['type'] == 'BUY'
-        diff = (close_price - pos['open_price']) if is_buy else (pos['open_price'] - close_price)
+        pip = 0.0001 if "JPY" not in pos['symbol'] else 0.01
         
-        # Sodda profit hisoblash (1 pip = $10 deb hisoblasak standart lot uchun)
-        # Haqiqiy botda bu yerda to'g'ri hisoblash bo'ladi
-        profit = (diff * 100000) * pos['volume'] 
+        # Slippage qo'llash (doim yomonlashuv tomoniga, simulyatsiya uchun)
+        slippage_val = random.uniform(0, self.config['slippage_pips']) * pip
+        if pos['type'] == 'BUY':
+            actual_close = close_price - slippage_val
+            diff = actual_close - pos['open_price']
+        else:
+            actual_close = close_price + slippage_val
+            diff = pos['open_price'] - actual_close
+        
+        # Standart lot qiymati (1 pip = $10 deb hisoblash EURUSD uchun)
+        multiplier = 100000 if pip == 0.0001 else 1000
+        profit = (diff * multiplier) * pos['volume'] 
+        
+        # Komissiya ayirish
+        commission = self.config['commission_per_lot'] * pos['volume']
+        profit -= commission
         
         self.balance += profit
         self.equity = self.balance
@@ -54,24 +94,28 @@ class MockBroker:
         
         history_record = {
             **pos,
-            'close_price': close_price,
+            'close_price': actual_close,
             'close_time': time,
             'reason': reason,
-            'profit': profit
+            'profit': profit,
+            'commission': commission,
+            'slippage_pips': slippage_val / pip
         }
         self.trade_history.append(history_record)
-        print(f"[MockBroker] {pos['type']} yopildi ({reason}): {profit:.2f}$")
+        print(f"[MockBroker] {pos['type']} yopildi ({reason}): {profit:.2f}$ (Kom: {commission:.2f}$, Slip: {slippage_val/pip:.1f}p)")
 
     def get_stats(self):
         wins = sum(1 for t in self.trade_history if t['profit'] > 0)
         total = len(self.trade_history)
         win_rate = (wins / total * 100) if total > 0 else 0
         total_profit = sum(t['profit'] for t in self.trade_history)
+        total_commission = sum(t.get('commission', 0) for t in self.trade_history)
         
         return {
             'initial_balance': 10000.0,
             'final_balance': self.balance,
             'total_trades': total,
             'win_rate': win_rate,
-            'total_profit': total_profit
+            'total_profit': total_profit,
+            'total_commission': total_commission
         }
