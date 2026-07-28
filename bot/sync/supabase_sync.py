@@ -158,6 +158,23 @@ class SupabaseSync:
             "stop_loss_pips": stop_loss_pips, "take_profit_pips": take_profit_pips,
         }})
 
+    def log_regime(self, symbol: str, timeframe: str, regime: str, adx_value: float, vol_pct: float) -> None:
+        self._post({"regime": {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "regime": regime,
+            "adx_value": adx_value,
+            "volatility_pct": vol_pct
+        }})
+
+    def log_strategy_performance(self, strategy_name: str, regime: str, win_rate: float, trades_count: int) -> None:
+        self._post({"strategy_performance": {
+            "strategy_name": strategy_name,
+            "regime": regime,
+            "win_rate": win_rate,
+            "trades_count": trades_count
+        }})
+
     def log_claude_cost(self, total_cost: float) -> None:
         """Cumulative total_cost qabul qiladi va faqat delta ni Cloud'ga yuboradi."""
         delta = max(0.0, float(total_cost) - float(self._last_reported_cost))
@@ -166,3 +183,52 @@ class SupabaseSync:
         if self._post({"add_claude_cost": delta}):
             self._last_reported_cost = float(total_cost)
             logger.info(f"Claude cost loglandi (+${delta:.6f}, jami ${total_cost:.6f})")
+
+    def check_pending_books(self) -> List[dict]:
+        """Supabase'dan o'qilishi kerak bo'lgan kitoblarni oladi."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return []
+        url = f"{self.config.supabase_url}/rest/v1/pending_books?status=eq.pending"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}"
+        }
+        try:
+            r = requests.get(url, headers=headers, timeout=10)
+            if r.status_code == 200:
+                return r.json()
+        except Exception as e:
+            logger.error(f"check_pending_books xatolik: {e}")
+        return []
+
+    def update_book_status(self, book_id: str, status: str) -> None:
+        """Kitob statusini yangilaydi (processing, done, error)."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/pending_books?id=eq.{book_id}"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.patch(url, headers=headers, json={"status": status}, timeout=10)
+        except Exception as e:
+            logger.error(f"update_book_status xatolik: {e}")
+
+    def upload_insight(self, insight: dict) -> None:
+        """AIStrategist qoidasini Supabase'ga yuboradi."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/strategy_insights"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.post(url, headers=headers, json=insight, timeout=10)
+        except Exception as e:
+            logger.error(f"upload_insight xatolik: {e}")

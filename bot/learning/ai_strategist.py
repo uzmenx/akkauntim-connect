@@ -220,6 +220,18 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
                 ids=[insight_id]
             )
             
+            # 3. Supabase'ga yuborish (Dashboard uchun)
+            if hasattr(self, 'sync_client') and self.sync_client:
+                try:
+                    self.sync_client.upload_insight({
+                        "id": insight_id,
+                        "insight_text": insight_text,
+                        "market_condition": condition,
+                        "setup_type": setup_type
+                    })
+                except Exception as e:
+                    print(f"Supabase'ga yuborishda xatolik: {e}")
+            
             insights_saved += 1
 
         cursor.execute("UPDATE knowledge_sources SET processed = 1 WHERE id = ?", (source_id,))

@@ -5,7 +5,7 @@ import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
   Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -305,12 +305,12 @@ export function DashboardPage() {
           {/* 4 Action Buttons Row */}
           <div className="flex gap-2 w-full items-center justify-between mt-auto px-1">
             {/* Button 1: Settings */}
-            <Link to="/settings" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center text-white/90 transition-all group" aria-label="Settings">
+            <Link to="/settings" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),inset_0_-2px_4px_rgba(0,0,0,0.3),0_4px_12px_rgba(71,85,105,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white/90 transition-all group border border-slate-500/50" aria-label="Settings">
               <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
             </Link>
             
             {/* Button 2: Signals */}
-            <Link to="/signals" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center text-white/90 transition-all group" aria-label="Signals">
+            <Link to="/signals" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(249,115,22,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-orange-300/50" aria-label="Signals">
               <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 80 80" className="group-hover:scale-110 transition-transform">
                 <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
                   <path stroke="currentColor" d="M40 48v24"/>
@@ -322,7 +322,7 @@ export function DashboardPage() {
             </Link>
 
             {/* Button 3: Filter */}
-            <button onClick={toggleFilter} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#2a2b4a]/90 backdrop-blur-sm shadow-[inset_0_2px_4px_rgba(255,255,255,0.1),inset_0_-2px_4px_rgba(0,0,0,0.25),0_4px_12px_rgba(0,0,0,0.3)] hover:brightness-125 active:scale-95 flex items-center justify-center gap-2 transition-all group" aria-label="Filter Mode">
+            <button onClick={toggleFilter} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 transition-all group border border-violet-400/50" aria-label="Filter Mode">
               <div className="flex items-center justify-center w-5 h-5">
                 {filterMode === "all" && (
                   <div className="relative w-[18px] h-[18px] group-hover:scale-110 transition-transform">
@@ -336,9 +336,14 @@ export function DashboardPage() {
             </button>
 
             {/* Button 4: AI Send */}
-            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-[#1a73e8] shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(26,115,232,0.6)] hover:brightness-125 active:scale-95 flex items-center justify-center gap-2 text-white transition-all group border border-white/20" aria-label="AI Send">
+            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(251,191,36,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 text-white transition-all group border border-amber-300/50" aria-label="AI Send">
               <Sparkles size={20} className="group-hover:scale-110 transition-transform text-white" />
             </button>
+
+            {/* Button 5: Shadow Learning AI */}
+            <Link to="/shadow-learning" className="flex-shrink-0 w-[50px] h-[50px] rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(20,184,166,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-teal-300/50" aria-label="Shadow Learning AI">
+              <Brain size={20} className="group-hover:scale-110 transition-transform text-white" />
+            </Link>
           </div>
         </div>
 

@@ -22,6 +22,36 @@ class DBManager:
         self._local = threading.local()
         self.logger = logging.getLogger(__name__)
         self._initialized = True
+        self._init_regime_tables()
+
+    def _init_regime_tables(self):
+        """Rejim va strategiya ishlashi tarixi uchun jadvallar yaratish"""
+        try:
+            self.execute('''
+                CREATE TABLE IF NOT EXISTS regime_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    symbol TEXT,
+                    timeframe TEXT,
+                    regime TEXT,
+                    adx_value REAL,
+                    volatility_pct REAL
+                )
+            ''')
+            self.execute('''
+                CREATE TABLE IF NOT EXISTS strategy_regime_performance (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    strategy_name TEXT,
+                    regime TEXT,
+                    trades_count INTEGER DEFAULT 0,
+                    win_rate REAL DEFAULT 0.0,
+                    profit_factor REAL DEFAULT 0.0,
+                    last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(strategy_name, regime)
+                )
+            ''')
+        except Exception as e:
+            self.logger.error(f"Error initializing regime tables: {e}")
 
     def _check_connection(self):
         if hasattr(self._local, "conn") and self._local.conn is not None:

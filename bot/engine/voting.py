@@ -11,7 +11,8 @@ def aggregate_signals(
     sr_volume_data: Dict[str, Any],
     auto_pattern_data: Dict[str, Any],
     kill_zones_data: Dict[str, Any],
-    config: Any
+    config: Any,
+    active_strategies: list = None
 ) -> Dict[str, Any]:
     """
     Yetti strategiyaning natijalarini oladi va umumiy risk/signal hisoblaydi.
@@ -35,26 +36,31 @@ def aggregate_signals(
     kill_zones_data = kill_zones_data or {}
     valid_signals = []
     
+    def _is_active(strat_name: str) -> bool:
+        if active_strategies is None:
+            return True
+        return strat_name in active_strategies
+
     # 1. Belgilangan threshold'dan past ishonch va HOLD larni filtrlash
-    if str(smc_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(smc_data.get("confidence") or 0) >= conf_smc:
+    if _is_active("SMC") and str(smc_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(smc_data.get("confidence") or 0) >= conf_smc:
         valid_signals.append(("SMC", str(smc_data.get("signal")).upper()))
         
-    if str(pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(pattern_data.get("confidence") or 0) >= conf_pattern:
+    if _is_active("Pattern") and str(pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(pattern_data.get("confidence") or 0) >= conf_pattern:
         valid_signals.append(("Pattern", str(pattern_data.get("signal")).upper()))
         
-    if str(news_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(news_data.get("confidence") or 0) >= conf_news:
+    if _is_active("News") and str(news_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(news_data.get("confidence") or 0) >= conf_news:
         valid_signals.append(("News", str(news_data.get("signal")).upper()))
 
-    if str(wyckoff_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(wyckoff_data.get("confidence") or 0) >= conf_wyckoff:
+    if _is_active("Wyckoff") and str(wyckoff_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(wyckoff_data.get("confidence") or 0) >= conf_wyckoff:
         valid_signals.append(("Wyckoff", str(wyckoff_data.get("signal")).upper()))
 
-    if str(sr_volume_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(sr_volume_data.get("confidence") or 0) >= conf_sr_volume:
+    if _is_active("SR_Volume") and str(sr_volume_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(sr_volume_data.get("confidence") or 0) >= conf_sr_volume:
         valid_signals.append(("SR_Volume", str(sr_volume_data.get("signal")).upper()))
 
-    if str(auto_pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(auto_pattern_data.get("confidence") or 0) >= conf_auto_pattern:
+    if _is_active("Auto_Pattern") and str(auto_pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(auto_pattern_data.get("confidence") or 0) >= conf_auto_pattern:
         valid_signals.append(("Auto_Pattern", str(auto_pattern_data.get("signal")).upper()))
 
-    if str(kill_zones_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(kill_zones_data.get("confidence") or 0) >= conf_kill_zones:
+    if _is_active("Kill_Zones") and str(kill_zones_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(kill_zones_data.get("confidence") or 0) >= conf_kill_zones:
         valid_signals.append(("Kill_Zones", str(kill_zones_data.get("signal")).upper()))
         
     # 2. Yo'nalishlarni guruhlash

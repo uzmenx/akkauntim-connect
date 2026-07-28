@@ -20,6 +20,8 @@ from bot.core.state_manager import StateManager
 from bot.engine.voting import aggregate_signals
 from bot.engine.prompt_builder import PromptBuilder
 from bot.engine.decision_logger import DecisionLogger
+from bot.engine.regime_detector import RegimeDetector
+from bot.engine.strategy_portfolio import StrategyPortfolioManager
 from bot.execution.risk_manager import RiskManager
 from bot.execution.order_manager import OrderManager
 from bot.learning.trade_reviewer import TradeReviewer
@@ -56,6 +58,8 @@ class TradingBot:
         # Engine
         self.prompt_builder = PromptBuilder(config)
         self.reviewer = TradeReviewer(self.mt5, self.ai, config)
+        self.regime_detector = RegimeDetector()
+        self.portfolio_manager = StrategyPortfolioManager()
 
         # Execution
         self.risk = RiskManager(self.mt5, config, self.state)
@@ -278,6 +282,19 @@ class TradingBot:
             return
 
         current_price = float(df_major.iloc[-1]['close'])
+        
+        # ============================================================
+        # 1.5. REJIM ANIQLASH VA STRATEGIYALAR PORTFELI
+        # ============================================================
+        current_regime = self.regime_detector.update(df_major)
+        active_strategies = self.portfolio_manager.get_active_strategies(current_regime)
+        
+        try:
+            adx_val = self.regime_detector._calculate_adx(df_major)
+            vol_pct = self.regime_detector._volatility_percentile(df_major)
+            self.sync.log_regime(symbol, self.config.timeframe_major, current_regime.value, adx_val, vol_pct)
+        except Exception as e:
+            logger.debug(f"Rejimni log qilishda xatolik: {e}")
 
         # ============================================================
         # 2. TEXNIK TAHLIL — barcha strategiyalarni ishga tushirish
@@ -321,6 +338,19 @@ class TradingBot:
         # 3. CONFLUENCE ENGINE — ball tizimi asosida savdo qarori
         # ============================================================
         adj = getattr(self, "last_adjustments", self.reviewer.get_active_adjustments())
+
+        voting_result = aggregate_signals(
+            smc_data=smc_result or smc_context,
+            pattern_data=pattern_result,
+            news_data=news_result,
+            wyckoff_data=wyckoff_result,
+            sr_volume_data=sr_volume_result,
+            auto_pattern_data=auto_patterns_result,
+            kill_zones_data=kill_zones_result,
+            config=self.config,
+            active_strategies=active_strategies
+        )
+
         # ============================================================
         # AI AGENT AUTONOMOUS DECISION
         # ============================================================
@@ -329,7 +359,7 @@ class TradingBot:
             smc_result=smc_result or smc_context,
             patterns=pattern_result,
             news=news_result,
-            voting={},
+            voting=voting_result,
             memory_bank=memory_bank_text,
             wyckoff=wyckoff_result,
             sr_volume=sr_volume_result,
@@ -337,6 +367,8 @@ class TradingBot:
             kill_zones=kill_zones_result
         )
         context["pair"] = symbol
+        context["regime"] = current_regime.value
+        context["active_strategies"] = active_strategies
         context["timeframe"] = self.config.timeframe_major
         context["current_price"] = current_price
         context["smc_m15"] = smc_m15
@@ -566,6 +598,40 @@ class TradingBot:
                         if settings:
                             self.config.update_from_dict(settings)
                             logger.info("Bot sozlamalari yangilandi.")
+                            
+                        # === YANGI: PENDING BOOKLARNI TEKSHIRISH ===
+                        try:
+                            pending_books = self.sync.check_pending_books()
+                            if pending_books:
+                                for book in pending_books:
+                                    logger.info(f"Yangi kitob topildi: {book['file_name']}")
+                                    self.sync.update_book_status(book["id"], "processing")
+                                    
+                                    import urllib.request
+                                    import tempfile
+                                    import os
+                                    
+                                    temp_dir = tempfile.gettempdir()
+                                    temp_path = os.path.join(temp_dir, book["file_name"])
+                                    
+                                    try:
+                                        urllib.request.urlretrieve(book["file_url"], temp_path)
+                                        self.reviewer.ai_strategist.sync_client = self.sync
+                                        success = self.reviewer.ai_strategist.add_knowledge_source(temp_path, book["file_name"])
+                                        
+                                        if success:
+                                            self.sync.update_book_status(book["id"], "done")
+                                        else:
+                                            self.sync.update_book_status(book["id"], "error_processing")
+                                    except Exception as e:
+                                        logger.error(f"Kitobni ishlashda xato: {e}")
+                                        self.sync.update_book_status(book["id"], "error_download")
+                                    finally:
+                                        if os.path.exists(temp_path):
+                                            os.remove(temp_path)
+                        except Exception as e:
+                            logger.error(f"Shadow Learning tekshirishda xatolik: {e}")
+                            
                     except Exception as e:
                         logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
 
