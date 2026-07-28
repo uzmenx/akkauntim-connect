@@ -25,12 +25,10 @@ class RegimeDetector:
     def __init__(self, lookback: int = 100):
         self.lookback = lookback
         self.history: List[MarketRegime] = []
-        self.confidence = {
-            MarketRegime.TREND: 0.0,
-            MarketRegime.RANGE: 0.0,
-            MarketRegime.VOLATILE: 0.0,
-            MarketRegime.UNKNOWN: 1.0
-        }
+        self.confidence = {r: 0.0 for r in MarketRegime}
+        self.confidence[MarketRegime.UNKNOWN] = 1.0
+        self.last_adx = 0.0
+        self.last_vol_pct = 0.0
         
     def _calculate_adx(self, df: pd.DataFrame, period: int = 14) -> float:
         """ADX ni hisoblash. Agar yetarli ma'lumot bo'lmasa, 0 qaytaradi."""
@@ -122,6 +120,9 @@ class RegimeDetector:
 
         adx = self._calculate_adx(df)
         vol_pct = self._volatility_percentile(df)
+        
+        self.last_adx = adx
+        self.last_vol_pct = vol_pct
         
         # Soddalashtirilgan logika
         if vol_pct > 80.0:

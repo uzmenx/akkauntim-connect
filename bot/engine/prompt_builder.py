@@ -86,10 +86,9 @@ class PromptBuilder:
         open_positions = context.get('open_positions', [])
         open_pos_text = ", ".join(open_positions) if open_positions else "Yo'q (0)"
         
-        smc_m15 = context.get('smc_m15', {})
-        smc_m15_trend = smc_m15.get('trend', {}).get('internal', 'N/A')
-        smc_m5 = context.get('smc_m5', {})
-        smc_m5_trend = smc_m5.get('trend', {}).get('internal', 'N/A')
+        smc_minor = context.get('smc_minor', {})
+        smc_minor_trend = smc_minor.get('trend', {}).get('internal', 'N/A')
+        tf_minor = context.get('timeframe_minor', 'Minor')
         
         prompt = f"""{system_prompt}
 Sening maqsading: quyidagi bozordagi barcha fundamental, texnik, SMC, va hajmiy (Wyckoff, SR) holatlarni tahlil qilib, MUSTAQIL ravishda xulosa chiqarish.
@@ -107,9 +106,8 @@ QAT'IY QOIDA: Agar ushbu juftlikda allaqachon bitim ochilgan bo'lsa va narx tubd
 {smc_summary}
 (Foydali bo'lishi mumkin - H1 Zonalar: {json.dumps(smc.get('zones', [])[:2])})
 
-Kichik Timeframelar:
-- M15 SMC Trend: {smc_m15_trend}
-- M5 SMC Trend: {smc_m5_trend}
+Kichik (Minor) Timeframe ({tf_minor}):
+- SMC Trend: {smc_minor_trend}
 
 === 3. HARMONIC PATTERN DETECTOR ===
 {pat_summary}
@@ -126,6 +124,14 @@ Kill Zones: {kz_summary}
 === 6. AI TRADE REVIEWER (O'RGANISH MODULI) XULOSASI ===
 Quyidagi tavsiyalar avvalgi xatolaringdan o'rganilgan:
 {json.dumps(context.get('learning_adjustments', {}), indent=2)}
+
+=== 7. KITOBLARDAN O'RGANILGAN QOIDALAR ===
+Quyidagi qoidalar sening o'qigan kitoblaringdan olingan. Ularning tarixiy samaradorligiga e'tibor ber:
+{context.get('book_knowledge', "Hali kitob o'qilmagan.")}
+
+=== 8. AI XOTIRASI (OLDINGI SABOQLAR) ===
+Quyidagi saboqlar sening oldingi savdolaring va xatolaringdan olingan. ULARGA AMAL QIL:
+{context.get('ai_memory', "Xotira hali bo'sh.")}
 
 === VAZIFA ===
 Bozor holatini to'liq o'rgan. 

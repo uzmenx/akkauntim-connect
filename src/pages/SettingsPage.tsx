@@ -10,12 +10,17 @@ import type { BotSettings, BotStatus } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 
 const MAJOR_TIMEFRAME_OPTIONS = [
+  { value: "D1", label: "D1 (1 kun)" },
   { value: "H4", label: "H4 (4 soat)" },
   { value: "H1", label: "H1 (1 soat)" },
   { value: "M30", label: "M30 (30 daqiqa)" },
+  { value: "M15", label: "M15 (15 daqiqa)" },
 ];
 
 const MINOR_TIMEFRAME_OPTIONS = [
+  { value: "H4", label: "H4 (4 soat)" },
+  { value: "H1", label: "H1 (1 soat)" },
+  { value: "M30", label: "M30 (30 daqiqa)" },
   { value: "M15", label: "M15 (15 daqiqa)" },
   { value: "M5", label: "M5 (5 daqiqa)" },
   { value: "M1", label: "M1 (1 daqiqa)" },
@@ -441,62 +446,9 @@ export function SettingsPage() {
             format={(v) => `${(v * 100).toFixed(0)}% balansdan`}
             onChange={(v) => setForm((f) => ({ ...f, max_daily_loss: v }))}
           />
-          <Slider
-            label="1 ta Strategiya tasdig'ida Risk (Single Confirmation)"
-            value={Number(form.risk_level_single_confirmation ?? 0.01)}
-            min={0.005} max={0.05} step={0.001}
-            format={(v) => `${(v * 100).toFixed(1)}%`}
-            onChange={(v) => setForm((f) => ({ ...f, risk_level_single_confirmation: v }))}
-          />
-          <Slider
-            label="Ko'p strategiyali tasdiqlashda Risk (Multiple Confirmation)"
-            value={Number(form.risk_level_multiple_confirmation ?? 0.02)}
-            min={0.01} max={0.10} step={0.002}
-            format={(v) => `${(v * 100).toFixed(1)}%`}
-            onChange={(v) => setForm((f) => ({ ...f, risk_level_multiple_confirmation: v }))}
-          />
         </div>
       </Card>
 
-      {/* 4. Strategy Confidence */}
-      <Card className="glass p-5">
-        <div className="flex items-center gap-2 mb-4 text-emerald-500">
-          <Sliders size={18} />
-          <h3 className="font-bold text-sm tracking-wide uppercase">Strategiya Ishonch Darajasi</h3>
-        </div>
-        <p className="text-xs text-fg-muted mb-4">
-          Qaysi strategiya necha foiz ishonch bilan signal berganida qabul qilinishini belgilang. Agar biror strategiya ko'p xato qilsa, uning foizini ko'tarib (yoki pasaytirib) ta'sirini kamaytirishingiz mumkin.
-        </p>
-        <div className="space-y-6">
-          <Slider
-            label="SMC (Smart Money Concepts)"
-            value={Number(form.strategy_weight_smc ?? 60)}
-            min={35} max={75} step={1}
-            format={(v) => `${v}%`}
-            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_smc: v }))}
-            leftLabel="← Yaxshi ishlasa"
-            rightLabel="Zarar qilsa →"
-          />
-          <Slider
-            label="Naqsh (Harmonic Patterns)"
-            value={Number(form.strategy_weight_pattern ?? 60)}
-            min={35} max={75} step={1}
-            format={(v) => `${v}%`}
-            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_pattern: v }))}
-            leftLabel="← Yaxshi ishlasa"
-            rightLabel="Zarar qilsa →"
-          />
-          <Slider
-            label="Fundamental (Yangiliklar)"
-            value={Number(form.strategy_weight_news ?? 60)}
-            min={35} max={75} step={1}
-            format={(v) => `${v}%`}
-            onChange={(v) => setForm((f) => ({ ...f, strategy_weight_news: v }))}
-            leftLabel="← Yaxshi ishlasa"
-            rightLabel="Zarar qilsa →"
-          />
-        </div>
-      </Card>
 
       {/* Save Button */}
       <Button size="lg" className="w-full bg-brand hover:bg-brand-strong text-white font-bold py-3.5 rounded-xl shadow-lg transition-all" onClick={save} disabled={busy}>

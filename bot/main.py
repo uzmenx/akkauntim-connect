@@ -25,6 +25,7 @@ from bot.engine.strategy_portfolio import StrategyPortfolioManager
 from bot.execution.risk_manager import RiskManager
 from bot.execution.order_manager import OrderManager
 from bot.learning.trade_reviewer import TradeReviewer
+from bot.learning.ai_memory import AIMemory
 from bot.sync.supabase_sync import SupabaseSync
 from bot.sync.telegram_sync import TelegramSync
 
@@ -69,6 +70,13 @@ class TradingBot:
         # Sync
         self.sync = SupabaseSync(config)
         self.telegram = TelegramSync(config)
+        
+        # AI Memory (doimiy xotira)
+        self.ai_memory = AIMemory()
+        self.ai_memory.sync_client = self.sync
+        
+        # Reviewer ichidagi ai_memory ni ham cloud ga ulaymiz
+        self.reviewer.ai_memory.sync_client = self.sync
         
         # Inyect dependencies into AIClient
         self.ai.sync = self.sync
@@ -290,8 +298,8 @@ class TradingBot:
         active_strategies = self.portfolio_manager.get_active_strategies(current_regime)
         
         try:
-            adx_val = self.regime_detector._calculate_adx(df_major)
-            vol_pct = self.regime_detector._volatility_percentile(df_major)
+            adx_val = self.regime_detector.last_adx
+            vol_pct = self.regime_detector.last_vol_pct
             self.sync.log_regime(symbol, self.config.timeframe_major, current_regime.value, adx_val, vol_pct)
         except Exception as e:
             logger.debug(f"Rejimni log qilishda xatolik: {e}")
@@ -302,11 +310,10 @@ class TradingBot:
         smc_result = self._get_smc_full_analysis(df_major)
         smc_context = self._get_smc_data(df_major)
         
-        # M15 va M5 timeframelarni qo'shish
-        df_m15 = self._fetch_data(symbol, "M15", 150)
-        df_m5 = self._fetch_data(symbol, "M5", 150)
-        smc_m15 = self._get_smc_data(df_m15) if not df_m15.empty else {}
-        smc_m5 = self._get_smc_data(df_m5) if not df_m5.empty else {}
+        # Minor timeframe ma'lumotlarini qo'shish
+        tf_minor = self.config.timeframe_minor
+        df_minor = self._fetch_data(symbol, tf_minor, 150)
+        smc_minor = self._get_smc_data(df_minor) if not df_minor.empty else {}
         
         pattern_result = self._get_harmonic_patterns(df_major)
         news_result = self._get_news_context(symbol)
@@ -371,8 +378,8 @@ class TradingBot:
         context["active_strategies"] = active_strategies
         context["timeframe"] = self.config.timeframe_major
         context["current_price"] = current_price
-        context["smc_m15"] = smc_m15
-        context["smc_m5"] = smc_m5
+        context["timeframe_minor"] = tf_minor
+        context["smc_minor"] = smc_minor
         context["balance"] = balance
         context["margin_free"] = margin_free
         context["open_positions"] = positions_info
@@ -394,6 +401,53 @@ class TradingBot:
         # O'rganish modulidan kelgan faol moslashuvlarni olish va kontekstga qo'shish
         active_adjustments = self.reviewer.get_active_adjustments()
         context["learning_adjustments"] = active_adjustments
+
+        # === YANGI: Kitob bilimlarini (RAG) olish ===
+        try:
+            smc_trend_text = str(smc_context.get('trend', {}).get('internal', 'Unknown')) if smc_context else 'Unknown'
+            harmonic_sig = str(pattern_result.get('signal', 'NEUTRAL')) if pattern_result else 'NEUTRAL'
+            situation_desc = f"{symbol} {self.config.timeframe_major} SMC:{smc_trend_text} Pattern:{harmonic_sig} Regime:{current_regime.value}"
+            market_cond = current_regime.value.lower() if hasattr(current_regime, 'value') else 'all'
+            # Rejimni market_condition ga moslashtirish
+            if 'trend' in market_cond:
+                market_cond = 'trend'
+            elif 'range' in market_cond or 'flat' in market_cond:
+                market_cond = 'range'
+            elif 'volatile' in market_cond or 'high' in market_cond:
+                market_cond = 'volatile'
+            else:
+                market_cond = 'all'
+            
+            book_knowledge = self.reviewer.ai_strategist.get_relevant_context(
+                current_situation_desc=situation_desc,
+                market_condition=market_cond,
+                limit=3
+            )
+            if book_knowledge:
+                context["book_knowledge"] = book_knowledge
+                logger.info(f"[{symbol}] Kitob bilimlaridan {len(book_knowledge.split(chr(10)))} ta qoida topildi")
+        except Exception as e:
+            logger.debug(f"[{symbol}] Kitob bilimlarini olishda xatolik (davom etamiz): {e}")
+
+        # === YANGI: AI Xotirasini olish ===
+        try:
+            ai_memory_text = self.ai_memory.get_recent_lessons(limit=7)
+            if ai_memory_text:
+                context["ai_memory"] = ai_memory_text
+        except Exception as e:
+            logger.debug(f"AI xotirani olishda xatolik: {e}")
+
+        # === YANGI: Dinamik strategiya vaznlarini qo'llash ===
+        try:
+            strategy_weights = self.ai_memory.get_strategy_weights()
+            if strategy_weights:
+                for strat, weight in strategy_weights.items():
+                    config_key = f"strategy_weight_{strat}"
+                    if hasattr(self.config, config_key):
+                        setattr(self.config, config_key, weight)
+                logger.debug(f"[{symbol}] Dinamik strategiya vaznlari qo'llandi: {strategy_weights}")
+        except Exception as e:
+            logger.debug(f"Strategiya vaznlarini qo'llashda xatolik: {e}")
 
         prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
         logger.info(f"[{symbol}] AI Agent ga bozor tahlili yuborilmoqda...")
@@ -534,8 +588,20 @@ class TradingBot:
                 entry_price=entry_price
             )
 
-        # Log to db
+        # Log to db (kitob bilimlaridan olingan insight ID larni ham saqlash)
         ticket = order_info.get("ticket") if isinstance(order_info, dict) else None
+        
+        # RAG dan olingan insight ID larni ajratib olish
+        used_insight_ids = []
+        try:
+            book_ctx = context.get("book_knowledge", "")
+            if book_ctx:
+                import re
+                ids_found = re.findall(r'\(ID: ([a-f0-9-]+)\)', book_ctx)
+                used_insight_ids = ids_found
+        except Exception:
+            pass
+        
         self.decision_logger.log(
             pair=symbol, timeframe=self.config.timeframe_major,
             context=context, prompt="AUTONOMOUS_AI",
@@ -543,7 +609,8 @@ class TradingBot:
             risk_pct=risk_pct, hash_val=self._get_state_hash(context),
             tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
             cost=self.ai.total_cost,
-            ticket=ticket
+            ticket=ticket,
+            used_insight_ids=json.dumps(used_insight_ids) if used_insight_ids else None
         )
 
         if success:
@@ -617,9 +684,12 @@ class TradingBot:
                                     try:
                                         urllib.request.urlretrieve(book["file_url"], temp_path)
                                         self.reviewer.ai_strategist.sync_client = self.sync
-                                        success = self.reviewer.ai_strategist.add_knowledge_source(temp_path, book["file_name"])
+                                        result = self.reviewer.ai_strategist.add_knowledge_source(temp_path, book["file_name"])
                                         
-                                        if success:
+                                        if isinstance(result, tuple) and result[0]:
+                                            _, saved, total = result
+                                            self.sync.update_book_status(book["id"], f"done|{saved}|{total}")
+                                        elif result is True:
                                             self.sync.update_book_status(book["id"], "done")
                                         else:
                                             self.sync.update_book_status(book["id"], "error_processing")
@@ -699,6 +769,22 @@ class TradingBot:
                         if closed_trades:
                             for ct in closed_trades:
                                 self.decision_logger.update_outcome(ct["ticket"], ct["profit"])
+                                
+                                # === YANGI: Kitob qoidalariga feedback qaytarish ===
+                                try:
+                                    insight_ids = self.decision_logger.get_insight_ids_for_ticket(ct["ticket"])
+                                    if insight_ids:
+                                        is_win = ct["profit"] > 0
+                                        for iid in insight_ids:
+                                            self.reviewer.ai_strategist.record_trade_result(
+                                                insight_id=iid,
+                                                success=is_win,
+                                                pnl=ct["profit"],
+                                                reason=f"Trade ticket {ct['ticket']} on {ct.get('symbol', 'N/A')}"
+                                            )
+                                        logger.info(f"🔄 Feedback: {len(insight_ids)} ta insight yangilandi ({'WIN' if is_win else 'LOSS'})")
+                                except Exception as fe:
+                                    logger.debug(f"Insight feedback xatolik: {fe}")
                     except Exception as e:
                         logger.warning(f"Cloud sync xatolik: {e}")
 

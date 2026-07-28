@@ -116,7 +116,7 @@ class AIStrategist:
         author: str = "",
         language: str = "en",
         category: str = "book",
-    ) -> bool:
+    ):
         file_path = Path(file_path)
         if not file_path.exists():
             print(f"❌ Fayl topilmadi: {file_path}")
@@ -151,8 +151,7 @@ class AIStrategist:
 
         print(f"✅ Qo'shildi: '{title}' ({language}), {len(content)} belgi")
         print("🔄 Tahlil qilinmoqda (bu bir necha daqiqa davom etishi mumkin)...")
-        self._process_source(source_id, content)
-        return True
+        return self._process_source(source_id, content)
 
     def _process_source(self, source_id: int, content: str):
         chunks = self._chunk_text(content, max_chars=4000)
@@ -239,6 +238,7 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
         conn.close()
 
         print(f"✅ {insights_saved} ta xulosa saqlandi ({len(chunks)} qismdan)")
+        return (True, insights_saved, len(chunks))
 
     def _chunk_text(self, text: str, max_chars: int = 4000) -> List[str]:
         chunks = []

@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import os
 
+from bot.learning.ai_strategist import AIStrategist
+from bot.learning.ai_memory import AIMemory
+
 logger = logging.getLogger(__name__)
 
 class TradeReviewer:
@@ -21,6 +24,24 @@ class TradeReviewer:
             self.db_path = db_path
             
         self.decisions_db = os.path.join(root_dir, 'decisions_log.db')
+        
+        # Initialize AIStrategist
+        def llm_wrapper(prompt: str) -> str:
+            if hasattr(self.ai, 'get_simple_response'):
+                return self.ai.get_simple_response(prompt, max_tokens=2000)
+            return ""
+            
+        self.ai_strategist = AIStrategist(
+            llm_call_fn=llm_wrapper,
+            knowledge_base_dir=os.path.join(root_dir, 'knowledge_base'),
+            db_path=os.path.join(root_dir, 'strategist_db.sqlite'),
+            chroma_db_dir=os.path.join(root_dir, 'chroma_db')
+        )
+        
+        # AI Memory (doimiy xotira)
+        self.ai_memory = AIMemory(
+            db_path=os.path.join(root_dir, 'ai_memory.db')
+        )
         
         self.init_schema()
 
@@ -209,13 +230,25 @@ Oxirgi savdolar:
 
 Vazifang - faqat quyidagi JSON formatida sozlamalar kiritish (qo'shimcha matnsiz):
 {{
-  "analysis_summary": "Nima xato va nima to'g'ri bo'lgani xulosasi",
+  "analysis_summary": "Nima xato va nima to'g'ri bo'lgani xulosasi. 3-5 gapda yoz.",
   "adjustments": {{
-    "sl_multiplier": 1.0, // SL ni kengaytirish (1.2) yoki qisqartirish (0.8)
+    "sl_multiplier": 1.0,
     "tp_multiplier": 1.0, 
-    "avoid_symbols": [] // Yomon ishlayotgan juftliklar (masalan: ["US30"])
+    "avoid_symbols": []
+  }},
+  "strategy_weights": {{
+    "smc": 1.0,
+    "harmonic": 1.0,
+    "wyckoff": 1.0,
+    "sr_volume": 1.0,
+    "auto_patterns": 1.0,
+    "kill_zones": 1.0,
+    "news": 1.0
   }}
 }}
+Har bir strategy_weight 0.3 dan 2.0 gacha bo'lishi mumkin.
+Agar biror strategiya doimo xato signal bergan bo'lsa, uning vaznini kamaytir (masalan 0.5).
+Agar biror strategiya ko'p to'g'ri signal bergan bo'lsa, vaznini oshir (masalan 1.5).
 """
         try:
             response = self.ai.get_decision(prompt, max_tokens=600)
@@ -228,6 +261,34 @@ Vazifang - faqat quyidagi JSON formatida sozlamalar kiritish (qo'shimcha matnsiz
                     recommendations=response.get("analysis_summary", ""),
                     adjustments=response.get("adjustments", {})
                 )
+                
+                # === YANGI: Saboqlarni xotiraga saqlash ===
+                try:
+                    summary = response.get("analysis_summary", "")
+                    if summary:
+                        def llm_wrapper(p):
+                            return self.ai.get_simple_response(p, max_tokens=600)
+                        self.ai_memory.auto_extract_lessons(summary, llm_wrapper)
+                except Exception as e:
+                    logger.warning(f"Saboqlarni xotiraga saqlashda xatolik: {e}")
+                
+                # === YANGI: Strategiya vaznlarini saqlash ===
+                try:
+                    strategy_weights = response.get("strategy_weights", {})
+                    if strategy_weights:
+                        for strat_name, weight in strategy_weights.items():
+                            self.ai_memory.save_strategy_performance(
+                                strategy_name=strat_name,
+                                wins=len([d for d in deals if d.profit > 0]),
+                                losses=len([d for d in deals if d.profit <= 0]),
+                                total_profit=sum(d.profit for d in deals),
+                                avg_rr=avg_rr,
+                                recommended_weight=weight
+                            )
+                        logger.info(f"Strategiya vaznlari yangilandi: {strategy_weights}")
+                except Exception as e:
+                    logger.warning(f"Strategiya vaznlarini saqlashda xatolik: {e}")
+
                 # Keyingi safar tekshirmasligi uchun vaqtni yangilash
                 self._update_review_state(datetime.now().isoformat(), len(deals))
                 logger.info(f"AI Trade Reviewer o'rganishni yakunladi. WinRate: {win_rate*100:.1f}%. Adjustments saqlandi.")

@@ -3,7 +3,7 @@ import json
 import hashlib
 from datetime import datetime
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,13 @@ class DecisionLogger:
             except sqlite3.OperationalError:
                 pass
                 
+            # Used insight IDs ustunini qo'shish (RAG feedback uchun)
+            try:
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN used_insight_ids TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+                
         except Exception as e:
             logger.error(f"Error initializing DB schema: {e}")
         finally:
@@ -69,7 +76,8 @@ class DecisionLogger:
     def log(self, pair: str, timeframe: str, context: Dict[str, Any], prompt: str, 
             response: Any, decision: str, risk_pct: float, 
             hash_val: Optional[str] = None, tokens: Optional[Dict[str, int]] = None, 
-            cost: Optional[float] = None, ticket: Optional[int] = None):
+            cost: Optional[float] = None, ticket: Optional[int] = None,
+            used_insight_ids: Optional[str] = None):
         """Logs a trading decision to SQLite."""
         
         input_tokens = tokens.get("input_tokens") if tokens else None
@@ -80,8 +88,8 @@ class DecisionLogger:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO ai_decisions 
-                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket, used_insight_ids)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 datetime.now().isoformat(),
                 pair,
@@ -95,7 +103,8 @@ class DecisionLogger:
                 input_tokens,
                 output_tokens,
                 cost,
-                ticket
+                ticket,
+                used_insight_ids
             ))
             conn.commit()
         except Exception as e:
@@ -121,6 +130,26 @@ class DecisionLogger:
             conn.commit()
         except Exception as e:
             logger.error(f"Error updating outcome for ticket {ticket}: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def get_insight_ids_for_ticket(self, ticket: int) -> List[str]:
+        """Berilgan ticket uchun ishlatilgan insight ID larni qaytarish."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT used_insight_ids FROM ai_decisions WHERE ticket = ? ORDER BY id DESC LIMIT 1",
+                (ticket,)
+            )
+            row = cursor.fetchone()
+            if row and row[0]:
+                return json.loads(row[0])
+            return []
+        except Exception as e:
+            logger.error(f"Insight IDs olishda xatolik: {e}")
+            return []
         finally:
             if 'conn' in locals():
                 conn.close()

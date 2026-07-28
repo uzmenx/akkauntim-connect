@@ -232,3 +232,35 @@ class SupabaseSync:
             requests.post(url, headers=headers, json=insight, timeout=10)
         except Exception as e:
             logger.error(f"upload_insight xatolik: {e}")
+
+    def upload_memory(self, memory_data: dict) -> None:
+        """AI saboqni Supabase'ga yuboradi."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/ai_memory"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.post(url, headers=headers, json=memory_data, timeout=10)
+        except Exception as e:
+            logger.error(f"upload_memory xatolik: {e}")
+
+    def upload_strategy_performance(self, perf_data: dict) -> None:
+        """Strategiya samaradorligini Supabase'ga yuboradi."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/strategy_performance"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.post(url, headers=headers, json=perf_data, timeout=10)
+        except Exception as e:
+            logger.error(f"upload_strategy_performance xatolik: {e}")
