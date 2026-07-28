@@ -23,6 +23,7 @@ const MINOR_TIMEFRAME_OPTIONS = [
 
 const AI_MODEL_OPTIONS = [
   { value: "auto", label: "Avto" },
+  { value: "kimi-k3", label: "Faqat - Kimi K3" },
   { value: "claude-sonnet-5", label: "Faqat - Claude Sonnet 5" },
   { value: "claude-haiku-4-5", label: "Faqat - Claude Haiku 4.5" },
 ];
@@ -106,7 +107,7 @@ export function SettingsPage() {
         timeframe_minor: "M5",
         loop_interval_minutes: 5,
         ai_enabled: true,
-        ai_model: "auto",
+        ai_model: "kimi-k3",
         prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
         prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
         prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
@@ -236,7 +237,7 @@ export function SettingsPage() {
           timeframe_minor: "M5",
           loop_interval_minutes: 5,
           ai_enabled: true,
-          ai_model: "auto",
+          ai_model: "kimi-k3",
           prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
           prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
           prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',

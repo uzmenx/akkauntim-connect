@@ -2,13 +2,17 @@ import json
 import logging
 import re
 from typing import Dict, Any, Optional
+import requests
 from anthropic import Anthropic
 
 class AIClient:
     def __init__(self, config):
         self.config = config
         self.logger = logging.getLogger(__name__)
-        self.client = Anthropic(api_key=self.config.anthropic_api_key)
+        try:
+            self.client = Anthropic(api_key=self.config.anthropic_api_key)
+        except Exception:
+            self.client = None
         self.total_tokens_in = 0
         self.total_tokens_out = 0
         self.total_cost = 0.0
@@ -73,21 +77,53 @@ class AIClient:
             for attempt in range(retries + 1):
                 try:
                     self.logger.info(f"Requesting AI decision using model: {model} (Attempt {attempt+1}/{retries+1})")
-                    kwargs = {
-                        "model": model,
-                        "max_tokens": max_tok,
-                        "messages": [{"role": "user", "content": prompt}],
-                    }
-                    if sys_prompt:
-                        kwargs["system"] = sys_prompt
+                    if "moonshot" in model.lower() or "kimi" in model.lower():
+                        if not getattr(self.config, "kimi_api_key", None):
+                            raise Exception("KIMI_API_KEY is required for moonshot models")
                         
-                    response = self.client.messages.create(**kwargs)
-                    
-                    content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
-                    
-                    # Tracking tokens and cost
-                    in_tok = response.usage.input_tokens
-                    out_tok = response.usage.output_tokens
+                        headers = {
+                            "Authorization": f"Bearer {self.config.kimi_api_key}",
+                            "Content-Type": "application/json"
+                        }
+                        msgs = []
+                        if sys_prompt:
+                            msgs.append({"role": "system", "content": sys_prompt})
+                        msgs.append({"role": "user", "content": prompt})
+                        
+                        payload = {
+                            "model": model,
+                            "messages": msgs
+                        }
+                        if max_tok:
+                            payload["max_tokens"] = max_tok
+                            
+                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=60)
+                        if resp.status_code != 200:
+                            raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
+                            
+                        rdata = resp.json()
+                        content = rdata["choices"][0]["message"]["content"]
+                        in_tok = rdata.get("usage", {}).get("prompt_tokens", 0)
+                        out_tok = rdata.get("usage", {}).get("completion_tokens", 0)
+                    else:
+                        if not self.client:
+                            raise Exception("Anthropic API key is not configured or invalid.")
+                        kwargs = {
+                            "model": model,
+                            "max_tokens": max_tok,
+                            "messages": [{"role": "user", "content": prompt}],
+                        }
+                        if sys_prompt:
+                            kwargs["system"] = sys_prompt
+                            
+                        response = self.client.messages.create(**kwargs)
+                        
+                        content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
+                        
+                        # Tracking tokens and cost
+                        in_tok = response.usage.input_tokens
+                        out_tok = response.usage.output_tokens
+
                     self.total_tokens_in += in_tok
                     self.total_tokens_out += out_tok
                     
@@ -168,17 +204,41 @@ class AIClient:
             retries = 2
             for attempt in range(retries):
                 try:
-                    kwargs = {
-                        "model": model,
-                        "max_tokens": max_tokens,
-                        "messages": [{"role": "user", "content": prompt}],
-                    }
-                    if system_prompt:
-                        kwargs["system"] = system_prompt
-                        
-                    response = self.client.messages.create(**kwargs)
-                    content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
-                    return content.strip()
+                    if "moonshot" in model.lower() or "kimi" in model.lower():
+                        if not getattr(self.config, "kimi_api_key", None):
+                            raise Exception("KIMI_API_KEY is required for moonshot models")
+                        headers = {
+                            "Authorization": f"Bearer {self.config.kimi_api_key}",
+                            "Content-Type": "application/json"
+                        }
+                        msgs = []
+                        if system_prompt:
+                            msgs.append({"role": "system", "content": system_prompt})
+                        msgs.append({"role": "user", "content": prompt})
+                        payload = {
+                            "model": model,
+                            "messages": msgs,
+                            "max_tokens": max_tokens
+                        }
+                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=60)
+                        if resp.status_code != 200:
+                            raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
+                        content = resp.json()["choices"][0]["message"]["content"]
+                        return content.strip()
+                    else:
+                        if not self.client:
+                            raise Exception("Anthropic API key is not configured or invalid.")
+                        kwargs = {
+                            "model": model,
+                            "max_tokens": max_tokens,
+                            "messages": [{"role": "user", "content": prompt}],
+                        }
+                        if system_prompt:
+                            kwargs["system"] = system_prompt
+                            
+                        response = self.client.messages.create(**kwargs)
+                        content = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
+                        return content.strip()
                 except anthropic.RateLimitError as e:
                     self.logger.warning(f"Rate limit for {model}: {e}")
                     last_exception = e

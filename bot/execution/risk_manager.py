@@ -4,9 +4,10 @@ from typing import Tuple, Optional, Any
 logger = logging.getLogger(__name__)
 
 class RiskManager:
-    def __init__(self, mt5_client: Any, config: Any):
+    def __init__(self, mt5_client: Any, config: Any, state_manager: Any = None):
         self.mt5 = mt5_client
         self.config = config
+        self.state_manager = state_manager
 
     def check_daily_loss_limit(self) -> Tuple[bool, str]:
         """Kunlik zarar limiti oshib ketganini tekshiradi"""
@@ -106,6 +107,25 @@ class RiskManager:
             return None, "Hisob ma'lumotini olib bo'lmadi"
             
         balance = account_info.balance
+        
+        # Drawdown-based risk reduction (Kelly)
+        if self.state_manager:
+            peak_balance = self.state_manager.get_peak_balance()
+            if peak_balance is None or balance > peak_balance:
+                self.state_manager.update_peak_balance(balance)
+                peak_balance = balance
+                
+            drawdown_pct = (peak_balance - balance) / peak_balance if peak_balance > 0 else 0
+            drawdown_threshold = getattr(self.config, "drawdown_threshold_pct", 0.05)
+            drawdown_multiplier = getattr(self.config, "drawdown_risk_multiplier", 0.5)
+            
+            if drawdown_pct >= drawdown_threshold:
+                original_risk = risk_pct
+                risk_pct = risk_pct * drawdown_multiplier
+                logger.warning(
+                    f"[{symbol}] Drawdown limitga yetdi! Peak: ${peak_balance:.2f}, Balance: ${balance:.2f} "
+                    f"({drawdown_pct*100:.2f}% drawdown). Risk {original_risk*100:.2f}% dan {risk_pct*100:.2f}% ga tushirildi."
+                )
         
         # 1. Risk qilinayotgan summa
         risk_amount = balance * risk_pct

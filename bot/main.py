@@ -58,7 +58,7 @@ class TradingBot:
         self.reviewer = TradeReviewer(self.mt5, self.ai, config)
 
         # Execution
-        self.risk = RiskManager(self.mt5, config)
+        self.risk = RiskManager(self.mt5, config, self.state)
         self.orders = OrderManager(self.mt5, self.state, config)
         self.closed_trades_count = 0
 

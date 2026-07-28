@@ -21,6 +21,15 @@ class StateManager:
         )
         """
         self.db.execute(query)
+        
+        query2 = """
+        CREATE TABLE IF NOT EXISTS account_state (
+            key TEXT PRIMARY KEY,
+            value REAL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+        self.db.execute(query2)
 
     def set_trade_info(self, ticket: int, info: Dict[str, Any]):
         """Mavjud ma'lumotlarni yangilari bilan merge qiladi (eski tartibni saqlash)."""
@@ -67,3 +76,25 @@ class StateManager:
         except Exception as e:
             self.logger.error(f"Failed to get all trades: {e}")
         return trades
+
+    def get_peak_balance(self) -> Optional[float]:
+        try:
+            row = self.db.fetchone("SELECT value FROM account_state WHERE key = 'peak_balance'")
+            if row:
+                return float(row["value"])
+        except Exception as e:
+            self.logger.error(f"Failed to get peak balance: {e}")
+        return None
+
+    def update_peak_balance(self, balance: float):
+        try:
+            query = """
+            INSERT INTO account_state (key, value, updated_at)
+            VALUES ('peak_balance', ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(key) DO UPDATE SET 
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+            """
+            self.db.execute(query, (balance,))
+        except Exception as e:
+            self.logger.error(f"Failed to update peak balance: {e}")

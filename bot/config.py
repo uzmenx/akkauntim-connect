@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 class BotConfig:
     # .env values
     anthropic_api_key: str = ""
+    kimi_api_key: str = ""
     mt5_login: int = 0
     mt5_password: str = ""
     mt5_server: str = ""
@@ -26,9 +27,9 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model_medium: str = "claude-sonnet-5"
-    ai_model_weak: str = "claude-haiku-4-5-20251001"
-    ai_model: str = "auto"
+    ai_model_medium: str = "kimi-k3"
+    ai_model_weak: str = "kimi-k3"
+    ai_model: str = "kimi-k3"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -49,6 +50,10 @@ class BotConfig:
     # Yangi xususiyatlar
     auto_discover_symbols: bool = True
     batch_size: int = 3
+    
+    # Drawdown-based risk reduction
+    drawdown_threshold_pct: float = 0.05
+    drawdown_risk_multiplier: float = 0.5
 
     @classmethod
     def load(cls, env_path: str = ".env", config_path: str = "config.json") -> "BotConfig":
@@ -60,6 +65,7 @@ class BotConfig:
     def load_env(self, env_path: str = ".env") -> None:
         load_dotenv(env_path)
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        self.kimi_api_key = os.environ.get("KIMI_API_KEY", "")
         
         try:
             self.mt5_login = int(os.environ.get("MT5_LOGIN", "0"))
@@ -154,6 +160,12 @@ class BotConfig:
             
         if "max_spread_multiplier" in data:
             self.max_spread_multiplier = float(data["max_spread_multiplier"])
+            
+        if "drawdown_threshold_pct" in data:
+            self.drawdown_threshold_pct = float(data["drawdown_threshold_pct"])
+            
+        if "drawdown_risk_multiplier" in data:
+            self.drawdown_risk_multiplier = float(data["drawdown_risk_multiplier"])
             
         if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
             identity = data.get("prompt_identity", "")
