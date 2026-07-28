@@ -19,3 +19,6 @@ requests>=2.31.0
 
 # Date parsing (news_detector)
 python-dateutil>=2.8.2
+
+# Vector DB
+chromadb>=0.4.0
