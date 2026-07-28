@@ -2,17 +2,20 @@ import random
 
 class MockBroker:
     def __init__(self, initial_balance: float = 10000.0, config: dict = None):
-        self.balance = initial_balance
-        self.equity = initial_balance
-        self.open_positions = []
-        self.trade_history = []
-        self.current_price = 0.0
-        
+        self.initial_balance = initial_balance
         self.config = config or {
             'spread_pips': 1.5,
             'commission_per_lot': 3.0,
             'slippage_pips': 0.5
         }
+        self.reset()
+
+    def reset(self):
+        self.balance = self.initial_balance
+        self.equity = self.initial_balance
+        self.open_positions = []
+        self.trade_history = []
+        self.current_price = 0.0
 
     def update_price(self, row):
         """Kandelstik narxlarini yangilash va StopLoss/TakeProfit larni tekshirish"""

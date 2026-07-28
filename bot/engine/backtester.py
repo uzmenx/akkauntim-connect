@@ -18,7 +18,7 @@ class Backtester:
         self.data_loader = BacktestDataLoader()
         self.broker = MockBroker(initial_balance=10000.0)
 
-    def run(self, start_date: datetime, end_date: datetime):
+    def run(self, start_date: datetime, end_date: datetime, split_ratio: float = 0.5):
         print(f"--- Backtest Boshlandi: {self.strategy_name} on {self.symbol} ---")
         
         # 1. Ma'lumotlarni yuklash
@@ -29,8 +29,35 @@ class Backtester:
             
         print(f"Jami {len(df)} ta kandel yuklandi.")
         
-        # 2. Asosiy tsikl (Candle by Candle simulyatsiyasi)
+        split_index = int(len(df) * split_ratio)
+        is_df = df.iloc[:split_index]
+        oos_df = df.iloc[split_index:]
+        
+        print(f"IS (In-Sample) kandelalar: {len(is_df)}")
+        print(f"OOS (Out-of-Sample) kandelalar: {len(oos_df)}")
+        
+        # In-Sample Run
+        print("\n--- IN-SAMPLE (IS) SIMULYATSIYA BOSHLANDI ---")
+        self.broker.reset()
+        self._run_simulation(is_df)
+        is_stats = self.broker.get_stats()
+        print(f"IS Natijalar: {is_stats}")
+        
+        # Out-of-Sample Run
+        print("\n--- OUT-OF-SAMPLE (OOS) SIMULYATSIYA BOSHLANDI ---")
+        self.broker.reset()
+        self._run_simulation(oos_df)
+        oos_stats = self.broker.get_stats()
+        print(f"OOS Natijalar: {oos_stats}")
+        
+        return {"IS": is_stats, "OOS": oos_stats}
+
+    def _run_simulation(self, df):
         min_bars = 100
+        if len(df) <= min_bars:
+            print("Kandelalar soni yetarli emas (min 100)!")
+            return
+            
         for i in range(min_bars, len(df)):
             # "Hozirgi vaqtgacha bo'lgan" qismini ajratib olish (look-ahead bias ni oldini olish)
             current_df = df.iloc[:i+1].copy()
@@ -63,10 +90,8 @@ class Backtester:
                 )
                 
                 # Signal tahlili (70+ score = EXECUTE)
-                # Yoki AI qarorisiz backtest uchun o'rtacha ballarni ham qabul qilishimiz mumkin
                 if result.decision == "EXECUTE" or result.score >= 50:
                     if result.signal == 'BUY':
-                        # Oddiy SL/TP hisoblash (ATR asosida yoki fix)
                         sl = current_price - (atr * 2) if atr > 0 else current_price * 0.99
                         tp = current_price + (atr * 4) if atr > 0 else current_price * 1.02
                         self.broker.open_order(
@@ -81,18 +106,11 @@ class Backtester:
                             sl=sl, tp=tp, time=current_row['time']
                         )
             except Exception as e:
-                # print(f"Tahlil xatosi (index {i}): {e}")
                 pass
 
-        print("--- Backtest Yakunlandi ---")
-        stats = self.broker.get_stats()
-        print(f"Natijalar: {stats}")
-        return stats
-
 if __name__ == "__main__":
-    # Test qilib ko'rish uchun
     from datetime import timedelta
     end = datetime.now()
     start = end - timedelta(days=30)
     bt = Backtester('EURUSD', 16384) # 16384 = mt5.TIMEFRAME_H1
-    bt.run(start, end)
+    bt.run(start, end, split_ratio=0.5)
