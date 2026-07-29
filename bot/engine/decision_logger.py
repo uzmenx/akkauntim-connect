@@ -73,6 +73,12 @@ class DecisionLogger:
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+
+            try:
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN news_coverage_gap BOOLEAN")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
                 
         except Exception as e:
             logger.error(f"Error initializing DB schema: {e}")
@@ -84,7 +90,8 @@ class DecisionLogger:
             response: Any, decision: str, risk_pct: float, 
             hash_val: Optional[str] = None, tokens: Optional[Dict[str, int]] = None, 
             cost: Optional[float] = None, ticket: Optional[int] = None,
-            used_insight_ids: Optional[str] = None):
+            used_insight_ids: Optional[str] = None,
+            news_coverage_gap: Optional[bool] = None):
         """Logs a trading decision to SQLite."""
         
         input_tokens = tokens.get("input_tokens") if tokens else None
@@ -95,8 +102,8 @@ class DecisionLogger:
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO ai_decisions 
-                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket, used_insight_ids)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket, used_insight_ids, news_coverage_gap)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 datetime.now().isoformat(),
                 pair,
@@ -111,7 +118,8 @@ class DecisionLogger:
                 output_tokens,
                 cost,
                 ticket,
-                used_insight_ids
+                used_insight_ids,
+                news_coverage_gap
             ))
             conn.commit()
         except Exception as e:

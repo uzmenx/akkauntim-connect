@@ -660,6 +660,9 @@ class TradingBot:
         except Exception:
             pass
         
+        from bot.engine.news_coverage_check import check_news_coverage_gap
+        news_gap = check_news_coverage_gap(symbol)
+
         self.decision_logger.log(
             pair=symbol, timeframe=self.config.timeframe_major,
             context=context, prompt="AUTONOMOUS_AI",
@@ -668,7 +671,8 @@ class TradingBot:
             tokens={"input_tokens": self.ai.total_tokens_in, "output_tokens": self.ai.total_tokens_out},
             cost=self.ai.total_cost,
             ticket=ticket,
-            used_insight_ids=json.dumps(used_insight_ids) if used_insight_ids else None
+            used_insight_ids=json.dumps(used_insight_ids) if used_insight_ids else None,
+            news_coverage_gap=news_gap
         )
 
         if success:
