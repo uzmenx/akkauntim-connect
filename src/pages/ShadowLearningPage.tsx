@@ -4,6 +4,7 @@ import { Brain, UploadCloud, BookOpen, Activity, Target, ShieldAlert, Loader2, S
 import { cn, timeAgo } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@iconify/react";
+import { AnalyticsView } from "@/components/AnalyticsView";
 
 type StrategyInsight = {
   id: string;
@@ -44,8 +45,24 @@ type StrategyPerf = {
   updated_at: string;
 };
 
+type BlackBoxStats = {
+  mechanism?: string;
+  gap?: string;
+  style?: string;
+  trade_count: number;
+  loss_count: number;
+  total_profit: number;
+};
+
+type BlackBoxData = {
+  close_mechanism: BlackBoxStats[];
+  news_coverage_gap: BlackBoxStats[];
+  news_strategy_style?: BlackBoxStats[];
+  updated_at: string;
+};
+
 export function ShadowLearningPage() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'memory'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'blackbox'>('overview');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +142,21 @@ export function ShadowLearningPage() {
       return data || [];
     },
     refetchInterval: 30000,
+  });
+
+  // Black Box Data (Local JSON)
+  const blackbox = useQuery({
+    queryKey: ["blackbox_data"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/blackbox.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as BlackBoxData;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 15000,
   });
 
   // Learning metrics hisoblash
@@ -320,6 +352,12 @@ export function ShadowLearningPage() {
               className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'memory' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
             >
               Xotira
+            </button>
+            <button 
+              onClick={() => setActiveTab('blackbox')}
+              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider flex items-center gap-1", activeTab === 'blackbox' ? "bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]" : "text-white/40 hover:text-white/70")}
+            >
+              <Icon icon="mdi:box-cutter" className="w-3.5 h-3.5" /> Qora Quti
             </button>
           </div>
         </div>
@@ -757,6 +795,134 @@ export function ShadowLearningPage() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* QORA QUTI (BLACK BOX) */}
+        {activeTab === 'blackbox' && (
+          <div className="flex flex-col gap-6">
+            <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2 px-1">
+              <Icon icon="mdi:box-cutter" className="text-emerald-400 w-5 h-5" />
+              Qora Quti Tahlili
+            </h2>
+
+            {blackbox.isLoading ? (
+               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-400" size={32} /></div>
+            ) : blackbox.data ? (
+              <>
+                {/* Close Mechanism Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
+                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">Close Mechanism bo'yicha Zararlar</h3>
+                  {blackbox.data.close_mechanism.length > 0 ? (
+                    <div className="space-y-4">
+                      {blackbox.data.close_mechanism.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        return (
+                          <div key={i} className="flex flex-col gap-1.5">
+                            <div className="flex justify-between items-end">
+                              <span className="text-xs font-bold text-white/90 uppercase">{stat.mechanism}</span>
+                              <div className="text-[10px] text-white/50 space-x-2">
+                                <span>{stat.trade_count} ta savdo</span>
+                                <span className="text-rose-400">{stat.loss_count} ta zarar</span>
+                                <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                              </div>
+                            </div>
+                            <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden flex">
+                              <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                              <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${100 - winRate}%` }} />
+                            </div>
+                            <div className="text-[9px] text-white/30 text-right">Win Rate: {winRate}%</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-white/40 text-xs italic">
+                      Yangi qoidalar bo'yicha yopilgan savdolar hali yo'q. Kutmoqdamiz...
+                    </div>
+                  )}
+                </div>
+
+                {/* News Coverage Gap Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden mt-4">
+                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">News Coverage bo'yicha Zararlar</h3>
+                  {blackbox.data.news_coverage_gap.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {blackbox.data.news_coverage_gap.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        const label = stat.gap === "1" ? "Yangilik Gap Bor" : stat.gap === "0" ? "Yangilik Gap Yo'q" : "Noma'lum";
+                        return (
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+                            <span className="text-[11px] font-bold text-white/80 uppercase">{label}</span>
+                            <div className="flex justify-between items-center">
+                              <div className="text-xl font-black text-white">{stat.trade_count}</div>
+                              <div className="text-xs text-rose-400">-{stat.loss_count}L</div>
+                            </div>
+                            <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                            </div>
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-white/40">Win Rate</span>
+                              <span className="text-white/70 font-bold">{winRate}%</span>
+                            </div>
+                            <div className="text-[10px] text-right mt-1">
+                              P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-white/40 text-xs italic">
+                      Hali yangiliklar tekshiruvi asosida yopilgan savdolar yo'q.
+                    </div>
+                  )}
+                </div>
+
+                {/* News Strategy Style Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden mt-4">
+                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">News Strategy bo'yicha Zararlar</h3>
+                  {blackbox.data.news_strategy_style && blackbox.data.news_strategy_style.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      {blackbox.data.news_strategy_style.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        const label = stat.style === "BEFORE_NEWS" ? "Yangilikdan Oldin (Straddle)" : stat.style === "AFTER_NEWS" ? "Yangilikdan Keyin (Fundamental)" : stat.style || "Noma'lum";
+                        return (
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
+                            <span className="text-[11px] font-bold text-white/80 uppercase">{label}</span>
+                            <div className="flex justify-between items-center">
+                              <div className="text-xl font-black text-white">{stat.trade_count}</div>
+                              <div className="text-xs text-rose-400">-{stat.loss_count}L</div>
+                            </div>
+                            <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                            </div>
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span className="text-white/40">Win Rate</span>
+                              <span className="text-white/70 font-bold">{winRate}%</span>
+                            </div>
+                            <div className="text-[10px] text-right mt-1">
+                              P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-6 text-center text-white/40 text-xs italic">
+                      Hali yangiliklar strategiyasi asosida yopilgan savdolar yo'q.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+               <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-[24px] p-8 text-center flex flex-col items-center justify-center gap-3">
+                 <Icon icon="mdi:box-cutter" className="text-white/20 w-10 h-10" />
+                 <p className="text-sm text-white/50">Qora quti ma'lumotlari hozircha yo'q yoki bot ishlamayapti.</p>
+               </div>
+            )}
+            
+            <AnalyticsView />
           </div>
         )}
 

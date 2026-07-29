@@ -433,6 +433,13 @@ export function SettingsPage() {
 
         <div className="space-y-4">
           <Slider
+            label="Har bir bitim uchun Risk (Risk per Trade)"
+            value={Number(form.risk_per_trade ?? 0.02)}
+            min={0.001} max={0.10} step={0.001}
+            format={(v) => `${(v * 100).toFixed(1)}% balansdan`}
+            onChange={(v) => setForm((f) => ({ ...f, risk_per_trade: v }))}
+          />
+          <Slider
             label="Maksimal Lot Hajmi"
             value={Number(form.max_lot_size ?? 5.0)}
             min={0.01} max={10} step={0.01}

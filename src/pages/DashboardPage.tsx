@@ -357,15 +357,15 @@ export function DashboardPage() {
 
             {/* Button 3: Filter */}
             <button onClick={toggleFilter} className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center transition-all group border border-violet-400/50" aria-label="Filter Mode">
-              <div className="flex items-center justify-center w-5 h-5">
+              <div className="flex items-center justify-center w-6 h-6 min-[360px]:w-7 min-[360px]:h-7">
                 {filterMode === "all" && (
-                  <div className="relative w-[16px] h-[16px] min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform">
-                    <TrendingUp size={10} className="text-emerald-400 absolute top-0 left-0" />
-                    <TrendingDown size={10} className="text-rose-400 absolute bottom-0 right-0" />
+                  <div className="relative w-full h-full group-hover:scale-110 transition-transform flex items-center justify-center">
+                    <TrendingUp size={16} className="text-emerald-400 absolute top-0 left-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
+                    <TrendingDown size={16} className="text-rose-400 absolute bottom-0 right-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
                   </div>
                 )}
-                {filterMode === "profit" && <TrendingUp size={16} className="text-emerald-400 min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform" />}
-                {filterMode === "loss" && <TrendingDown size={16} className="text-rose-400 min-[360px]:w-[18px] min-[360px]:h-[18px] group-hover:scale-110 transition-transform" />}
+                {filterMode === "profit" && <TrendingUp size={22} className="text-emerald-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
+                {filterMode === "loss" && <TrendingDown size={22} className="text-rose-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
               </div>
             </button>
 

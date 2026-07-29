@@ -30,6 +30,9 @@ from bot.learning.ai_memory import AIMemory
 from bot.sync.supabase_sync import SupabaseSync
 from bot.sync.telegram_sync import TelegramSync
 from bot.engine.close_mechanism_classifier import classify_close_mechanism
+from bot.engine.blackbox_exporter import export_blackbox_json
+from bot.strategy.news.straddle import check_and_place_straddle, cleanup_straddle_orders, refresh_straddle_for_delayed_news
+from bot.strategy.news.fundamental import execute_fundamental_method
 
 logger = logging.getLogger(__name__)
 
@@ -574,7 +577,7 @@ class TradingBot:
         
         sl_pips = sl_price_diff / pip_divisor
         tp_pips = abs(entry_price - tp_price) / pip_divisor if tp_price else 100 * tp_mult
-        risk_pct = ai_decision.get("risk_pct", 0.01)
+        risk_pct = ai_decision.get("risk_pct")
 
         # Signalni "BUY", "SELL", "BUY_LIMIT", "SELL_LIMIT", "BUY_STOP", "SELL_STOP" ga aylantirish
         order_signal = final_decision
@@ -767,6 +770,19 @@ class TradingBot:
                     except Exception as e:
                         logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
 
+                    # === YANGILIKLAR SAVDOSI (NEWS TRADING - 2 USUL) ===
+                    try:
+                        # 1-usul: AI'siz Straddle (Buy Stop/Sell Stop)
+                        check_and_place_straddle(self.mt5, self.orders, [], getattr(self.config, 'news_settings', {}))
+                        cleanup_straddle_orders(self.mt5, self.orders)
+                        # Kechikkan yangiliklar uchun orderlarni yangilab turish
+                        refresh_straddle_for_delayed_news(self.mt5, self.orders)
+                        
+                        # 2-usul: AI bilan Uzoq muddatli (Fundamental)
+                        execute_fundamental_method(self.mt5, self.orders, self.ai)
+                    except Exception as e:
+                        logger.error(f"News Trading siklida xatolik: {e}")
+
                     # Juftliklarni aniqlash (Dam olish kuni vs Ish kuni)
                     import datetime
                     is_weekend = datetime.datetime.utcnow().weekday() >= 5
@@ -851,6 +867,12 @@ class TradingBot:
                                         logger.info(f"🔄 Feedback: {len(insight_ids)} ta insight yangilandi ({'WIN' if is_win else 'LOSS'})")
                                 except Exception as fe:
                                     logger.debug(f"Insight feedback xatolik: {fe}")
+                                    
+                            try:
+                                export_blackbox_json()
+                            except Exception as ex:
+                                logger.error(f"Black box eksport xatosi: {ex}")
+                                
                     except Exception as e:
                         logger.warning(f"Cloud sync xatolik: {e}")
 

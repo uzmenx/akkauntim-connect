@@ -7,9 +7,18 @@ export function cn(...inputs: ClassValue[]) {
 
 export function fmtMoney(n: number | null | undefined, currency = "USD") {
   if (n == null || Number.isNaN(n)) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency", currency, maximumFractionDigits: 2,
-  }).format(n);
+  
+  const validCurrency = (currency && typeof currency === 'string' && currency.trim() !== '') ? currency : "USD";
+  
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency", currency: validCurrency, maximumFractionDigits: 2,
+    }).format(n);
+  } catch (e) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency", currency: "USD", maximumFractionDigits: 2,
+    }).format(n);
+  }
 }
 
 export function fmtNum(n: number | null | undefined, digits = 2) {

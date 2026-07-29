@@ -20,6 +20,8 @@ def setup_bot():
     bot.sync = MagicMock()
     bot.telegram = MagicMock()
     bot.reviewer = MagicMock()
+    bot.state = MagicMock()
+    bot.state.get_symbol_gate_state.return_value = {}
     bot.risk = MagicMock()
     bot.orders = MagicMock()
     bot.decision_logger = MagicMock()

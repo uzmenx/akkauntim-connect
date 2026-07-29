@@ -15,7 +15,8 @@ class DecisionLogger:
     def init_schema(self):
         """Creates table and runs migrations."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
+            conn.execute('PRAGMA journal_mode=WAL')
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS ai_decisions (
@@ -40,25 +41,20 @@ class DecisionLogger:
                 pass # Allaqachon mavjud
                 
             # Tokenlar va cost ustunlarini qo'shish
-            try:
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN input_tokens INTEGER")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN output_tokens INTEGER")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN cost REAL")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
+            for col in ["input_tokens INTEGER", "output_tokens INTEGER", "cost REAL"]:
+                try:
+                    cursor.execute(f"ALTER TABLE ai_decisions ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass
+            conn.commit()
                 
             # Shadow Learner ustunlarini qo'shish
-            try:
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN ticket INTEGER")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN outcome_profit REAL")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN outcome_label TEXT")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN closed_at TEXT")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN shadow_prediction TEXT")
-                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN shadow_confidence REAL")
-                conn.commit()
-            except sqlite3.OperationalError:
-                pass
+            for col in ["ticket INTEGER", "outcome_profit REAL", "outcome_label TEXT", "closed_at TEXT", "shadow_prediction TEXT", "shadow_confidence REAL"]:
+                try:
+                    cursor.execute(f"ALTER TABLE ai_decisions ADD COLUMN {col}")
+                except sqlite3.OperationalError:
+                    pass
+            conn.commit()
                 
             # Used insight IDs ustunini qo'shish (RAG feedback uchun)
             try:
@@ -79,6 +75,12 @@ class DecisionLogger:
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+
+            try:
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN news_strategy_type TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
                 
         except Exception as e:
             logger.error(f"Error initializing DB schema: {e}")
@@ -91,19 +93,20 @@ class DecisionLogger:
             hash_val: Optional[str] = None, tokens: Optional[Dict[str, int]] = None, 
             cost: Optional[float] = None, ticket: Optional[int] = None,
             used_insight_ids: Optional[str] = None,
-            news_coverage_gap: Optional[bool] = None):
+            news_coverage_gap: Optional[bool] = None,
+            news_strategy_type: Optional[str] = None):
         """Logs a trading decision to SQLite."""
         
         input_tokens = tokens.get("input_tokens") if tokens else None
         output_tokens = tokens.get("output_tokens") if tokens else None
         
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
             cursor = conn.cursor()
             cursor.execute('''
                 INSERT INTO ai_decisions 
-                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket, used_insight_ids, news_coverage_gap)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (timestamp, pair, timeframe, context_json, prompt, ai_response, final_decision, risk_pct, context_hash, input_tokens, output_tokens, cost, ticket, used_insight_ids, news_coverage_gap, news_strategy_type)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 datetime.now().isoformat(),
                 pair,
@@ -119,7 +122,8 @@ class DecisionLogger:
                 cost,
                 ticket,
                 used_insight_ids,
-                news_coverage_gap
+                news_coverage_gap,
+                news_strategy_type
             ))
             conn.commit()
         except Exception as e:
@@ -131,10 +135,16 @@ class DecisionLogger:
     def update_outcome(self, ticket: int, profit: float, close_mechanism: Optional[str] = None) -> None:
         """Updates the trade outcome for shadow learning, plus close_mechanism tag."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
             cursor = conn.cursor()
             
-            outcome_label = 'WIN' if profit > 0 else 'LOSS'
+            if profit > 0:
+                outcome_label = 'WIN'
+            elif profit == 0:
+                outcome_label = 'BREAKEVEN'
+            else:
+                outcome_label = 'LOSS'
+            
             closed_at = datetime.now().isoformat()
             
             cursor.execute('''
@@ -152,7 +162,7 @@ class DecisionLogger:
     def get_insight_ids_for_ticket(self, ticket: int) -> List[str]:
         """Berilgan ticket uchun ishlatilgan insight ID larni qaytarish."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT used_insight_ids FROM ai_decisions WHERE ticket = ? ORDER BY id DESC LIMIT 1",
@@ -172,7 +182,7 @@ class DecisionLogger:
     def get_last_hash(self, pair: str) -> Optional[str]:
         """Gets the hash of the last recorded decision for caching."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
             cursor = conn.cursor()
             cursor.execute("SELECT context_hash FROM ai_decisions WHERE pair = ? ORDER BY id DESC LIMIT 1", (pair,))
             row = cursor.fetchone()
@@ -187,7 +197,7 @@ class DecisionLogger:
     def get_last_cached_response(self, pair: str, hash_val: str) -> Optional[Dict[str, Any]]:
         """Gets the last cached response if the hash matches."""
         try:
-            conn = sqlite3.connect(self.db_path)
+            conn = sqlite3.connect(self.db_path, timeout=15)
             cursor = conn.cursor()
             cursor.execute("SELECT context_hash, ai_response FROM ai_decisions WHERE pair = ? ORDER BY id DESC LIMIT 1", (pair,))
             row = cursor.fetchone()
@@ -210,8 +220,8 @@ class DecisionLogger:
         risk = (context.get('risk_manager') or {})
         
         state = {
-            "vote": context.get('voting_result', {}).get('signal'),
-            "vote_risk": context.get('voting_result', {}).get('risk_pct'),
+            "vote": (context.get('voting_result') or {}).get('signal'),
+            "vote_risk": (context.get('voting_result') or {}).get('risk_pct'),
             "smc_trend": smc.get('trend'),
             "smc_events": smc.get('events'),
             "pat_signal": (context.get('harmonic_pattern') or {}).get('signal'),

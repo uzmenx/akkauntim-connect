@@ -18,7 +18,7 @@ class NewsDetector:
     def __init__(self, target_currencies=None):
         self.target_currencies = target_currencies or ["USD", "EUR", "GBP", "JPY"]
         self.calendar_url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
-        self.cache_file = "news_cache.json"
+        self.cache_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "news_cache.json")
         self.cache_duration = 43200  # 12 soat (sekundlarda)
         self.events = []
     
@@ -146,6 +146,62 @@ class NewsDetector:
         upcoming.sort(key=lambda x: x.get('minutes_to_release', 999))
         return upcoming
 
+    def get_pending_news(self, impact_filter=None, max_delay_minutes=15):
+        """
+        Yangilik vaqti o'tgan, lekin hali Actual natija chiqmagan (kechikkan) yangiliklarni qaytaradi.
+        Bu straddle orderlarini yangilik kechiksa ham tirik saqlash uchun ishlatiladi.
+        
+        Args:
+            impact_filter: Faqat berilgan impact darajadagi yangiliklarni filterlash
+            max_delay_minutes: Maksimal kutish vaqti (daqiqalarda). Default: 15 daqiqa.
+        
+        Returns:
+            Kechikkan yangiliklar ro'yxati (har birida 'minutes_overdue' maydoni bor)
+        """
+        if not self.events:
+            self.fetch_calendar(force_refresh=True)
+            
+        now = datetime.now(timezone.utc)
+        pending = []
+        
+        for event in self.events:
+            country = event.get('country')
+            impact = event.get('impact')
+            actual = event.get('actual')
+            
+            if country not in self.target_currencies:
+                continue
+                
+            if impact_filter and impact not in impact_filter:
+                continue
+            
+            # Faqat Actual natija HALI chiqmagan yangiliklarni olamiz
+            if actual:
+                continue
+                
+            event_date_str = event.get('date')
+            if not event_date_str:
+                continue
+                
+            try:
+                event_date = dateutil.parser.isoparse(event_date_str)
+                event_date_utc = event_date.astimezone(timezone.utc)
+                
+                # Yangilik vaqti o'tganmi?
+                delta = now - event_date_utc
+                delta_minutes = delta.total_seconds() / 60.0
+                
+                # Vaqti o'tgan (delta_minutes > 0) va max_delay ichida
+                if 0 < delta_minutes <= max_delay_minutes:
+                    event_copy = event.copy()
+                    event_copy['minutes_overdue'] = round(delta_minutes, 1)
+                    pending.append(event_copy)
+            except Exception:
+                pass
+                
+        pending.sort(key=lambda x: x.get('minutes_overdue', 999))
+        return pending
+
     def format_news_for_ai(self, hours_back=24, minutes_ahead=180):
         """
         Formats recent historical news and upcoming news into a clean text prompt
@@ -162,7 +218,7 @@ class NewsDetector:
                 actual = e.get('actual', 'N/A')
                 forecast = e.get('forecast', 'N/A')
                 prev = e.get('previous', 'N/A')
-                text += f"- [{e['impact']}] {e['country']} | {e['title']} ({e['hours_ago']} soat oldin)\n"
+                text += f"- [{e.get('impact', 'N/A')}] {e.get('country', 'N/A')} | {e.get('title', 'Unknown')} ({e.get('hours_ago', 0)} soat oldin)\n"
                 text += f"  Haqiqiy (Actual): {actual} | Prognoz (Forecast): {forecast} | Oldingi (Previous): {prev}\n"
         else:
             text += "- Yaqin orada hech qanday muhim yangilik e'lon qilinmadi.\n"
@@ -172,7 +228,7 @@ class NewsDetector:
             for e in upcoming:
                 forecast = e.get('forecast', 'N/A')
                 prev = e.get('previous', 'N/A')
-                text += f"- [{e['impact']}] {e['country']} | {e['title']} (yana {e['minutes_to_release']} daqiqadan so'ng)\n"
+                text += f"- [{e.get('impact', 'N/A')}] {e.get('country', 'N/A')} | {e.get('title', 'Unknown')} (yana {e.get('minutes_to_release', 0)} daqiqadan so'ng)\n"
                 text += f"  Prognoz (Forecast): {forecast} | Oldingi (Previous): {prev}\n"
         else:
             text += "- Yaqin soatlar ichida hech qanday muhim yangilik kutilmayapti.\n"

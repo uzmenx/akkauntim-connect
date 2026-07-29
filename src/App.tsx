@@ -8,7 +8,6 @@ import { HistoryPage } from "@/pages/HistoryPage";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { BacktestPage } from "@/pages/BacktestPage";
-import { LandingPage } from "@/pages/LandingPage";
 import { ShadowLearningPage } from "@/pages/ShadowLearningPage";
 import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -85,9 +84,8 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
-        <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     );
   }

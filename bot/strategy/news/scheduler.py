@@ -26,7 +26,11 @@ def watch_upcoming_news(pair: str, minutes_ahead: int = 60, detector=None) -> di
     nearest_event = next((e for e in upcoming if e.get('impact') == 'High'), upcoming[0])
     
     # Analyze historical impact for this event
-    hist_impact = analyze_historical_impact(pair, nearest_event['title'], lookback_months=6, currency=nearest_event.get('currency'))
+    try:
+        hist_impact = analyze_historical_impact(pair, nearest_event['title'], lookback_months=6, currency=nearest_event.get('country'))
+    except Exception as e:
+        logger.error(f"Historical impact tahlilida xatolik: {e}")
+        hist_impact = None
     
     status = "AWAITING_NEWS"
     recommended_action = "none"

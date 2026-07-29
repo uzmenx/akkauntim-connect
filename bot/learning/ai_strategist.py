@@ -309,24 +309,30 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
         Trade tugagandan so'ng natijani tizimga qaytarish.
         Bu AI ning xatosidan o'rganishini (Shadow Learning) ta'minlaydi.
         """
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute(
-            """
-            INSERT INTO trade_feedback (insight_id, success, pnl, reason, timestamp)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (insight_id, int(success), pnl, reason, datetime.now().isoformat())
-        )
-        
-        if success:
-            cursor.execute("UPDATE strategy_insights SET success_count = success_count + 1 WHERE id = ?", (insight_id,))
-        else:
-            cursor.execute("UPDATE strategy_insights SET fail_count = fail_count + 1 WHERE id = ?", (insight_id,))
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
             
-        conn.commit()
-        conn.close()
+            cursor.execute(
+                """
+                INSERT INTO trade_feedback (insight_id, success, pnl, reason, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (insight_id, int(success), pnl, reason, datetime.now().isoformat())
+            )
+            
+            if success:
+                cursor.execute("UPDATE strategy_insights SET success_count = success_count + 1 WHERE id = ?", (insight_id,))
+            else:
+                cursor.execute("UPDATE strategy_insights SET fail_count = fail_count + 1 WHERE id = ?", (insight_id,))
+                
+            conn.commit()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"Trade result yozishda xatolik: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
         
         result_text = "Foyda" if success else "Zarar"
         print(f"🔄 Feedback qabul qilindi: Insight {insight_id[:6]}... -> {result_text}")

@@ -40,12 +40,14 @@ class AIClient:
         try:
             return json.loads(text)
         except json.JSONDecodeError:
-            return {}
+            return None
 
     def _calculate_cost(self, model: str, input_tokens: int, output_tokens: int) -> float:
         # Anthropic public pricing per 1M tokens (2025).
         m = model.lower()
-        if "haiku-3" in m or "haiku-3-5" in m or "claude-3-haiku" in m:
+        if "kimi" in m or "moonshot" in m:
+            in_price, out_price = 0.06, 0.06  # Kimi K3 approximate pricing
+        elif "haiku-3" in m or "haiku-3-5" in m or "claude-3-haiku" in m:
             in_price, out_price = 0.25, 1.25
         elif "haiku" in m:  # Haiku 4.x
             in_price, out_price = 0.80, 4.00
@@ -67,6 +69,8 @@ class AIClient:
             models_to_try = [weak]
         else: # "auto" or anything else
             models_to_try = [medium, weak]
+            
+        models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
 
         import time
         import anthropic
@@ -196,6 +200,9 @@ class AIClient:
             models_to_try = [weak]
         else: # "auto"
             models_to_try = [weak, medium]
+            
+        models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
+
         import time
         import anthropic
         

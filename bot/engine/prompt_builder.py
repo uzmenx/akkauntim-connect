@@ -97,8 +97,7 @@ class PromptBuilder:
         smc_minor_trend = smc_minor.get('trend', {}).get('internal', 'N/A')
         tf_minor = context.get('timeframe_minor', 'Minor')
         
-        prompt = f"""{system_prompt}
-Sening maqsading: quyidagi bozordagi barcha fundamental, texnik, SMC, va hajmiy (Wyckoff, SR) holatlarni tahlil qilib, MUSTAQIL ravishda xulosa chiqarish.
+        prompt = f"""Sening maqsading: quyidagi bozordagi barcha fundamental, texnik, SMC, va hajmiy (Wyckoff, SR) holatlarni tahlil qilib, MUSTAQIL ravishda xulosa chiqarish.
 Sen boshqa barcha algoritmlardan ustunsan. Senga hech qanday qaror majburlanmagan. Sen "LIMIT_BUY", "LIMIT_SELL" yoki "HOLD" xulosasini berishing kerak.
 
 === 1. JORIY HOLAT ({pair}) ===
@@ -133,7 +132,7 @@ Kill Zones: {kz_summary}
 
 === 6. AI TRADE REVIEWER (O'RGANISH MODULI) XULOSASI ===
 Quyidagi tavsiyalar avvalgi xatolaringdan o'rganilgan:
-{json.dumps(context.get('learning_adjustments', {}), indent=2)}
+{json.dumps(context.get('learning_adjustments', {}))}
 
 === 7. KITOBLARDAN O'RGANILGAN QOIDALAR ===
 Quyidagi qoidalar sening o'qigan kitoblaringdan olingan. Ularning tarixiy samaradorligiga e'tibor ber:
