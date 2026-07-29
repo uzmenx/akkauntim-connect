@@ -23,11 +23,13 @@ from bot.engine.decision_logger import DecisionLogger
 from bot.engine.regime_detector import RegimeDetector
 from bot.engine.strategy_portfolio import StrategyPortfolioManager
 from bot.execution.risk_manager import RiskManager
+from bot.engine.ai_call_gate import should_call_ai
 from bot.execution.order_manager import OrderManager
 from bot.learning.trade_reviewer import TradeReviewer
 from bot.learning.ai_memory import AIMemory
 from bot.sync.supabase_sync import SupabaseSync
 from bot.sync.telegram_sync import TelegramSync
+from bot.engine.close_mechanism_classifier import classify_close_mechanism
 
 logger = logging.getLogger(__name__)
 
@@ -428,11 +430,11 @@ class TradingBot:
 
         # === YANGI: Kitob bilimlarini (RAG) olish ===
         try:
-            smc_trend_text = str(smc_context.get('trend', {}).get('internal', 'Unknown')) if smc_context else 'Unknown'
-            harmonic_sig = str(pattern_result.get('signal', 'NEUTRAL')) if pattern_result else 'NEUTRAL'
+            smc_trend_text = str(smc_context.get('trend', {}).get('internal', 'Unknown')) if 'smc_context' in locals() and smc_context else 'Unknown'
+            harmonic_sig = str(pattern_result.get('signal', 'NEUTRAL')) if 'pattern_result' in locals() and pattern_result else 'NEUTRAL'
             situation_desc = f"{symbol} {self.config.timeframe_major} SMC:{smc_trend_text} Pattern:{harmonic_sig} Regime:{current_regime.value}"
             market_cond = current_regime.value.lower() if hasattr(current_regime, 'value') else 'all'
-            # Rejimni market_condition ga moslashtirish
+            
             if 'trend' in market_cond:
                 market_cond = 'trend'
             elif 'range' in market_cond or 'flat' in market_cond:
@@ -442,10 +444,11 @@ class TradingBot:
             else:
                 market_cond = 'all'
             
+            # Shadow (chaqaloq) AI bilimlari ishlashi uchun yoqildi, lekin token tejash uchun limit=1 qilindi
             book_knowledge = self.reviewer.ai_strategist.get_relevant_context(
                 current_situation_desc=situation_desc,
                 market_condition=market_cond,
-                limit=3
+                limit=1
             )
             if book_knowledge:
                 context["book_knowledge"] = book_knowledge
@@ -455,7 +458,7 @@ class TradingBot:
 
         # === YANGI: AI Xotirasini olish ===
         try:
-            ai_memory_text = self.ai_memory.get_recent_lessons(limit=7)
+            ai_memory_text = self.ai_memory.get_recent_lessons(limit=2)
             if ai_memory_text:
                 context["ai_memory"] = ai_memory_text
         except Exception as e:
@@ -473,6 +476,29 @@ class TradingBot:
         except Exception as e:
             logger.debug(f"Strategiya vaznlarini qo'llashda xatolik: {e}")
 
+        # === AI Call Gate: bozor strukturasi o'zgarmagan bo'lsa, chaqiruvni tejash ===
+        smc_for_gate = smc_result if 'smc_result' in locals() and smc_result else (smc_context if 'smc_context' in locals() and smc_context else {})
+        trend_internal = str(smc_for_gate.get('trend', {}).get('internal', 'Unknown'))
+        last_bos_obj = smc_for_gate.get('last_bos', {}) or {}
+        bos_price = last_bos_obj.get('price')
+        regime_str = current_regime.value if hasattr(current_regime, 'value') else str(current_regime)
+
+        gate_state = self.state.get_symbol_gate_state(symbol)
+        call_needed, gate_reason = should_call_ai(
+            symbol=symbol,
+            current_trend_internal=trend_internal,
+            current_bos_price=bos_price,
+            current_regime=regime_str,
+            gate_state=gate_state,
+        )
+
+        if not call_needed:
+            logger.info(f"[{symbol}] AI chaqiruvi o'tkazib yuborildi ({gate_reason}). "
+                        f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
+            return  # Bu tsikl uchun HOLD bilan bir xil natija — yangi bitim ochilmaydi
+        else:
+            logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
+
         prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
         logger.info(f"[{symbol}] AI Agent ga bozor tahlili yuborilmoqda...")
         
@@ -484,6 +510,14 @@ class TradingBot:
         final_decision = ai_decision.get("decision", "HOLD")
         reasoning_text = ai_decision.get("reasoning", "")
         logger.info(f"[{symbol}] AI Xulosasi: {final_decision} | Sabab: {reasoning_text[:200]}")
+
+        self.state.update_symbol_gate_state(
+            symbol=symbol,
+            trend_internal=trend_internal,
+            bos_price=bos_price,
+            regime=regime_str,
+            ai_decision=final_decision,
+        )
 
         if final_decision == "HOLD":
             reasoning_lower = reasoning_text.lower()
@@ -792,7 +826,11 @@ class TradingBot:
                         closed_trades = self.sync.sync_all(self.mt5, is_running=True, message=status_msg)
                         if closed_trades:
                             for ct in closed_trades:
-                                self.decision_logger.update_outcome(ct["ticket"], ct["profit"])
+                                close_mechanism = classify_close_mechanism(
+                                    ct.get("mt5_comment", ""),
+                                    ct.get("mt5_reason")
+                                )
+                                self.decision_logger.update_outcome(ct["ticket"], ct["profit"], close_mechanism)
                                 
                                 # === YANGI: Kitob qoidalariga feedback qaytarish ===
                                 try:

@@ -126,6 +126,8 @@ class SupabaseSync:
                     "profit": float(d.profit),
                     "opened_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
                     "closed_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
+                    "mt5_comment": str(d.comment) if getattr(d, 'comment', None) else "",
+                    "mt5_reason": int(d.reason) if hasattr(d, 'reason') else None,
                 })
         self.last_sync_time = datetime.datetime.now()
 

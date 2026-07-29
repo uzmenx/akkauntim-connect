@@ -31,6 +31,18 @@ class StateManager:
         """
         self.db.execute(query2)
 
+        query_symbol_state = """
+        CREATE TABLE IF NOT EXISTS symbol_ai_gate_state (
+            symbol TEXT PRIMARY KEY,
+            last_trend_internal TEXT,
+            last_bos_price REAL,
+            last_regime TEXT,
+            last_ai_call_at TIMESTAMP,
+            last_ai_decision TEXT
+        )
+        """
+        self.db.execute(query_symbol_state)
+
     def set_trade_info(self, ticket: int, info: Dict[str, Any]):
         """Mavjud ma'lumotlarni yangilari bilan merge qiladi (eski tartibni saqlash)."""
         try:
@@ -98,3 +110,47 @@ class StateManager:
             self.db.execute(query, (balance,))
         except Exception as e:
             self.logger.error(f"Failed to update peak balance: {e}")
+
+    def get_symbol_gate_state(self, symbol: str) -> Optional[Dict[str, Any]]:
+        try:
+            row = self.db.fetchone(
+                "SELECT symbol, last_trend_internal, last_bos_price, last_regime, "
+                "last_ai_call_at, last_ai_decision FROM symbol_ai_gate_state WHERE symbol = ?",
+                (symbol,)
+            )
+            if not row:
+                return None
+            return {
+                "symbol": row["symbol"],
+                "last_trend_internal": row["last_trend_internal"],
+                "last_bos_price": row["last_bos_price"],
+                "last_regime": row["last_regime"],
+                "last_ai_call_at": row["last_ai_call_at"],
+                "last_ai_decision": row["last_ai_decision"],
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to get gate state for {symbol}: {e}")
+            return None
+
+    def update_symbol_gate_state(self, symbol: str, trend_internal: str,
+                                 bos_price: Optional[float], regime: str,
+                                 ai_decision: str) -> None:
+        try:
+            import datetime
+            now = datetime.datetime.now().isoformat()
+            self.db.execute(
+                """
+                INSERT INTO symbol_ai_gate_state
+                    (symbol, last_trend_internal, last_bos_price, last_regime, last_ai_call_at, last_ai_decision)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(symbol) DO UPDATE SET
+                    last_trend_internal = excluded.last_trend_internal,
+                    last_bos_price = excluded.last_bos_price,
+                    last_regime = excluded.last_regime,
+                    last_ai_call_at = excluded.last_ai_call_at,
+                    last_ai_decision = excluded.last_ai_decision
+                """,
+                (symbol, trend_internal, bos_price, regime, now, ai_decision)
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to update gate state for {symbol}: {e}")

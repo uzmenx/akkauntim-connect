@@ -67,6 +67,13 @@ class DecisionLogger:
             except sqlite3.OperationalError:
                 pass
                 
+            # Close mechanism ustunini qo'shish (Qora quti MVP)
+            try:
+                cursor.execute("ALTER TABLE ai_decisions ADD COLUMN close_mechanism TEXT")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+                
         except Exception as e:
             logger.error(f"Error initializing DB schema: {e}")
         finally:
@@ -113,8 +120,8 @@ class DecisionLogger:
             if 'conn' in locals():
                 conn.close()
 
-    def update_outcome(self, ticket: int, profit: float) -> None:
-        """Updates the trade outcome for shadow learning."""
+    def update_outcome(self, ticket: int, profit: float, close_mechanism: Optional[str] = None) -> None:
+        """Updates the trade outcome for shadow learning, plus close_mechanism tag."""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -124,9 +131,9 @@ class DecisionLogger:
             
             cursor.execute('''
                 UPDATE ai_decisions 
-                SET outcome_profit = ?, outcome_label = ?, closed_at = ?
+                SET outcome_profit = ?, outcome_label = ?, closed_at = ?, close_mechanism = ?
                 WHERE ticket = ?
-            ''', (profit, outcome_label, closed_at, ticket))
+            ''', (profit, outcome_label, closed_at, close_mechanism, ticket))
             conn.commit()
         except Exception as e:
             logger.error(f"Error updating outcome for ticket {ticket}: {e}")
