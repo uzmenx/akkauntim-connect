@@ -40,7 +40,7 @@ def backup_databases(config, databases=None):
                 
                 with open(gz_file, 'rb') as f:
                     res = supabase.storage.from_(bucket_name).upload(
-                        file=os.path.abspath(gz_file),
+                        file=f,
                         path=remote_path,
                         file_options={"content-type": "application/gzip"}
                     )
