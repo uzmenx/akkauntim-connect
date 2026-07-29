@@ -162,7 +162,7 @@ JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn
   "take_profit": 1.06000, // null agar HOLD bo'lsa
   "expiration_minutes": 240, // faqat LIMIT orderlar uchun: ushbu limit order qancha daqiqadan so'ng bekor qilinishi kerak? O'zing vaziyatga qarab belgilagin, agar MARKET order bo'lsa null.
   "risk_pct": 0.02, // 1% = 0.01
-  "reasoning": "Nima uchun ushbu qarorga kelganing haqida to'liq sabab...",
+  "reasoning": "Nima uchun ushbu qarorga kelganing haqida JUDA QISQA va L'ONDA (max 1-2 ta gap) sabab yoz. Keraksiz, uzun gaplar yozma.",
   "warnings": ["yangilik chiqish arafasida"]
 }}
 """

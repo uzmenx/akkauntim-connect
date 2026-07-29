@@ -361,7 +361,7 @@ export function SettingsPage() {
               <Slider
                 label="Bozorni tahlil qilish tezligi (Daqiqa)"
                 value={Number(form.loop_interval_minutes ?? 5)}
-                min={1} max={60} step={1}
+                min={1} max={240} step={1}
                 format={(v) => `Har ${v} daqiqada`}
                 onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
               />

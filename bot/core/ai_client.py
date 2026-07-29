@@ -101,7 +101,7 @@ class AIClient:
                         if max_tok:
                             payload["max_tokens"] = max_tok
                             
-                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=60)
+                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=120)
                         if resp.status_code != 200:
                             raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
                             
@@ -227,7 +227,7 @@ class AIClient:
                             "messages": msgs,
                             "max_tokens": max_tokens
                         }
-                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=60)
+                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=120)
                         if resp.status_code != 200:
                             raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
                         content = resp.json()["choices"][0]["message"]["content"]
