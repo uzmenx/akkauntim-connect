@@ -45,7 +45,7 @@ class BotConfig:
     allow_single_strategy_trade: bool = False
     news_lookback_hours: int = 24
     max_spread_multiplier: float = 4.0
-    ai_max_tokens: int = 2000
+    ai_max_tokens: int = 4000
     
     # Yangi xususiyatlar
     auto_discover_symbols: bool = True

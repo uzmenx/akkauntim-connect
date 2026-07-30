@@ -333,6 +333,15 @@ class TradingBot:
         # 2. TEXNIK TAHLIL — barcha strategiyalarni ishga tushirish
         # ============================================================
         smc_result = self._get_smc_full_analysis(df_major)
+        if smc_result:
+            try:
+                from bot.strategy.smc.engine import to_voting_signal as smc_voting
+                sig_data = smc_voting(smc_result)
+                smc_result["signal"] = sig_data.get("signal", "HOLD")
+                smc_result["confidence"] = sig_data.get("confidence", 0)
+            except Exception as e:
+                logger.error(f"SMC to_voting_signal xatosi: {e}")
+                
         smc_context = self._get_smc_data(df_major)
         
         # Minor timeframe ma'lumotlarini qo'shish
@@ -356,8 +365,12 @@ class TradingBot:
                 positions_info.append(f"{'BUY' if p.type == self.mt5.ORDER_TYPE_BUY else 'SELL'} {p.volume} lot at {p.price_open}")
 
         try:
-            from bot.strategy.wyckoff.engine import analyze_wyckoff
+            from bot.strategy.wyckoff.engine import analyze_wyckoff, to_voting_signal as wyckoff_voting
             wyckoff_result = analyze_wyckoff(df_major)
+            if wyckoff_result:
+                sig_data = wyckoff_voting(wyckoff_result)
+                wyckoff_result["signal"] = sig_data.get("signal", "HOLD")
+                wyckoff_result["confidence"] = sig_data.get("confidence", 0)
         except Exception as e:
             logger.error(f"Wyckoff tahlil xatosi: {e}")
             wyckoff_result = {}
@@ -389,6 +402,15 @@ class TradingBot:
         # AI AGENT AUTONOMOUS DECISION
         # ============================================================
         
+        recent_candles_text = "Vaqt, O, H, L, C\n"
+        if not df_major.empty:
+            for _, row in df_major.tail(30).iterrows():
+                try:
+                    time_str = row['time'].strftime('%m-%d %H:%M') if hasattr(row['time'], 'strftime') else str(row['time'])
+                except Exception:
+                    time_str = str(row['time'])
+                recent_candles_text += f"{time_str}, {row['open']:.5f}, {row['high']:.5f}, {row['low']:.5f}, {row['close']:.5f}\n"
+
         context = self.prompt_builder.build_context_summary(
             smc_result=smc_result or smc_context,
             patterns=pattern_result,
@@ -400,7 +422,8 @@ class TradingBot:
             auto_patterns=auto_patterns_result,
             kill_zones=kill_zones_result,
             anti_manipulation=anti_manipulation_result,
-            trap_detector=trap_detector_result
+            trap_detector=trap_detector_result,
+            recent_candles=recent_candles_text
         )
         context["pair"] = symbol
         context["regime"] = current_regime.value
@@ -512,6 +535,12 @@ class TradingBot:
 
         final_decision = ai_decision.get("decision", "HOLD")
         reasoning_text = ai_decision.get("reasoning", "")
+        
+        web_searches_used = ai_decision.get("_web_search_used", 0)
+        if web_searches_used > 0:
+            reasoning_text = f"[WEB SEARCH: {web_searches_used}] " + reasoning_text
+            ai_decision["reasoning"] = reasoning_text
+            
         logger.info(f"[{symbol}] AI Xulosasi: {final_decision} | Sabab: {reasoning_text[:200]}")
 
         self.state.update_symbol_gate_state(

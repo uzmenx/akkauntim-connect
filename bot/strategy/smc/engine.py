@@ -1130,3 +1130,43 @@ def _empty_result() -> dict:
             "total_fvgs": 0, "fresh_fvgs": 0,
         },
     }
+
+def to_voting_signal(result: dict) -> dict:
+    """
+    SMC natijalaridan ovoz berish moduli uchun BUY/SELL/HOLD signali chiqaradi.
+    """
+    if not result or "trend" not in result:
+        return {"signal": "HOLD", "confidence": 0}
+        
+    internal_trend = result["trend"].get("internal", "")
+    last_bos = result.get("last_bos")
+    bos_dir = last_bos.get("type", "").lower() if last_bos else ""
+    
+    demand_obs = result.get("order_blocks", {}).get("demand", [])
+    supply_obs = result.get("order_blocks", {}).get("supply", [])
+    
+    near_demand_ob = False
+    for ob in demand_obs:
+        if ob.get("status") == "fresh" and abs(ob.get("distance_pct", 100)) < 0.5:
+            near_demand_ob = True
+            break
+            
+    near_supply_ob = False
+    for ob in supply_obs:
+        if ob.get("status") == "fresh" and abs(ob.get("distance_pct", 100)) < 0.5:
+            near_supply_ob = True
+            break
+            
+    is_bullish = ("Up" in internal_trend) or (bos_dir == "bullish")
+    is_bearish = ("Down" in internal_trend) or (bos_dir == "bearish")
+    
+    if is_bullish and near_demand_ob:
+        return {"signal": "BUY", "confidence": 75}
+    elif is_bearish and near_supply_ob:
+        return {"signal": "SELL", "confidence": 75}
+    elif is_bullish and not is_bearish:
+        return {"signal": "BUY", "confidence": 60}
+    elif is_bearish and not is_bullish:
+        return {"signal": "SELL", "confidence": 60}
+        
+    return {"signal": "HOLD", "confidence": 0}

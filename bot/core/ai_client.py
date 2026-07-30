@@ -116,6 +116,11 @@ class AIClient:
                             "model": model,
                             "max_tokens": max_tok,
                             "messages": [{"role": "user", "content": prompt}],
+                            "tools": [{
+                                "type": "web_search_20250305",
+                                "name": "web_search",
+                                "max_uses": 2,
+                            }],
                         }
                         if sys_prompt:
                             kwargs["system"] = sys_prompt
@@ -132,10 +137,26 @@ class AIClient:
                     self.total_tokens_out += out_tok
                     
                     cost = self._calculate_cost(model, in_tok, out_tok)
-                    self.total_cost += cost
-                    self.logger.info(f"AI Call tokens: in={in_tok}, out={out_tok}, cost=${cost:.5f}")
                     
-                    return self._extract_json(content)
+                    # Web search cost calculation
+                    search_cost = 0.0
+                    for b in response.content:
+                        b_type = getattr(b, "type", "")
+                        if b_type == "server_tool_use":
+                            b_dict = b.model_dump() if hasattr(b, "model_dump") else (b.__dict__ if hasattr(b, "__dict__") else (b if isinstance(b, dict) else {}))
+                            reqs = b_dict.get("web_search_requests", 1)
+                            search_cost += reqs * 0.01
+                        elif b_type == "tool_use" and getattr(b, "name", "") == "web_search":
+                            search_cost += 0.01
+                            
+                    cost += search_cost
+                    self.total_cost += cost
+                    self.logger.info(f"AI Call tokens: in={in_tok}, out={out_tok}, search_cost=${search_cost:.3f}, cost=${cost:.5f}")
+                    
+                    parsed_json = self._extract_json(content)
+                    if parsed_json and isinstance(parsed_json, dict):
+                        parsed_json["_web_search_used"] = int(search_cost / 0.01)
+                    return parsed_json
                     
                 except anthropic.RateLimitError as e:
                     self.logger.warning(f"Rate limit on {model}: {e}")

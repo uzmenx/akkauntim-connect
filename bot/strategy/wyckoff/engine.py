@@ -207,3 +207,26 @@ def _detect_sos_sow(df: pd.DataFrame) -> str:
         return "SOW"
         
     return "None"
+
+def to_voting_signal(result: dict) -> dict:
+    """
+    Wyckoff natijalaridan ovoz berish moduli uchun BUY/SELL/HOLD signali chiqaradi.
+    """
+    if not result:
+        return {"signal": "HOLD", "confidence": 0}
+        
+    spring_upthrust = result.get("spring_upthrust", "None")
+    phase = result.get("phase", "Unknown")
+    momentum_sign = result.get("momentum_sign", "None")
+    
+    if spring_upthrust == "Spring":
+        return {"signal": "BUY", "confidence": 70}
+    elif spring_upthrust == "Upthrust":
+        return {"signal": "SELL", "confidence": 70}
+        
+    if phase == "Markup" and momentum_sign == "SOS":
+        return {"signal": "BUY", "confidence": 55}
+    elif phase == "Markdown" and momentum_sign == "SOW":
+        return {"signal": "SELL", "confidence": 55}
+        
+    return {"signal": "HOLD", "confidence": 0}

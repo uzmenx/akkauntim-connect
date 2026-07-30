@@ -19,7 +19,8 @@ class PromptBuilder:
                               auto_patterns: Optional[Dict[str, Any]] = None,
                               kill_zones: Optional[Dict[str, Any]] = None,
                               anti_manipulation: Optional[str] = None,
-                              trap_detector: Optional[str] = None) -> Dict[str, Any]:
+                              trap_detector: Optional[str] = None,
+                              recent_candles: Optional[str] = None) -> Dict[str, Any]:
         """
         Gathers context components into a structured dictionary.
         Voting argumenti eski moslashuvchanlik uchun qoldirildi, lekin u ignor qilinishi mumkin.
@@ -34,7 +35,8 @@ class PromptBuilder:
             "auto_patterns": auto_patterns or {},
             "kill_zones": kill_zones or {},
             "anti_manipulation": anti_manipulation or "",
-            "trap_detector": trap_detector or ""
+            "trap_detector": trap_detector or "",
+            "recent_candles": recent_candles or ""
         }
 
     def build_trading_prompt(self, context: Dict[str, Any], pair: str, current_price: float) -> str:
@@ -48,14 +50,34 @@ class PromptBuilder:
         if last_bos:
             smc_summary += f"\nOxirgi BoS: {last_bos.get('type', '')} at {last_bos.get('price', '')}"
             
-        zones = smc.get('zones', [])
+        order_blocks = smc.get('order_blocks', {})
+        fvgs = smc.get('fvg', {})
+        
+        zones = []
+        for ob in order_blocks.get('demand', []):
+            if ob.get('status') == 'fresh':
+                zones.append({'type': 'Demand OB', 'price': (ob.get('top', 0) + ob.get('bottom', 0)) / 2})
+        for ob in order_blocks.get('supply', []):
+            if ob.get('status') == 'fresh':
+                zones.append({'type': 'Supply OB', 'price': (ob.get('top', 0) + ob.get('bottom', 0)) / 2})
+        for fvg in fvgs.get('demand', []):
+            if fvg.get('status') == 'fresh':
+                zones.append({'type': 'Demand FVG', 'price': (fvg.get('top', 0) + fvg.get('bottom', 0)) / 2})
+        for fvg in fvgs.get('supply', []):
+            if fvg.get('status') == 'fresh':
+                zones.append({'type': 'Supply FVG', 'price': (fvg.get('top', 0) + fvg.get('bottom', 0)) / 2})
+                
         if zones:
             smc_summary += "\nYaqin SMC zonalar (OB/FVG):"
+            def get_dist(z):
+                return abs(current_price - z.get('price', 0))
+            
+            zones.sort(key=get_dist)
+            
             for z in zones[:3]:
-                # Faraz qilamizki z['price'] yoki z['top']/z['bottom'] bor
-                z_price = z.get('price', z.get('top', z.get('bottom', 0)))
-                dist = abs(current_price - z_price) if z_price else 0
-                smc_summary += f"\n- {z.get('type', 'Zone')} at {z_price} (Hozirgi narxdan masofa: {dist:.5f})"
+                z_price = z.get('price', 0)
+                dist = abs(current_price - z_price)
+                smc_summary += f"\n- {z.get('type', 'Zone')} at {z_price:.5f} (Hozirgi narxdan masofa: {dist:.5f})"
             
         pat = context.get('harmonic_pattern', {})
         pat_summary = f"Pattern signal: {pat.get('signal', 'NEUTRAL')}"
@@ -85,6 +107,7 @@ class PromptBuilder:
         trap_detect = context.get('trap_detector', "")
 
         memory_bank = context.get('memory_bank', "SMC Memory Bank: Joriy narx atrofida kuchli tarixiy zonalar topilmadi.\n")
+        recent_candles = context.get('recent_candles', "")
         
         system_prompt = getattr(self.config, "ai_system_prompt", "Sen to'liq avtonom AI Treyder Agentisan.")
         
@@ -108,9 +131,12 @@ QAT'IY QOIDA: Agar ushbu juftlikda allaqachon bitim ochilgan bo'lsa va narx tubd
 {context.get("risk_info", "")}
 {memory_bank}
 
+So'nggi narx harakatlari (Xom shamlar):
+{recent_candles}
+
 === 2. TEXNIK SMC TAHLILI ===
 {smc_summary}
-(Foydali bo'lishi mumkin - H1 Zonalar: {json.dumps(smc.get('zones', [])[:2])})
+(Foydali bo'lishi mumkin - H1 Zonalar: {json.dumps(zones[:2]) if zones else '[]'})
 
 Kichik (Minor) Timeframe ({tf_minor}):
 - SMC Trend: {smc_minor_trend}
@@ -141,6 +167,9 @@ Quyidagi qoidalar sening o'qigan kitoblaringdan olingan. Ularning tarixiy samara
 === 8. AI XOTIRASI (OLDINGI SABOQLAR) ===
 Quyidagi saboqlar sening oldingi savdolaring va xatolaringdan olingan. ULARGA AMAL QIL:
 {context.get('ai_memory', "Xotira hali bo'sh.")}
+
+=== VEB QIDIRUV (WEB SEARCH) QOIDASI ===
+Agar joriy vaqt AQSh/Yevropa savdo seansi va yaqinda muhim iqtisodiy ma'lumot (NFP, CPI, markaziy bank qarori) e'lon qilingan yoki qilinishi kutilayotgan bo'lsa, VA sizning ichki 'YANGILIKLAR KONTEKSTI' bo'limi bunga oid aniq ma'lumot bermasa — veb qidiruv vositasidan foydalanib, so'nggi bozorga tegishli yangiliklarni tekshiring. Aks holda veb qidiruvdan foydalanmang.
 
 === VAZIFA ===
 Bozor holatini to'liq o'rgan. 

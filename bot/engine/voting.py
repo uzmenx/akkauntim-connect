@@ -60,8 +60,7 @@ def aggregate_signals(
     if _is_active("Auto_Pattern") and str(auto_pattern_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(auto_pattern_data.get("confidence") or 0) >= conf_auto_pattern:
         valid_signals.append(("Auto_Pattern", str(auto_pattern_data.get("signal")).upper()))
 
-    if _is_active("Kill_Zones") and str(kill_zones_data.get("signal") or "").upper() in ["BUY", "SELL"] and int(kill_zones_data.get("confidence") or 0) >= conf_kill_zones:
-        valid_signals.append(("Kill_Zones", str(kill_zones_data.get("signal")).upper()))
+    # Kill_Zones ovoz beruvchi sifatida olib tashlandi, u risk multiplikatori vazifasini bajaradi
         
     # 2. Yo'nalishlarni guruhlash
     buy_strategies = [s[0] for s in valid_signals if s[1] == "BUY"]
@@ -108,6 +107,13 @@ def aggregate_signals(
                 "reasoning": "Yakka strategiya signali olingan, ammo ruxsat etilmagan (allow_single_strategy_trade=False)."
             }
             
+    if kill_zones_data.get("is_kill_zone") or kill_zones_data.get("is_overlap"):
+        risk_pct *= 1.0  # to'liq risk — yuqori volatillik, signal ishonchli vaqt
+    elif kill_zones_data.get("is_dead_zone"):
+        risk_pct *= 0.5  # yarim risk — Dead Zone'da spread kengroq, signal yolg'on chiqishi ehtimoli ko'proq
+    else:
+        risk_pct *= 0.75  # o'rtacha
+
     reasoning = f"{num_strats} ta strategiya ({', '.join(winner_strategies)}) kelishdi."
     logger.info(f"Voting natijasi: {winner_direction}, Risk: {risk_pct}, Sabab: {reasoning}")
     
