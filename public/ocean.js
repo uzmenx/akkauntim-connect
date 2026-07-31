@@ -41,12 +41,12 @@ async function init() {
 
     const uTime = uniform(0.0);
     const uSea = uniform(0.0);
-    const uSunDir = uniform(new THREE.Vector3(0, 1, 0));
-    const uSunColor = uniform(new THREE.Color(1, 1, 1));
-    const uHorizonColor = uniform(new THREE.Color(0, 0, 0));
-    const uZenithColor = uniform(new THREE.Color(0, 0, 0));
-    const uDeepColor = uniform(new THREE.Color(0, 0, 0));
-    const uShallowColor = uniform(new THREE.Color(0, 0, 0));
+    const uSunDir = uniform(vec3(0, 1, 0));
+    const uSunColor = uniform(vec3(1, 1, 1));
+    const uHorizonColor = uniform(vec3(0, 0, 0));
+    const uZenithColor = uniform(vec3(0, 0, 0));
+    const uDeepColor = uniform(vec3(0, 0, 0));
+    const uShallowColor = uniform(vec3(0, 0, 0));
 
     const waves = [
         { dir: new THREE.Vector2(1.0, 0.0).normalize(), wl: 60.0, st: 0.12 },
