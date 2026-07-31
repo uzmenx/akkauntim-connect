@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
 import type { TradeHistory } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Bot } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -62,7 +62,7 @@ export function HistoryPage() {
             const profit = Number(t.profit);
             const isBuy = t.side?.toUpperCase() === "BUY";
             return (
-              <Card key={t.id} className="p-3">
+              <Card key={t.id} className="p-3 flex flex-col gap-2">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
                     <span
@@ -83,6 +83,21 @@ export function HistoryPage() {
                     {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
                   </p>
                 </div>
+                {/* Badges Row */}
+                {(t.agreed_strategies?.length || t.ai_used) ? (
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {t.ai_used && (
+                      <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
+                        <Bot size={10} /> AI
+                      </div>
+                    )}
+                    {t.agreed_strategies?.map((strat) => (
+                      <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+                        {strat}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </Card>
             );
           })}

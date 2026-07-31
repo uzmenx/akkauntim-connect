@@ -28,7 +28,11 @@ const defaultPositions = (): Position[] => {
     const isBuy = i % 2 === 0;
     const symbol = symbols[i % symbols.length];
     const openPrice = symbol.includes("JPY") ? 150.0 + i : (symbol.includes("XAU") ? 2300.0 + i : 1.0500 + i * 0.01);
-    const profit = isBuy ? (Math.random() * 500) : -(Math.random() * 200);
+    const hasAi = Math.random() > 0.5;
+    const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+    const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+    const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
     return {
       id: `mock-pos-${i + 1}`,
       ticket: 10000000 + i,
@@ -41,6 +45,8 @@ const defaultPositions = (): Position[] => {
       take_profit: openPrice + 0.0400,
       profit: Number(profit.toFixed(2)),
       opened_at: new Date(Date.now() - ((i + 1) * 3600000)).toISOString(),
+      agreed_strategies: agreedStrategies,
+      ai_used: hasAi,
     };
   });
 };
@@ -60,6 +66,11 @@ const defaultHistory = (): TradeHistory[] => {
     const profit = Number((currentBalance * rate).toFixed(2));
     currentBalance = Number((currentBalance + profit).toFixed(2));
     
+    const hasAi = Math.random() > 0.4;
+    const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+    const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+    const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
     list.unshift({
       id: `mock-hist-${i}`,
       ticket: 11110000 + i,
@@ -71,6 +82,8 @@ const defaultHistory = (): TradeHistory[] => {
       profit,
       opened_at: new Date(Date.now() - 3600000 * (26 - i) * 3 - 3600000).toISOString(),
       closed_at: new Date(Date.now() - 3600000 * (26 - i) * 3).toISOString(),
+      agreed_strategies: agreedStrategies,
+      ai_used: hasAi,
     });
   }
   return list;
@@ -241,6 +254,11 @@ export const guestMock = {
         // Add to history
         const histItem = localStorage.getItem(MOCK_HISTORY_KEY);
         const historyList = histItem ? JSON.parse(histItem) : [];
+        const hasAi = Math.random() > 0.4;
+        const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+        const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+        const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
         const newHist: TradeHistory = {
           id: `mock-hist-${Date.now()}`,
           ticket: closedPos.ticket,
@@ -252,6 +270,8 @@ export const guestMock = {
           profit: profit, 
           opened_at: closedPos.opened_at,
           closed_at: new Date().toISOString(),
+          agreed_strategies: closedPos.agreed_strategies || agreedStrategies,
+          ai_used: closedPos.ai_used !== undefined ? closedPos.ai_used : hasAi,
         };
         historyList.unshift(newHist);
         localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(historyList.slice(0, 50)));
@@ -264,6 +284,12 @@ export const guestMock = {
       const symbols = ["EURUSD", "XAUUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"];
       const newSym = symbols[Math.floor(Math.random() * symbols.length)];
       const openPrice = newSym.includes("JPY") ? 150.0 : (newSym.includes("XAU") ? 2300.0 : 1.0500);
+      
+      const newHasAi = Math.random() > 0.5;
+      const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+      const newShuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+      const newAgreedStrategies = newShuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
       val.push({
         id: `mock-pos-${Date.now()}`,
         ticket: 10000000 + Math.floor(Math.random() * 900000),
@@ -275,7 +301,9 @@ export const guestMock = {
         stop_loss: openPrice - 0.02,
         take_profit: openPrice + 0.04,
         profit: Number(((Math.random() - 0.4) * 20).toFixed(2)),
-        opened_at: new Date().toISOString()
+        opened_at: new Date().toISOString(),
+        agreed_strategies: newAgreedStrategies,
+        ai_used: newHasAi,
       });
     }
 

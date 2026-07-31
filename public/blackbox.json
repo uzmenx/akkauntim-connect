@@ -1,6 +1,26 @@
 {
-  "close_mechanism": [],
-  "news_coverage_gap": [],
+  "close_mechanism": [
+    {
+      "mechanism": "virtual_sl",
+      "trade_count": 1,
+      "loss_count": 1,
+      "total_profit": -71.82
+    },
+    {
+      "mechanism": "tp1_partial",
+      "trade_count": 1,
+      "loss_count": 0,
+      "total_profit": 65.16
+    }
+  ],
+  "news_coverage_gap": [
+    {
+      "gap": "0",
+      "trade_count": 2,
+      "loss_count": 1,
+      "total_profit": -6.66
+    }
+  ],
   "news_strategy_style": [],
-  "updated_at": "2026-07-30T03:07:06.588825"
+  "updated_at": "2026-07-31T02:15:33.488203"
 }

@@ -13,13 +13,25 @@ interface CustomSelectProps {
   options: Option[];
   className?: string;
   placeholder?: string;
+  multiple?: boolean;
+  maxCount?: number;
 }
 
-export function CustomSelect({ value, onChange, options, className, placeholder }: CustomSelectProps) {
+export function CustomSelect({ value, onChange, options, className, placeholder, multiple, maxCount }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const selectedOption = options.find((opt) => opt.value === value) || options[0];
+  const selectedValues = multiple ? (value ? value.split(",").map(v => v.trim()).filter(Boolean) : []) : [value];
+
+  let displayLabel = placeholder || "Tanlang...";
+  if (!multiple) {
+    const selectedOption = options.find((opt) => opt.value === value) || options[0];
+    displayLabel = selectedOption?.label || displayLabel;
+  } else {
+    if (selectedValues.length > 0) {
+      displayLabel = `${selectedValues.length} ta tanlandi`;
+    }
+  }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -31,6 +43,24 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleSelect = (optionValue: string) => {
+    if (!multiple) {
+      onChange(optionValue);
+      setIsOpen(false);
+    } else {
+      if (selectedValues.includes(optionValue)) {
+        const newValues = selectedValues.filter(v => v !== optionValue);
+        onChange(newValues.join(","));
+      } else {
+        if (maxCount && selectedValues.length >= maxCount) {
+          return;
+        }
+        const newValues = [...selectedValues, optionValue];
+        onChange(newValues.join(","));
+      }
+    }
+  };
+
   return (
     <div ref={containerRef} className={cn("relative w-full", isOpen && "z-30", className)}>
       <button
@@ -41,7 +71,7 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
           isOpen && "border-brand/60 ring-1 ring-brand/60"
         )}
       >
-        <span className="truncate">{selectedOption?.label}</span>
+        <span className="truncate">{displayLabel}</span>
         <ChevronDown
           size={16}
           className={cn("text-fg-muted transition-transform duration-200", isOpen && "rotate-180 text-brand")}
@@ -52,20 +82,21 @@ export function CustomSelect({ value, onChange, options, className, placeholder 
         <div className="absolute z-50 mt-2 w-full origin-top rounded-xl border border-white/10 bg-black/80 backdrop-blur-xl p-1.5 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="max-h-60 overflow-y-auto no-scrollbar space-y-1">
             {options.map((option) => {
-              const isSelected = option.value === value;
+              const isSelected = selectedValues.includes(option.value);
+              const isDisabled = multiple && maxCount && !isSelected && selectedValues.length >= maxCount;
+              
               return (
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => {
-                    onChange(option.value);
-                    setIsOpen(false);
-                  }}
+                  onClick={() => handleSelect(option.value)}
+                  disabled={isDisabled}
                   className={cn(
                     "flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-all cursor-pointer",
                     isSelected
                       ? "bg-brand/20 text-brand font-semibold"
-                      : "text-fg-muted hover:bg-white/5 hover:text-fg"
+                      : "text-fg-muted hover:bg-white/5 hover:text-fg",
+                    isDisabled && "opacity-50 cursor-not-allowed hover:bg-transparent hover:text-fg-muted"
                   )}
                 >
                   <span className="truncate">{option.label}</span>

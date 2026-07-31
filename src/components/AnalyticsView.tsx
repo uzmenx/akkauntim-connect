@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { guestMock } from "@/lib/guestMock";
 import { fmtMoney, cn } from "@/lib/utils";
 import type { TradeHistory } from "@/lib/types";
-import { Loader2, Activity, CalendarDays, Grid3X3, AlertTriangle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Activity, CalendarDays, Grid3X3, AlertTriangle, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 
 type TimeFrame = "24h" | "7d" | "30d" | "all";
 
@@ -62,7 +62,7 @@ export function AnalyticsView() {
   }, [history, timeframe, referenceDate]);
 
   const { symbolStats, overallStats } = useMemo(() => {
-    const sStats: Record<string, { trades: number; wins: number; losses: number; profit: number }> = {};
+    const sStats: Record<string, { trades: number; wins: number; losses: number; profit: number; strategies: Set<string>; ai_used: boolean }> = {};
     const overall = { trades: 0, wins: 0, losses: 0, profit: 0 };
 
     filteredData.forEach(t => {
@@ -74,14 +74,22 @@ export function AnalyticsView() {
       if (isWin) overall.wins++; else overall.losses++;
       overall.profit += p;
 
-      if (!sStats[sym]) sStats[sym] = { trades: 0, wins: 0, losses: 0, profit: 0 };
+      if (!sStats[sym]) sStats[sym] = { trades: 0, wins: 0, losses: 0, profit: 0, strategies: new Set<string>(), ai_used: false };
       sStats[sym].trades++;
       if (isWin) sStats[sym].wins++; else sStats[sym].losses++;
       sStats[sym].profit += p;
+      if (t.ai_used) sStats[sym].ai_used = true;
+      if (t.agreed_strategies) {
+        t.agreed_strategies.forEach(s => sStats[sym].strategies.add(s));
+      }
     });
 
     return { 
-      symbolStats: Object.entries(sStats).map(([sym, st]) => ({ sym, ...st })).sort((a, b) => a.profit - b.profit),
+      symbolStats: Object.entries(sStats).map(([sym, st]) => ({ 
+        sym, 
+        ...st,
+        strategies: Array.from(st.strategies)
+      })).sort((a, b) => a.profit - b.profit),
       overallStats: overall
     };
   }, [filteredData]);
@@ -381,6 +389,22 @@ export function AnalyticsView() {
                           {s.profit >= 0 ? "+" : ""}{fmtMoney(s.profit)}
                         </span>
                       </div>
+                      
+                      {/* Badges Row */}
+                      {(s.strategies?.length > 0 || s.ai_used) && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {s.ai_used && (
+                            <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
+                              <Bot size={10} /> AI
+                            </div>
+                          )}
+                          {s.strategies?.map((strat) => (
+                            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+                              {strat}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                       <div className="flex justify-between items-end">
                         <div className="flex gap-3 text-[10px] text-white/50 font-medium">
                           <span>{s.trades} savdo</span>

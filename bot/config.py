@@ -9,6 +9,7 @@ class BotConfig:
     # .env values
     anthropic_api_key: str = ""
     kimi_api_key: str = ""
+    openrouter_api_key: str = ""
     mt5_login: int = 0
     mt5_password: str = ""
     mt5_server: str = ""
@@ -66,6 +67,7 @@ class BotConfig:
         load_dotenv(env_path)
         self.anthropic_api_key = os.environ.get("ANTHROPIC_API_KEY", "")
         self.kimi_api_key = os.environ.get("KIMI_API_KEY", "")
+        self.openrouter_api_key = os.environ.get("OPENROUTER_API_KEY", "")
         
         try:
             self.mt5_login = int(os.environ.get("MT5_LOGIN", "0"))

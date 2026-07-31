@@ -83,29 +83,18 @@ def aggregate_signals(
             "reasoning": "Strategiyalar o'rtasida ziddiyat bor yoki kuchli signal topilmadi."
         }
         
-    # 3. Kombinatsiyaga qarab riskni belgilash
-    risk_pct = 0.0
+    # 3. Kombinatsiyaga qarab riskni o'zgartirmaslik (foydalanuvchi so'rovi)
+    risk_pct = getattr(config, "risk_per_trade", 0.02)
     num_strats = len(winner_strategies)
     
-    if num_strats >= 5:
-        risk_pct = 0.05
-    elif num_strats == 4:
-        risk_pct = 0.04
-    elif num_strats == 3:
-        risk_pct = 0.03
-    elif num_strats == 2:
-        risk_pct = 0.02
-    elif num_strats == 1:
-        if allow_single:
-            risk_pct = 0.01
-        else:
-            logger.info("Yakka strategiya signali olingan, ammo ruxsat etilmagan.")
-            return {
-                "signal": "HOLD",
-                "risk_pct": 0.0,
-                "agreed_strategies": list(winner_strategies),
-                "reasoning": "Yakka strategiya signali olingan, ammo ruxsat etilmagan (allow_single_strategy_trade=False)."
-            }
+    if num_strats == 1 and not allow_single:
+        logger.info("Yakka strategiya signali olingan, ammo ruxsat etilmagan.")
+        return {
+            "signal": "HOLD",
+            "risk_pct": 0.0,
+            "agreed_strategies": list(winner_strategies),
+            "reasoning": "Yakka strategiya signali olingan, ammo ruxsat etilmagan (allow_single_strategy_trade=False)."
+        }
             
     if kill_zones_data.get("is_kill_zone") or kill_zones_data.get("is_overlap"):
         risk_pct *= 1.0  # to'liq risk — yuqori volatillik, signal ishonchli vaqt

@@ -13,8 +13,25 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <script type="module" crossorigin src="/assets/index-eawO_jeT.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-DSpJjX1a.css">
+    <script>
+      window.addEventListener('error', function(e) {
+        if (e.target && e.target.nodeName === 'SCRIPT') {
+          console.error("Script load failed:", e.target.src);
+          if (sessionStorage.getItem('script_reload')) return;
+          sessionStorage.setItem('script_reload', 'true');
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for(var i = 0; i < regs.length; i++) { regs[i].unregister(); }
+              window.location.reload(true);
+            });
+          } else {
+            window.location.reload(true);
+          }
+        }
+      }, true);
+    </script>
+    <script type="module" crossorigin src="/assets/index-DJJeKnfa.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BGz_5G6R.css">
   <link rel="manifest" href="/manifest.webmanifest"></head>
   <body>
     <div id="root"></div>

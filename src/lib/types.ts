@@ -56,6 +56,8 @@ export type Position = {
   take_profit: number | null;
   profit: number | null;
   opened_at: string;
+  agreed_strategies?: string[];
+  ai_used?: boolean;
 };
 
 export type PendingOrder = {
@@ -98,4 +100,6 @@ export type TradeHistory = {
   profit: number;
   opened_at: string;
   closed_at: string;
+  agreed_strategies?: string[];
+  ai_used?: boolean;
 };

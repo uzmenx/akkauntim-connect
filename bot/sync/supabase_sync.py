@@ -10,6 +10,9 @@ from typing import Optional, Dict, Any, List
 
 import requests
 import MetaTrader5 as mt5
+import sqlite3
+import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,42 @@ class SupabaseSync:
         except Exception as e:
             logger.error(f"bot-sync POST xatolik: {e}")
             return None
+
+    def _get_decision_metadata(self, ticket: int) -> tuple[List[str], bool]:
+        """Local bazadan ticket bo'yicha strategiyalar va AI ishlatilganligini topadi."""
+        db_path = 'decisions_log.db'
+        if not os.path.exists(db_path):
+            return [], False
+        try:
+            conn = sqlite3.connect(db_path, timeout=5)
+            cur = conn.cursor()
+            cur.execute("SELECT context_json, ai_response FROM ai_decisions WHERE ticket = ? ORDER BY id DESC LIMIT 1", (ticket,))
+            row = cur.fetchone()
+            conn.close()
+            if not row:
+                return [], False
+            
+            ctx = json.loads(row[0]) if row[0] else {}
+            ai_resp_str = row[1]
+            ai_resp = {}
+            if ai_resp_str:
+                try:
+                    ai_resp = json.loads(ai_resp_str)
+                except Exception:
+                    pass
+            
+            ai_used = False
+            if isinstance(ai_resp, dict) and ai_resp.get("signal") in ["BUY", "SELL"]:
+                ai_used = True
+            
+            agreed = []
+            if isinstance(ctx, dict) and "voting_result" in ctx:
+                agreed = ctx["voting_result"].get("agreed_strategies", [])
+                
+            return agreed, ai_used
+        except Exception as e:
+            logger.debug(f"Failed to read decision metadata for {ticket}: {e}")
+            return [], False
 
     def fetch_bot_settings(self) -> dict:
         """Cloud'dan bot sozlamalarini olish."""
@@ -116,6 +155,8 @@ class SupabaseSync:
                                 original_ticket = int(pd.order)
                                 break
 
+                agreed_strategies, ai_used = self._get_decision_metadata(original_ticket)
+
                 closed_rows.append({
                     "ticket": original_ticket,
                     "symbol": d.symbol,
@@ -128,6 +169,8 @@ class SupabaseSync:
                     "closed_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
                     "mt5_comment": str(d.comment) if getattr(d, 'comment', None) else "",
                     "mt5_reason": int(d.reason) if hasattr(d, 'reason') else None,
+                    "agreed_strategies": agreed_strategies,
+                    "ai_used": ai_used
                 })
         self.last_sync_time = datetime.datetime.now()
 

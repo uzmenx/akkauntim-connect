@@ -1,13 +1,19 @@
 import React, { useMemo } from 'react';
 import { TradeHistory } from '@/lib/types';
 import { fmtMoney } from '@/lib/utils';
+import { Activity, TrendingUp, TrendingDown, Percent } from 'lucide-react';
 
 interface BalanceTrendChartProps {
   history: TradeHistory[];
   currentBalance: number;
+  stats?: {
+    todayCount: number;
+    todayPL: number;
+    wr: number | null;
+  };
 }
 
-export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChartProps) {
+export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTrendChartProps) {
   const { points, startBalance, endBalance, startTime, endTime, path, fillPath, segments = [] } = useMemo(() => {
     if (!history || history.length === 0) {
       return {
@@ -193,6 +199,36 @@ export function BalanceTrendChart({ history, currentBalance }: BalanceTrendChart
       onTouchEnd={onMouseLeave}
       className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
     >
+      {stats && (
+        <div className="absolute top-2 left-3.5 right-3.5 z-10 flex items-center justify-between pointer-events-none">
+          <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full backdrop-blur-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+            <span className="text-[8px] font-bold text-white/50 tracking-wider uppercase">TREND</span>
+          </div>
+          <div className="flex items-center gap-3 bg-white/5 border border-white/10 px-2.5 py-0.5 rounded-full backdrop-blur-md pointer-events-auto select-none">
+            <div className="flex items-center gap-1.5 text-white/80" title="Savdolar soni">
+              <Activity size={10} className="text-blue-400" />
+              <span className="text-[10px] font-bold leading-none">{stats.todayCount}</span>
+            </div>
+            <div className="w-[1px] h-2.5 bg-white/10" />
+            <div className="flex items-center gap-1.5" title="Bugungi P/L">
+              {stats.todayPL >= 0 ? (
+                <TrendingUp size={10} className="text-emerald-400" />
+              ) : (
+                <TrendingDown size={10} className="text-rose-400" />
+              )}
+              <span className={`text-[10px] font-bold leading-none ${stats.todayPL >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {stats.todayPL >= 0 ? "+" : ""}{fmtMoney(stats.todayPL)}
+              </span>
+            </div>
+            <div className="w-[1px] h-2.5 bg-white/10" />
+            <div className="flex items-center gap-1.5 text-white/80" title="Win Rate">
+              <Percent size={9} className="text-purple-400" />
+              <span className="text-[10px] font-bold leading-none">{stats.wr != null ? `${stats.wr}%` : "0%"}</span>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Background SVG Grid / Glow */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl"></div>

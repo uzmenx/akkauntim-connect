@@ -33,6 +33,7 @@ from bot.engine.close_mechanism_classifier import classify_close_mechanism
 from bot.engine.blackbox_exporter import export_blackbox_json
 from bot.strategy.news.straddle import check_and_place_straddle, cleanup_straddle_orders, refresh_straddle_for_delayed_news
 from bot.strategy.news.fundamental import execute_fundamental_method
+from bot.sync.job_listener import JobListener
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +87,9 @@ class TradingBot:
         # Inyect dependencies into AIClient
         self.ai.sync = self.sync
         self.ai.telegram = self.telegram
+        
+        # Web orqali yuboriladigan vazifalar (backtest) tinglovchisi
+        self.job_listener = JobListener(config)
 
         # Batch Processing holati
         self.current_symbol_index = 0
@@ -518,20 +522,45 @@ class TradingBot:
             gate_state=gate_state,
         )
 
-        if not call_needed:
-            logger.info(f"[{symbol}] AI chaqiruvi o'tkazib yuborildi ({gate_reason}). "
-                        f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
-            return  # Bu tsikl uchun HOLD bilan bir xil natija — yangi bitim ochilmaydi
+        ai_decision = None
+        if not getattr(self.config, "ai_enabled", True):
+            logger.warning(f"[{symbol}] ⚙️ AI-siz rejim faol! Faqat algoritmik qaror chiqariladi.")
         else:
-            logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
+            if not call_needed:
+                logger.info(f"[{symbol}] AI chaqiruvi o'tkazib yuborildi ({gate_reason}). "
+                            f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
+                return  # Bu tsikl uchun HOLD bilan bir xil natija
+            else:
+                logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
+    
+            prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
+            logger.info(f"[{symbol}] AI Agent ga bozor tahlili yuborilmoqda...")
+            
+            ai_decision = self.ai.get_decision(prompt)
+            if not ai_decision:
+                logger.error(f"[{symbol}] AI javob bermadi! AI-siz algoritmik rejimga o'tilmoqda.")
 
-        prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
-        logger.info(f"[{symbol}] AI Agent ga bozor tahlili yuborilmoqda...")
-        
-        ai_decision = self.ai.get_decision(prompt)
         if not ai_decision:
-            logger.error(f"[{symbol}] AI javob bermadi — savdo bekor qilindi.")
-            return
+            # Fallback to pure algorithmic decision based on voting_result
+            final_signal = voting_result.get("signal", "HOLD")
+            ai_decision = {
+                "decision": final_signal,
+                "confidence": voting_result.get("score", 0),
+                "reasoning": f"⚙️ [AI-siz Rejim] Sof algoritmik xulosa (Ball: {voting_result.get('score', 0)})",
+                "risk_pct": self.config.risk_per_trade,
+                "entry_price": current_price
+            }
+            
+            # Simple algorithmic SL/TP placement if BUY/SELL
+            pip_div = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
+            default_sl_pips = getattr(self.config, "default_sl_pips", 30)
+            
+            if final_signal in ["BUY", "LIMIT_BUY"]:
+                ai_decision["stop_loss"] = current_price - (default_sl_pips * pip_div)
+                ai_decision["take_profit"] = current_price + ((default_sl_pips * 2) * pip_div)
+            elif final_signal in ["SELL", "LIMIT_SELL"]:
+                ai_decision["stop_loss"] = current_price + (default_sl_pips * pip_div)
+                ai_decision["take_profit"] = current_price - ((default_sl_pips * 2) * pip_div)
 
         final_decision = ai_decision.get("decision", "HOLD")
         reasoning_text = ai_decision.get("reasoning", "")
@@ -563,7 +592,7 @@ class TradingBot:
 
             try:
                 self.sync.log_ai_signal(
-                    symbol=symbol, signal="HOLD", confidence=80, reasoning=ai_decision.get("reasoning", ""),
+                    symbol=symbol, signal="HOLD", confidence=ai_decision.get("confidence", 80), reasoning=ai_decision.get("reasoning", ""),
                     entry_price=None, sl_price=None, tp_price=None, rr_ratio=0.0,
                     stop_loss_pips=0.0, take_profit_pips=0.0
                 )
@@ -749,6 +778,9 @@ class TradingBot:
             return
 
         self._running = True
+        
+        # Job Listener (Veb orqali backtest boshlash u-n) ni ishga tushirish
+        self.job_listener.start()
 
         try:
             while self._running:
@@ -942,6 +974,10 @@ class TradingBot:
                 self.sync.sync_all(self.mt5, is_running=False, message="Bot stopped")
             except Exception:
                 pass
+            
+            # Job listener'ni to'xtatamiz
+            self.job_listener.stop()
+            
             self.mt5.disconnect()
             logger.info("🛑 Bot to'xtadi.")
 

@@ -27,10 +27,51 @@ const MINOR_TIMEFRAME_OPTIONS = [
 ];
 
 const AI_MODEL_OPTIONS = [
-  { value: "auto", label: "Avto" },
-  { value: "kimi-k3", label: "Faqat - Kimi K3" },
-  { value: "claude-sonnet-5", label: "Faqat - Claude Sonnet 5" },
-  { value: "claude-haiku-4-5", label: "Faqat - Claude Haiku 4.5" },
+  { value: "auto", label: "Avtomatik (Smart AI Tanlash)" },
+  
+  // Eskilari (Direct API)
+  { value: "claude-sonnet-5", label: "01. Claude Sonnet 3.5 (Direct API) - $3.00 / $15.00" },
+  { value: "kimi-k3", label: "02. Kimi K3 (Direct API) - $0.06 / $0.06" },
+  { value: "claude-haiku-4-5", label: "03. Claude Haiku 3.5 (Direct API) - $0.80 / $4.00" },
+
+  // OpenRouter - Top Tier (Eng kuchli modellar)
+  { value: "openrouter/openai/o1-preview", label: "04. OpenAI o1 Preview - $15.00 / $60.00" },
+  { value: "openrouter/anthropic/claude-3.5-sonnet", label: "05. Claude 3.5 Sonnet - $3.00 / $15.00" },
+  { value: "openrouter/openai/gpt-4o", label: "06. GPT-4o - $5.00 / $15.00" },
+  { value: "openrouter/anthropic/claude-3-opus", label: "07. Claude 3 Opus - $15.00 / $75.00" },
+  { value: "openrouter/google/gemini-1.5-pro", label: "08. Gemini 1.5 Pro - $3.50 / $10.50" },
+  { value: "openrouter/meta-llama/llama-3.1-405b-instruct", label: "09. Llama 3.1 (405B) - $3.00 / $3.00" },
+  { value: "openrouter/openai/gpt-4-turbo", label: "10. GPT-4 Turbo - $10.00 / $30.00" },
+  
+  // OpenRouter - High Tier (Tez va aqlli modellar)
+  { value: "openrouter/mistralai/mistral-large-2407", label: "11. Mistral Large 2 - $2.00 / $6.00" },
+  { value: "openrouter/x-ai/grok-2-1212", label: "12. Grok 2 - $2.00 / $10.00" },
+  { value: "openrouter/cohere/command-r-plus", label: "13. Cohere Command R+ - $3.00 / $15.00" },
+  { value: "openrouter/openai/o1-mini", label: "14. OpenAI o1 Mini - $3.00 / $12.00" },
+  { value: "openrouter/nvidia/nemotron-4-340b-instruct", label: "15. Nemotron-4 340B - $4.00 / $4.00" },
+  { value: "openrouter/nousresearch/hermes-3-llama-3.1-405b", label: "16. Hermes 3 (405B) - $3.00 / $3.00" },
+
+  // OpenRouter - Mid Tier (Arzon va tez modellar)
+  { value: "openrouter/qwen/qwen-2.5-72b-instruct", label: "17. Qwen 2.5 (72B) - $0.35 / $0.40" },
+  { value: "openrouter/meta-llama/llama-3.2-90b-vision-instruct", label: "18. Llama 3.2 (90B Vision) - $0.80 / $0.80" },
+  { value: "openrouter/meta-llama/llama-3.1-70b-instruct", label: "19. Llama 3.1 (70B) - $0.60 / $0.60" },
+  { value: "openrouter/deepseek/deepseek-chat", label: "20. DeepSeek V3 - $0.14 / $0.28" },
+  { value: "openrouter/deepseek/deepseek-coder", label: "21. DeepSeek Coder - $0.14 / $0.28" },
+  { value: "openrouter/mistralai/mixtral-8x22b-instruct", label: "22. Mixtral 8x22B - $0.90 / $0.90" },
+  { value: "openrouter/microsoft/wizardlm-2-8x22b", label: "23. WizardLM-2 8x22B - $0.50 / $0.50" },
+
+  // OpenRouter - Fast & Cheap Tier (Juda arzon va tezkor)
+  { value: "openrouter/anthropic/claude-3.5-haiku", label: "24. Claude 3.5 Haiku - $0.80 / $4.00" },
+  { value: "openrouter/openai/gpt-4o-mini", label: "25. GPT-4o Mini - $0.15 / $0.60" },
+  { value: "openrouter/qwen/qwen-2.5-coder-32b-instruct", label: "26. Qwen 2.5 Coder (32B) - $0.15 / $0.15" },
+  
+  // OpenRouter - Free / Almost Free Tier (Tekin yoki juda arzon)
+  { value: "openrouter/google/gemini-1.5-flash", label: "27. Gemini 1.5 Flash - $0.07 / $0.30" },
+  { value: "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free", label: "28. Nemotron 3 Ultra (550B) - $0.00 / $0.00" },
+  { value: "openrouter/poolside/laguna-m.1:free", label: "29. Laguna M.1 (Kodlash) - $0.00 / $0.00" },
+  { value: "openrouter/cohere/north-mini-code:free", label: "30. North Mini Code - $0.00 / $0.00" },
+  { value: "openrouter/poolside/laguna-xs-2.1:free", label: "31. Laguna XS 2.1 - $0.00 / $0.00" },
+  { value: "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free", label: "32. Nemotron Nano Omni - $0.00 / $0.00" },
 ];
 
 const ASSET_CATEGORIES: Record<string, string[]> = {
@@ -38,6 +79,7 @@ const ASSET_CATEGORIES: Record<string, string[]> = {
   Crypto: ["BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD", "ADAUSD", "DOGEUSD", "BNBUSD", "LTCUSD", "LINKUSD"],
   Indices: ["US30", "SPX500", "NAS100", "GER40", "UK100", "JPN225"],
   Metals: ["XAUUSD", "XAGUSD"],
+  Stock: ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "NVDA"],
 };
 
 export function SettingsPage() {
@@ -87,11 +129,6 @@ export function SettingsPage() {
       if (current.includes(sym)) {
         return { ...f, symbols: current.filter(s => s !== sym) };
       } else {
-        if (current.length >= 3) {
-          setToastMsg("Maksimal 3 ta juftlik tanlash mumkin!");
-          setTimeout(() => setToastMsg(""), 3000);
-          return f;
-        }
         return { ...f, symbols: [...current, sym] };
       }
     });
@@ -319,7 +356,7 @@ export function SettingsPage() {
               </div>
             ) : (
               <div>
-                <label className="mb-2 mt-3 block text-[10px] font-semibold text-fg-muted">Qo'lda tanlash (Maks: 3)</label>
+                <label className="mb-2 mt-3 block text-[10px] font-semibold text-fg-muted">Qo'lda tanlash</label>
                 <div 
                   onClick={() => setIsSymbolModalOpen(true)}
                   className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-fg cursor-pointer hover:bg-white/5 transition-all flex items-center justify-between"
@@ -331,7 +368,7 @@ export function SettingsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] bg-brand/20 text-brand px-2 py-0.5 rounded-full">
-                      {form.symbols?.filter(s => s !== "AUTO").length || 0}/3
+                      {form.symbols?.filter(s => s !== "AUTO").length || 0} ta
                     </span>
                     <ListPlus size={16} className="text-brand opacity-80" />
                   </div>
@@ -395,12 +432,14 @@ export function SettingsPage() {
           </div>
 
           <div className="py-3">
-            <p className="text-xs font-semibold text-white/90 mb-2">AI Modeli</p>
+            <p className="text-xs font-semibold text-white/90 mb-2">AI Modeli (3 tagacha tanlash mumkin)</p>
             <CustomSelect
               options={AI_MODEL_OPTIONS}
               value={form.ai_model ?? "auto"}
               onChange={(v) => setForm((f) => ({ ...f, ai_model: v }))}
               placeholder="Modelni tanlang..."
+              multiple={true}
+              maxCount={3}
             />
           </div>
 
@@ -471,7 +510,7 @@ export function SettingsPage() {
             <div className="flex justify-between items-center p-5 border-b border-white/5 relative">
               <div>
                 <h2 className="text-lg font-bold text-white">Juftliklarni Tanlash</h2>
-                <p className="text-xs text-brand/80">Eng ko'pi bilan 3 ta juftlik tanlashingiz mumkin.</p>
+                <p className="text-xs text-brand/80">Istalgancha juftlik tanlashingiz mumkin.</p>
               </div>
               <button 
                 onClick={() => setIsSymbolModalOpen(false)}
@@ -505,12 +544,40 @@ export function SettingsPage() {
               ))}
             </div>
 
+            {/* Select/Deselect All Buttons */}
+            <div className="flex justify-between items-center px-4 pt-3 pb-1">
+              <button 
+                onClick={() => {
+                  const currentCatSymbols = ASSET_CATEGORIES[activeCategory];
+                  setForm(f => {
+                    const current = f.symbols || [];
+                    const filtered = current.filter(s => !currentCatSymbols.includes(s));
+                    return { ...f, symbols: [...filtered, ...currentCatSymbols] };
+                  });
+                }}
+                className="text-xs text-brand hover:text-white transition-all font-semibold"
+              >
+                + Barchasini tanlash
+              </button>
+              <button 
+                onClick={() => {
+                  const currentCatSymbols = ASSET_CATEGORIES[activeCategory];
+                  setForm(f => {
+                    const current = f.symbols || [];
+                    return { ...f, symbols: current.filter(s => !currentCatSymbols.includes(s)) };
+                  });
+                }}
+                className="text-xs text-red-400 hover:text-red-300 transition-all font-semibold"
+              >
+                - Barchasini o'chirish
+              </button>
+            </div>
+
             {/* Symbols Grid */}
             <div className="p-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
                 {ASSET_CATEGORIES[activeCategory].map((sym) => {
                   const isSelected = (form.symbols || []).includes(sym);
-                  const isMaxedOut = !isSelected && (form.symbols || []).length >= 3;
                   return (
                     <div 
                       key={sym}
@@ -518,9 +585,7 @@ export function SettingsPage() {
                       className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
                         isSelected 
                           ? "bg-brand/10 border-brand/50 shadow-[0_0_15px_rgba(37,99,235,0.15)]" 
-                          : isMaxedOut
-                            ? "bg-white/5 border-transparent opacity-50 cursor-not-allowed"
-                            : "bg-white/5 border-transparent hover:bg-white/10"
+                          : "bg-white/5 border-transparent hover:bg-white/10"
                       }`}
                     >
                       <span className={`text-sm font-bold ${isSelected ? "text-brand" : "text-white"}`}>
@@ -543,7 +608,7 @@ export function SettingsPage() {
                 onClick={() => setIsSymbolModalOpen(false)}
                 className="w-full py-6 rounded-2xl bg-gradient-to-r from-[#2563eb] to-[#0434b6] hover:brightness-110 shadow-[0_0_20px_rgba(37,99,235,0.3)] text-white font-bold"
               >
-                Tasdiqlash ({(form.symbols || []).length}/3)
+                Tasdiqlash ({(form.symbols || []).length} ta)
               </Button>
             </div>
           </div>

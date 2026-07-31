@@ -5,7 +5,7 @@ import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
   Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -222,29 +222,9 @@ export function DashboardPage() {
 
       <div className="w-full h-full mx-auto px-4 pt-[max(env(safe-area-inset-top),0.75rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)] relative z-10 flex flex-col gap-2">
         
-        {/* Top 8%: Balance Trend Chart */}
-        <div className="h-[8dvh] min-h-[50px] shrink-0 w-full animate-in fade-in slide-in-from-top-4 duration-500">
-           <BalanceTrendChart history={history.data || []} currentBalance={Number(equity || 0)} />
-        </div>
-
-        {/* Stats Row 5%: Minimalist, Modern, Premium Stats Bar */}
-        <div className="h-[5dvh] min-h-[40px] shrink-0 w-full bg-[#10192e]/45 border border-white/5 rounded-2xl flex items-center justify-around text-center px-4 animate-in fade-in slide-in-from-top-3 duration-600 backdrop-blur-md shadow-lg shadow-black/10">
-          <div className="flex flex-col">
-            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">SAVDOLAR</span>
-            <span className="text-xs font-black text-white/95 mt-0.5">{stats.todayCount}</span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-white/10" />
-          <div className="flex flex-col">
-            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">UMUMIY P/L</span>
-            <span className={`text-xs font-black tabular-nums mt-0.5 ${stats.todayPL >= 0 ? "text-emerald-400" : "text-rose-500"}`}>
-              {stats.todayPL >= 0 ? "+" : ""}{fmtMoney(stats.todayPL)}
-            </span>
-          </div>
-          <div className="w-[1px] h-3.5 bg-white/10" />
-          <div className="flex flex-col">
-            <span className="text-[8px] text-white/40 font-bold uppercase tracking-widest">WIN RATE</span>
-            <span className="text-xs font-black text-white/95 mt-0.5">{stats.wr != null ? `${stats.wr}%` : "0%"}</span>
-          </div>
+        {/* Unified Balance Trend Chart & Minimalist Stats */}
+        <div className="h-[11dvh] min-h-[85px] shrink-0 w-full animate-in fade-in slide-in-from-top-4 duration-500">
+           <BalanceTrendChart history={history.data || []} currentBalance={Number(equity || 0)} stats={stats} />
         </div>
 
         {isGuest && (
@@ -336,8 +316,8 @@ export function DashboardPage() {
             ))}
           </a>
 
-          {/* 4 Action Buttons Row */}
-          <div className="flex gap-1.5 min-[360px]:gap-2 w-full items-center justify-between mt-auto px-1">
+          {/* Action Buttons Row */}
+          <div className="flex gap-1.5 min-[360px]:gap-2 w-full items-center overflow-x-auto no-scrollbar mt-auto px-1 pb-1">
             {/* Button 1: Settings */}
             <Link to="/settings" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),inset_0_-2px_4px_rgba(0,0,0,0.3),0_4px_12px_rgba(71,85,105,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white/90 transition-all group border border-slate-500/50" aria-label="Settings">
               <Settings size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:rotate-90 transition-transform duration-500" />
@@ -377,6 +357,11 @@ export function DashboardPage() {
             {/* Button 5: Shadow Learning AI */}
             <Link to="/shadow-learning" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(20,184,166,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-teal-300/50" aria-label="Shadow Learning AI">
               <Brain size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
+            </Link>
+            
+            {/* Button 6: Backtest */}
+            <Link to="/backtest" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(244,63,94,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-pink-400/50" aria-label="Backtest">
+              <FlaskConical size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
             </Link>
           </div>
         </div>
@@ -555,8 +540,8 @@ function PositionRow({ p }: { p: Position }) {
   const isBuy = String(p.side).toUpperCase() === "BUY";
   const profit = Number(p.profit ?? 0);
   return (
-    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3">
-      <div className="flex items-center justify-between mb-2">
+    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
             {isBuy ? "BUY" : "SELL"}
@@ -568,7 +553,24 @@ function PositionRow({ p }: { p: Position }) {
           {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
         </span>
       </div>
-      <div className="grid grid-cols-4 gap-1 text-[10px]">
+      
+      {/* Badges Row */}
+      {(p.agreed_strategies?.length || p.ai_used) ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {p.ai_used && (
+            <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
+              <Bot size={10} /> AI
+            </div>
+          )}
+          {p.agreed_strategies?.map((strat) => (
+            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+              {strat}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-4 gap-1 text-[10px] mt-1">
         <MiniField label="Open" value={fmtNum(p.open_price, 5)} />
         <MiniField label="Now" value={fmtNum(p.current_price, 5)} />
         <MiniField label="SL" value={p.stop_loss ? fmtNum(p.stop_loss, 5) : "—"} tone={p.stop_loss ? "danger" : undefined} />
@@ -605,17 +607,35 @@ function HistoryRow({ t }: { t: TradeHistory }) {
   const isBuy = String(t.side).toUpperCase() === "BUY";
   const profit = Number(t.profit ?? 0);
   return (
-    <div className="rounded-2xl bg-[#10192e]/60 backdrop-blur-md border border-white/5 p-3 flex items-center justify-between">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
-          {isBuy ? "BUY" : "SELL"}
+    <div className="rounded-2xl bg-[#10192e]/60 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
+            {isBuy ? "BUY" : "SELL"}
+          </span>
+          <span className="text-sm font-bold text-white truncate">{t.symbol}</span>
+          <span className="text-[10px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
+        </div>
+        <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+          {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
         </span>
-        <span className="text-sm font-bold text-white truncate">{t.symbol}</span>
-        <span className="text-[10px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
       </div>
-      <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-        {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
-      </span>
+      
+      {/* Badges Row */}
+      {(t.agreed_strategies?.length || t.ai_used) ? (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {t.ai_used && (
+            <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
+              <Bot size={10} /> AI
+            </div>
+          )}
+          {t.agreed_strategies?.map((strat) => (
+            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+              {strat}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

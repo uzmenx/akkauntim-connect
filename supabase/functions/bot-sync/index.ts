@@ -65,6 +65,8 @@ type Body = {
     profit: number;
     opened_at: string;
     closed_at: string;
+    agreed_strategies?: string[];
+    ai_used?: boolean;
   }>;
 };
 

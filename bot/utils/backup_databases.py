@@ -47,7 +47,10 @@ def backup_databases(config, databases=None):
                     
                 logger.info(f"{db_file} zaxirasi Supabase'ga muvaffaqiyatli yuklandi: {remote_path}")
             except Exception as ex:
-                logger.error(f"{db_file} ni zaxiralashda xatolik: {ex}")
+                if "Invalid Compact JWS" in str(ex):
+                    logger.error(f"{db_file} ni zaxiralashda xatolik: SUPABASE_PUBLISHABLE_KEY haqiqiy JWT formati emas. Iltimos, .env faylidagi kalitni Supabase panelidagi to'g'ri 'anon' 'public' JWT kalitiga almashtiring.")
+                else:
+                    logger.error(f"{db_file} ni zaxiralashda xatolik: {ex}")
                 success = False
             finally:
                 # Local zip ni o'chirish

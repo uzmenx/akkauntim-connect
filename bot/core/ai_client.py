@@ -16,6 +16,7 @@ class AIClient:
         self.total_tokens_in = 0
         self.total_tokens_out = 0
         self.total_cost = 0.0
+        self.consecutive_failures = 0
 
     @staticmethod
     def _extract_json(text: str) -> Dict[str, Any]:
@@ -51,6 +52,8 @@ class AIClient:
             in_price, out_price = 0.25, 1.25
         elif "haiku" in m:  # Haiku 4.x
             in_price, out_price = 0.80, 4.00
+        elif "openrouter" in m:
+            in_price, out_price = 0.5, 2.0  # Default approx for OpenRouter
         else:  # Sonnet 3.5 / 4.x default
             in_price, out_price = 3.0, 15.0
         return (input_tokens * in_price / 1_000_000.0) + (output_tokens * out_price / 1_000_000.0)
@@ -63,12 +66,18 @@ class AIClient:
         medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
         weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
         
-        if selected_model == "claude-sonnet-5":
+        if "," in selected_model:
+            models_to_try = [m.strip() for m in selected_model.split(",") if m.strip()]
+        elif selected_model == "auto":
+            models_to_try = [medium, weak]
+        elif selected_model == "claude-sonnet-5":
             models_to_try = [medium]
         elif selected_model == "claude-haiku-4-5":
             models_to_try = [weak]
-        else: # "auto" or anything else
-            models_to_try = [medium, weak]
+        elif selected_model == "kimi-k3":
+            models_to_try = ["kimi-k3"]
+        else:
+            models_to_try = [selected_model, weak]
             
         models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
 
@@ -101,7 +110,7 @@ class AIClient:
                         if max_tok:
                             payload["max_tokens"] = max_tok
                             
-                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=120)
+                        resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=180)
                         if resp.status_code != 200:
                             raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
                             
@@ -109,6 +118,42 @@ class AIClient:
                         content = rdata["choices"][0]["message"]["content"]
                         in_tok = rdata.get("usage", {}).get("prompt_tokens", 0)
                         out_tok = rdata.get("usage", {}).get("completion_tokens", 0)
+                    elif model.startswith("openrouter/"):
+                        if not getattr(self.config, "openrouter_api_key", None):
+                            raise Exception("OPENROUTER_API_KEY is required for OpenRouter models")
+                        
+                        or_model = model.replace("openrouter/", "")
+                        headers = {
+                            "Authorization": f"Bearer {self.config.openrouter_api_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://akkauntim-connect.com", 
+                            "X-Title": "Akkauntim Connect Bot"
+                        }
+                        msgs = []
+                        if sys_prompt:
+                            msgs.append({"role": "system", "content": sys_prompt})
+                        msgs.append({"role": "user", "content": prompt})
+                        
+                        payload = {
+                            "model": or_model,
+                            "messages": msgs
+                        }
+                        if max_tok:
+                            payload["max_tokens"] = max_tok
+                            
+                        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=180)
+                        if resp.status_code != 200:
+                            raise Exception(f"OpenRouter Error {resp.status_code}: {resp.text}")
+                            
+                        rdata = resp.json()
+                        content = rdata["choices"][0]["message"]["content"]
+                        in_tok = rdata.get("usage", {}).get("prompt_tokens", 0)
+                        out_tok = rdata.get("usage", {}).get("completion_tokens", 0)
+                        
+                        # Use total_cost if openrouter provides it, else fallback
+                        or_cost = rdata.get("usage", {}).get("total_cost", 0)
+                        if or_cost > 0:
+                            self._or_cost = or_cost
                     else:
                         if not self.client:
                             raise Exception("Anthropic API key is not configured or invalid.")
@@ -116,6 +161,7 @@ class AIClient:
                             "model": model,
                             "max_tokens": max_tok,
                             "messages": [{"role": "user", "content": prompt}],
+                            "timeout": 180,
                             "tools": [{
                                 "type": "web_search_20250305",
                                 "name": "web_search",
@@ -136,18 +182,33 @@ class AIClient:
                     self.total_tokens_in += in_tok
                     self.total_tokens_out += out_tok
                     
-                    cost = self._calculate_cost(model, in_tok, out_tok)
+                    cost = getattr(self, "_or_cost", None)
+                    if cost is not None:
+                        delattr(self, "_or_cost")
+                    else:
+                        cost = self._calculate_cost(model, in_tok, out_tok)
                     
-                    # Web search cost calculation
-                    search_cost = 0.0
-                    for b in response.content:
-                        b_type = getattr(b, "type", "")
-                        if b_type == "server_tool_use":
-                            b_dict = b.model_dump() if hasattr(b, "model_dump") else (b.__dict__ if hasattr(b, "__dict__") else (b if isinstance(b, dict) else {}))
-                            reqs = b_dict.get("web_search_requests", 1)
-                            search_cost += reqs * 0.01
-                        elif b_type == "tool_use" and getattr(b, "name", "") == "web_search":
-                            search_cost += 0.01
+                    # To'g'ri web search cost hisob-kitobi (response.usage.server_tool_use orqali)
+                    web_searches = 0
+                    if hasattr(response, "usage") and response.usage:
+                        usage_dict = response.usage.model_dump() if hasattr(response.usage, "model_dump") else (response.usage.__dict__ if hasattr(response.usage, "__dict__") else (response.usage if isinstance(response.usage, dict) else {}))
+                        server_tool_usage = usage_dict.get("server_tool_use", {})
+                        if getattr(response.usage, "server_tool_use", None):
+                            # In newer anthropic versions, server_tool_use might be an object
+                            stu = response.usage.server_tool_use
+                            stu_dict = stu.model_dump() if hasattr(stu, "model_dump") else (stu.__dict__ if hasattr(stu, "__dict__") else (stu if isinstance(stu, dict) else {}))
+                            web_searches = stu_dict.get("web_search_requests", 0)
+                        elif isinstance(server_tool_usage, dict):
+                            web_searches = server_tool_usage.get("web_search_requests", 0)
+                            
+                    # Eski formatdagi tool_use fallback
+                    if web_searches == 0:
+                        for b in response.content:
+                            b_type = getattr(b, "type", "")
+                            if b_type == "tool_use" and getattr(b, "name", "") == "web_search":
+                                web_searches += 1
+                                
+                    search_cost = web_searches * 0.01
                             
                     cost += search_cost
                     self.total_cost += cost
@@ -156,6 +217,8 @@ class AIClient:
                     parsed_json = self._extract_json(content)
                     if parsed_json and isinstance(parsed_json, dict):
                         parsed_json["_web_search_used"] = int(search_cost / 0.01)
+                    
+                    self.consecutive_failures = 0
                     return parsed_json
                     
                 except anthropic.RateLimitError as e:
@@ -171,7 +234,8 @@ class AIClient:
                 except Exception as e:
                     # Boshqa xatoliklar (masalan API key xato bo'lsa yoki 500 error)
                     # not_found_error bo'lsa tekshiramiz
-                    if "not_found_error" in str(e):
+                    err_str = str(e)
+                    if "not_found_error" in err_str or "No endpoints found" in err_str or "404" in err_str:
                         self.logger.warning(f"Model {model} mavjud emas. Keyingi modelga o'tilmoqda...")
                         last_exception = e
                         break
@@ -182,20 +246,32 @@ class AIClient:
                         time.sleep(2)
                 
         self.logger.error(f"Hech qaysi AI modeli ishlamadi. Oxirgi xato: {last_exception}")
-        self._trigger_all_models_failed_alert(last_exception)
+        
+        self.consecutive_failures += 1
+        if self.consecutive_failures >= 3 and len(models_to_try) == 1:
+            self.logger.critical("Ketma-ket 3 marta AI ishlamadi. Avtomatik AI-siz rejimga o'tilmoqda!")
+            self.config.ai_enabled = False
+            self.consecutive_failures = 0
+            if getattr(self, "telegram", None):
+                try:
+                    self.telegram.send_message("⚠️ AI Ketma-ket 3 marta ishlamadi. Bot avtomatik AI-siz rejimga o'tdi.")
+                except Exception:
+                    pass
+                    
+        self._trigger_all_models_failed_alert(last_exception, models_to_try)
         return None
 
-    def _trigger_all_models_failed_alert(self, last_exception: Optional[Exception]):
-        medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
-        weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
-        msg = f"Ikkala model (o'rta: {medium}, kuchsiz: {weak}) ham ishlamadi — savdo qarorlari to'xtatildi"
+    def _trigger_all_models_failed_alert(self, last_exception: Optional[Exception], models_tried: list = None):
+        if not models_tried:
+            models_tried = []
+        msg = f"Quyidagi modellar ishlamadi: {', '.join(models_tried)} — savdo qarorlari to'xtatildi"
         
         self.logger.critical(msg)
         
         telegram = getattr(self, "telegram", None)
         if telegram:
             try:
-                telegram.send_message(f"🚨 IKKALA AI MODEL ISHLAMAYAPTI (o'rta va kuchsiz) — savdo qarorlari to'xtatildi\nXato: {last_exception}")
+                telegram.send_message(f"🚨 AI MODELLAR ISHLAMAYAPTI ({', '.join(models_tried)})\nXato: {last_exception}")
             except Exception as e:
                 self.logger.error(f"Telegram alert xatosi: {e}")
                 
@@ -215,12 +291,18 @@ class AIClient:
         medium = getattr(self.config, "ai_model_medium", "claude-sonnet-5")
         weak = getattr(self.config, "ai_model_weak", "claude-haiku-4-5-20251001")
         
-        if selected_model == "claude-sonnet-5":
+        if "," in selected_model:
+            models_to_try = [m.strip() for m in selected_model.split(",") if m.strip()]
+        elif selected_model == "auto":
+            models_to_try = [weak, medium]
+        elif selected_model == "claude-sonnet-5":
             models_to_try = [medium]
         elif selected_model == "claude-haiku-4-5":
             models_to_try = [weak]
-        else: # "auto"
-            models_to_try = [weak, medium]
+        elif selected_model == "kimi-k3":
+            models_to_try = ["kimi-k3"]
+        else:
+            models_to_try = [selected_model, weak]
             
         models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
 
@@ -253,6 +335,32 @@ class AIClient:
                             raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
                         content = resp.json()["choices"][0]["message"]["content"]
                         return content.strip()
+                    elif model.startswith("openrouter/"):
+                        if not getattr(self.config, "openrouter_api_key", None):
+                            raise Exception("OPENROUTER_API_KEY is required for OpenRouter models")
+                        
+                        or_model = model.replace("openrouter/", "")
+                        headers = {
+                            "Authorization": f"Bearer {self.config.openrouter_api_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://akkauntim-connect.com", 
+                            "X-Title": "Akkauntim Connect Bot"
+                        }
+                        msgs = []
+                        if system_prompt:
+                            msgs.append({"role": "system", "content": system_prompt})
+                        msgs.append({"role": "user", "content": prompt})
+                        
+                        payload = {
+                            "model": or_model,
+                            "messages": msgs,
+                            "max_tokens": max_tokens
+                        }
+                        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=120)
+                        if resp.status_code != 200:
+                            raise Exception(f"OpenRouter Error {resp.status_code}: {resp.text}")
+                        content = resp.json()["choices"][0]["message"]["content"]
+                        return content.strip()
                     else:
                         if not self.client:
                             raise Exception("Anthropic API key is not configured or invalid.")
@@ -274,6 +382,9 @@ class AIClient:
                 except Exception as e:
                     self.logger.error(f"Failed to get simple response with {model} (attempt {attempt+1}): {e}")
                     last_exception = e
+                    err_str = str(e)
+                    if "not_found_error" in err_str or "No endpoints found" in err_str or "404" in err_str:
+                        break
                     if attempt < retries - 1:
                         time.sleep(2)
         
