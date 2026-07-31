@@ -128,8 +128,8 @@ class AIStrategist:
 
         content_hash = hashlib.md5(content.encode()).hexdigest()
 
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            cursor = conn.cursor()
 
         try:
             cursor.execute(
@@ -141,13 +141,10 @@ class AIStrategist:
                 (title, author, language, str(file_path), content_hash, category, datetime.now().isoformat()),
             )
             source_id = cursor.lastrowid
-            conn.commit()
+                conn.commit()
         except sqlite3.IntegrityError:
             print(f"⚠️ '{title}' allaqachon mavjud (bir xil kontent)")
-            conn.close()
             return False
-
-        conn.close()
 
         print(f"✅ Qo'shildi: '{title}' ({language}), {len(content)} belgi")
         print("🔄 Tahlil qilinmoqda (bu bir necha daqiqa davom etishi mumkin)...")
@@ -156,9 +153,6 @@ class AIStrategist:
     def _process_source(self, source_id: int, content: str):
         chunks = self._chunk_text(content, max_chars=4000)
         insights_saved = 0
-
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
 
         for i, chunk in enumerate(chunks):
             prompt = f"""Siz professional trading strategiyasi tahlilchisisiz.
@@ -200,13 +194,16 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
             setup_type = data.get("setup_type", "unknown")
 
             # 1. SQLite'ga saqlash
-            cursor.execute(
-                """
-                INSERT INTO strategy_insights (id, source_id, insight_text, market_condition, setup_type)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (insight_id, source_id, insight_text, condition, setup_type),
-            )
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    """
+                    INSERT INTO strategy_insights (id, source_id, insight_text, market_condition, setup_type)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (insight_id, source_id, insight_text, condition, setup_type),
+                )
+                conn.commit()
             
             # 2. ChromaDB'ga saqlash (Vektor qidiruv uchun)
             self.collection.add(
@@ -233,9 +230,10 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
             
             insights_saved += 1
 
-        cursor.execute("UPDATE knowledge_sources SET processed = 1 WHERE id = ?", (source_id,))
-        conn.commit()
-        conn.close()
+        with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE knowledge_sources SET processed = 1 WHERE id = ?", (source_id,))
+            conn.commit()
 
         print(f"✅ {insights_saved} ta xulosa saqlandi ({len(chunks)} qismdan)")
         return (True, insights_saved, len(chunks))
@@ -327,6 +325,16 @@ Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
                 cursor.execute("UPDATE strategy_insights SET fail_count = fail_count + 1 WHERE id = ?", (insight_id,))
                 
             conn.commit()
+            
+            # Yangi qiymatlarni o'qib olib Supabase'ga jo'natish
+            if hasattr(self, 'sync_client') and self.sync_client:
+                cursor.execute("SELECT success_count, fail_count FROM strategy_insights WHERE id = ?", (insight_id,))
+                row = cursor.fetchone()
+                if row:
+                    self.sync_client.update_insight(insight_id, {
+                        "success_count": row[0],
+                        "fail_count": row[1]
+                    })
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"Trade result yozishda xatolik: {e}")

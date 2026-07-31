@@ -23,7 +23,6 @@ const titles: Record<string, string> = {
   "/history": "Trade history",
   "/settings": "Bot settings",
   "/pricing": "Ta'riflar va Obuna",
-  "/backtest": "Backtest Tizimi",
   "/shadow-learning": "Shadow Learning AI",
   "/chart": "Narx Grafigi",
 };
@@ -153,7 +152,6 @@ export default function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/pricing" element={<SubscriptionPage />} />
-          <Route path="/backtest" element={<BacktestPage />} />
           <Route path="/shadow-learning" element={<ShadowLearningPage />} />
           <Route path="/chart" element={<ChartPage />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />

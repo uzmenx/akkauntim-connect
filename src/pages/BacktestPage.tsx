@@ -4,7 +4,7 @@ import { TestResultsCard, TestResultProps } from "@/components/backtest/TestResu
 import { Play, Activity, BarChart3, Clock, DollarSign, History, Cpu, Zap, Loader2, Timer, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-export function BacktestPage() {
+export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const [activeTab, setActiveTab] = useState<"ai_siz" | "ai_bilan" | "history">("ai_siz");
   const [strategy, setStrategy] = useState("smc");
   const [timeframe, setTimeframe] = useState("1h");
@@ -118,20 +118,22 @@ export function BacktestPage() {
   };
 
   return (
-    <div className="pb-24 pt-4 space-y-6 animate-in fade-in duration-300">
+    <div className={`${isEmbedded ? "space-y-4" : "pb-24 pt-4 space-y-6"} animate-in fade-in duration-300`}>
       
       {/* Header Info */}
-      <div className="px-4">
-        <h2 className="text-2xl font-black text-white drop-shadow-md mb-2">
-          Test Markazi
-        </h2>
-        <p className="text-sm text-white/60 mb-4">
-          Strategiyalarni mexanik yoki AI yordamida tarixiy ma'lumotlarda sinab ko'ring.
-        </p>
-      </div>
+      {!isEmbedded && (
+        <div className="px-4">
+          <h2 className="text-2xl font-black text-white drop-shadow-md mb-2">
+            Test Markazi
+          </h2>
+          <p className="text-sm text-white/60 mb-4">
+            Strategiyalarni mexanik yoki AI yordamida tarixiy ma'lumotlarda sinab ko'ring.
+          </p>
+        </div>
+      )}
 
       {/* Tabs */}
-      <div className="px-4 flex gap-2">
+      <div className={`${isEmbedded ? "" : "px-4"} flex gap-2`}>
         <button
           onClick={() => setActiveTab("ai_siz")}
           className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
@@ -169,7 +171,7 @@ export function BacktestPage() {
 
       {/* Settings Panel for Tests */}
       {activeTab !== "history" && !running && (
-        <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2">
+        <div className={isEmbedded ? "space-y-4 animate-in slide-in-from-bottom-2" : "px-4 space-y-4 animate-in slide-in-from-bottom-2"}>
           <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 p-5 rounded-2xl shadow-xl">
             <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
               <Activity className={`w-5 h-5 ${activeTab === 'ai_bilan' ? 'text-purple-400' : 'text-blue-400'}`} />
@@ -263,7 +265,7 @@ export function BacktestPage() {
 
       {/* Running Progress Panel */}
       {activeTab !== "history" && running && (
-        <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2">
+        <div className={isEmbedded ? "space-y-4 animate-in slide-in-from-bottom-2" : "px-4 space-y-4 animate-in slide-in-from-bottom-2"}>
           <div className="bg-[#0f172a]/90 backdrop-blur-xl border border-blue-500/30 p-6 rounded-2xl shadow-xl shadow-blue-500/10">
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <div className="relative w-20 h-20 flex items-center justify-center">
@@ -304,7 +306,7 @@ export function BacktestPage() {
 
       {/* History Panel */}
       {activeTab === "history" && (
-        <div className="px-4 space-y-4 animate-in slide-in-from-bottom-2">
+        <div className={isEmbedded ? "space-y-4 animate-in slide-in-from-bottom-2" : "px-4 space-y-4 animate-in slide-in-from-bottom-2"}>
           {loading ? (
             <div className="flex justify-center py-10">
               <div className="w-6 h-6 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />

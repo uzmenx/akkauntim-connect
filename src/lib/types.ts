@@ -10,6 +10,7 @@ export type BotSettings = {
   timeframe_minor?: string;
   ai_model?: string;
   ai_enabled?: boolean;
+  shadow_mode?: boolean;
   system_prompt?: string;
   prompt_identity?: string;
   prompt_strategy?: string;

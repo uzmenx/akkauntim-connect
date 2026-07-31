@@ -157,7 +157,7 @@ class TradingBot:
                     candles_list.append({
                         "symbol": symbol,
                         "timeframe": timeframe,
-                        "time": str(idx),
+                        "time": row['time'].isoformat() if hasattr(row['time'], 'isoformat') else str(row['time']),
                         "open": float(row['open']),
                         "high": float(row['high']),
                         "low": float(row['low']),
@@ -940,7 +940,18 @@ class TradingBot:
         try:
             self.orders.manage_open_trades(self._get_trailing_decision)
             if getattr(self.config, "shadow_mode", False):
-                self.orders.manage_virtual_shadow_trades()
+                closed_shadows = self.orders.manage_virtual_shadow_trades()
+                if closed_shadows:
+                    for ct in closed_shadows:
+                        msg = (
+                            f"👻 <b>Shadow Trade Yopildi!</b>\n\n"
+                            f"💎 <b>Juftlik:</b> #{ct['symbol']}\n"
+                            f"💵 <b>Foyda/Zarar:</b> {ct['profit']:.2f}\n"
+                            f"📝 <b>Sabab:</b> {ct['reason']}\n\n"
+                            f"<i>AI ushbu natijadan o'rganish uchun xotiraga yozdi.</i>"
+                        )
+                        if hasattr(self, 'telegram') and self.telegram:
+                            self.telegram.send_message(msg)
         except Exception as e:
             logger.error(f"manage_open_trades error: {e}")
 

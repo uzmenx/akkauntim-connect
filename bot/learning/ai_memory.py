@@ -225,6 +225,17 @@ class AIMemory:
                     )
             
             conn.commit()
+            
+            # Yangi qiymatlarni o'qib olib Supabase'ga jo'natish
+            if hasattr(self, 'sync_client') and self.sync_client:
+                cursor.execute("SELECT success_applications, failed_applications, importance FROM ai_lessons WHERE id = ?", (lesson_id,))
+                row = cursor.fetchone()
+                if row:
+                    self.sync_client.update_memory(lesson_id, {
+                        "success_applications": row[0],
+                        "failed_applications": row[1],
+                        "importance": row[2]
+                    })
         except Exception as e:
             logger.error(f"Lesson application qayd qilishda xatolik: {e}")
         finally:

@@ -116,15 +116,45 @@ class TradeReviewer:
             since_dt = datetime.fromisoformat(since_iso)
             now = datetime.now()
             
+            trade_deals = []
+            
+            # 1. MT5 dagi haqiqiy/demo bitimlarni olish
             deals = self.mt5.history_deals_get(since_dt, now)
-            if deals is None:
-                return []
+            if deals:
+                # mt5 deal_type: 0 (BUY), 1 (SELL), entry 1 means closed deal
+                mt5_deals = [d for d in deals if d.type in (0, 1) and d.entry == 1]
+                trade_deals.extend(mt5_deals)
                 
-            # mt5 deal_type: 0 (BUY), 1 (SELL), entry 1 means closed deal
-            trade_deals = [d for d in deals if d.type in (0, 1) and d.entry == 1]
+            # 2. Soya (Shadow) bitimlarni olish
+            if getattr(self.config, "shadow_mode", False):
+                try:
+                    import os
+                    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'bot_learning.db')
+                    if os.path.exists(db_path):
+                        conn = sqlite3.connect(db_path)
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id, symbol, profit, close_reason, timestamp FROM shadow_trade_history WHERE timestamp > ?", (since_iso,))
+                        rows = cursor.fetchall()
+                        
+                        class DummyDeal:
+                            def __init__(self, symbol, profit, timestamp, type=1, entry=1, volume=0.01):
+                                self.symbol = symbol
+                                self.profit = profit
+                                self.time = datetime.fromisoformat(timestamp).timestamp()
+                                self.type = type
+                                self.entry = entry
+                                self.volume = volume
+                        
+                        for row in rows:
+                            dummy = DummyDeal(row[1], row[2], row[4])
+                            trade_deals.append(dummy)
+                        conn.close()
+                except Exception as shadow_e:
+                    logger.error(f"Error getting shadow deals: {shadow_e}")
+                    
             return trade_deals
         except Exception as e:
-            logger.error(f"Error getting MT5 deals: {e}")
+            logger.error(f"Error getting MT5/Shadow deals: {e}")
             return []
 
     def get_ai_decisions_for_deals(self, deals: List[Any]) -> List[Dict]:

@@ -1,0 +1,1 @@
+{"sentiment_score": 50, "strategies": [{"name": "SMC", "weight": 60}, {"name": "Pattern", "weight": 60}, {"name": "News", "weight": 60}, {"name": "Wyckoff", "weight": 50}, {"name": "SR_Volume", "weight": 50}, {"name": "Auto_Pattern", "weight": 50}]}

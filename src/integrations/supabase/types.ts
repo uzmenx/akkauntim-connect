@@ -90,6 +90,7 @@ export type Database = {
           risk_level_multiple_confirmation: number
           risk_level_single_confirmation: number
           risk_per_trade: number
+          shadow_mode: boolean | null
           strategy_weight_news: number | null
           strategy_weight_pattern: number | null
           strategy_weight_smc: number | null
@@ -121,6 +122,7 @@ export type Database = {
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
+          shadow_mode?: boolean | null
           strategy_weight_news?: number | null
           strategy_weight_pattern?: number | null
           strategy_weight_smc?: number | null
@@ -152,6 +154,7 @@ export type Database = {
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
+          shadow_mode?: boolean | null
           strategy_weight_news?: number | null
           strategy_weight_pattern?: number | null
           strategy_weight_smc?: number | null

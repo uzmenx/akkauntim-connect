@@ -80,13 +80,17 @@ class Backtester:
         print(f"IS Natijalar: {is_stats}")
         self._print_error_summary("IS")
 
-        print("\n--- OUT-OF-SAMPLE (OOS) SIMULYATSIYA BOSHLANDI ---")
-        self.broker.reset()
-        self.error_counts = {}
-        self._run_simulation(oos_df, mode)
-        oos_stats = self.broker.get_stats()
-        print(f"OOS Natijalar: {oos_stats}")
-        self._print_error_summary("OOS")
+        oos_stats = None
+        if split_ratio < 1.0 and len(oos_df) > 0:
+            print("\n--- OUT-OF-SAMPLE (OOS) SIMULYATSIYA BOSHLANDI ---")
+            self.broker.reset()
+            self.error_counts = {}
+            self._run_simulation(oos_df, mode)
+            oos_stats = self.broker.get_stats()
+            print(f"OOS Natijalar: {oos_stats}")
+            self._print_error_summary("OOS")
+        elif split_ratio < 1.0:
+            print("\n--- OUT-OF-SAMPLE (OOS) SIMULYATSIYA O'TKAZIB YUBORILDI (Kandelalar yo'q) ---")
 
         return {"IS": is_stats, "OOS": oos_stats}
 

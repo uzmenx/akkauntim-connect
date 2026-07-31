@@ -288,6 +288,22 @@ class SupabaseSync:
         except Exception as e:
             logger.error(f"upload_insight xatolik: {e}")
 
+    def update_insight(self, insight_id: str, updates: dict) -> None:
+        """Supabase'dagi insight'ni yangilaydi (masalan: success_count)."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/strategy_insights?id=eq.{insight_id}"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.patch(url, headers=headers, json=updates, timeout=10)
+        except Exception as e:
+            logger.error(f"update_insight xatolik: {e}")
+
     def upload_memory(self, memory_data: dict) -> None:
         """AI saboqni Supabase'ga yuboradi."""
         if not self.config.supabase_url or not self.config.supabase_key:
@@ -303,6 +319,22 @@ class SupabaseSync:
             requests.post(url, headers=headers, json=memory_data, timeout=10)
         except Exception as e:
             logger.error(f"upload_memory xatolik: {e}")
+
+    def update_memory(self, lesson_id: str, updates: dict) -> None:
+        """Supabase'dagi saboqni (ai_memory) yangilaydi (masalan: success_applications)."""
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/ai_memory?id=eq.{lesson_id}"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.patch(url, headers=headers, json=updates, timeout=10)
+        except Exception as e:
+            logger.error(f"update_memory xatolik: {e}")
 
     def upload_strategy_performance(self, perf_data: dict) -> None:
         """Strategiya samaradorligini Supabase'ga yuboradi."""

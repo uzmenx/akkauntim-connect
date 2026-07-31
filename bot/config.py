@@ -49,7 +49,7 @@ class BotConfig:
     ai_max_tokens: int = 4000
     
     # Yangi xususiyatlar
-    auto_discover_symbols: bool = True
+    auto_discover_symbols: bool = False
     batch_size: int = 3
     
     # Drawdown-based risk reduction
@@ -173,6 +173,9 @@ class BotConfig:
             
         if "drawdown_risk_multiplier" in data:
             self.drawdown_risk_multiplier = float(data["drawdown_risk_multiplier"])
+            
+        if "shadow_mode" in data:
+            self.shadow_mode = bool(data["shadow_mode"])
             
         if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
             identity = data.get("prompt_identity", "")

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -16,6 +16,17 @@ export function AuthPage() {
   const [server, setServer] = useState("MetaQuotes-Demo");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  useEffect(() => {
+    const savedLogin = localStorage.getItem("mt5_saved_login");
+    const savedPass = localStorage.getItem("mt5_saved_password");
+    if (savedLogin && savedPass) {
+      setLogin(savedLogin);
+      setPassword(savedPass);
+      setRememberMe(true);
+    }
+  }, []);
 
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,6 +72,14 @@ export function AuthPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
+      
+      if (rememberMe) {
+        localStorage.setItem("mt5_saved_login", login.trim());
+        localStorage.setItem("mt5_saved_password", password);
+      } else {
+        localStorage.removeItem("mt5_saved_login");
+        localStorage.removeItem("mt5_saved_password");
+      }
     } catch (e: any) {
       setErr(e.message ?? "Xatolik yuz berdi");
     } finally {
@@ -70,16 +89,12 @@ export function AuthPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-6 py-10 relative z-10">
-      {/* Nature background for realistic Glossmorphism reflections */}
-      <div className="fixed inset-0 pointer-events-none -z-10">
-        <div 
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-          style={{ backgroundImage: "url('/nature_bg.jpg')" }}
-        />
-        <div className="absolute inset-0 bg-black/5" />
+      {/* 3D Open Sea background */}
+      <div className="fixed inset-0 pointer-events-auto z-0">
+        <iframe src="/ocean.html?v=2" className="absolute inset-0 w-full h-full border-0 pointer-events-auto" title="Open Sea Background" />
       </div>
 
-      <div className="mb-8 flex flex-col items-center gap-3 text-center">
+      <div className="mb-8 flex flex-col items-center gap-3 text-center relative z-10">
         <div className="h-16 w-16 overflow-hidden rounded-[20px] bg-gradient-to-br from-blue-500 to-indigo-700 shadow-[0_0_25px_rgba(59,130,246,0.3)] border border-white/20 flex items-center justify-center">
           <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
         </div>
@@ -91,7 +106,7 @@ export function AuthPage() {
         </p>
       </div>
 
-      <Card className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-[32px] backdrop-saturate-[150%] border-t border-l border-white/30 border-r border-b border-white/5 p-8 rounded-[42px] shadow-[0_30px_60px_rgba(0,0,0,0.3),inset_1px_1px_15px_rgba(255,255,255,0.2),inset_-1px_-1px_15px_rgba(0,0,0,0.1)] relative overflow-hidden">
+      <Card className="bg-gradient-to-br from-white/10 to-transparent backdrop-blur-[32px] backdrop-saturate-[150%] border-t border-l border-white/30 border-r border-b border-white/5 p-8 rounded-[42px] shadow-[0_30px_60px_rgba(0,0,0,0.3),inset_1px_1px_15px_rgba(255,255,255,0.2),inset_-1px_-1px_15px_rgba(0,0,0,0.1)] relative z-10 overflow-hidden">
         {/* Crisp curved reflection (glare) at the top for 3D liquid glass effect */}
         <div className="absolute top-[-25%] left-[-20%] w-[140%] h-[60%] bg-gradient-to-b from-white/30 to-transparent rounded-[100%] pointer-events-none transform -rotate-12 blur-[1px]" />
 
@@ -145,6 +160,19 @@ export function AuthPage() {
             </div>
           )}
 
+          <div className="flex items-center gap-2 pt-1 pb-1">
+            <input
+              type="checkbox"
+              id="rememberMe"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded bg-white/10 border-white/20 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 cursor-pointer"
+            />
+            <label htmlFor="rememberMe" className="text-sm font-medium text-white/90 cursor-pointer select-none">
+              Meni eslab qol
+            </label>
+          </div>
+
           {err && (
             <div className="rounded-xl bg-red-500/10 border-t border-l border-red-500/30 border-r border-b border-red-500/10 px-3 py-2.5 text-xs text-rose-200">{err}</div>
           )}
@@ -172,7 +200,7 @@ export function AuthPage() {
         </form>
       </Card>
 
-      <p className="mt-8 text-center text-[10px] text-white/30 leading-relaxed">
+      <p className="mt-8 text-center text-[10px] text-white/30 leading-relaxed relative z-10">
         Har bir foydalanuvchi faqat o'zining MT5 hisob ma'lumotlarini ko'radi.
         <br />Ma'lumotlar xavfsiz saqlanadi.
       </p>

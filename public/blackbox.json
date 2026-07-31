@@ -22,5 +22,11 @@
     }
   ],
   "news_strategy_style": [],
-  "updated_at": "2026-07-31T11:51:58.543409"
+  "updated_at": "2026-07-31T13:31:57.487707",
+  "rl_agent_progress": {
+    "episodes_played": 10000,
+    "avg_reward": 988.68,
+    "win_rate_simulation": 98.2,
+    "growth": 98.2
+  }
 }

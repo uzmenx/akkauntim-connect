@@ -136,25 +136,47 @@ class ShadowStateCollector:
             cursor.execute("SELECT COUNT(*) FROM shadow_states WHERE ai_decision IN ('BUY', 'SELL', 'LIMIT_BUY', 'LIMIT_SELL', 'BUY_LIMIT', 'SELL_LIMIT')")
             trade_decisions = cursor.fetchone()[0]
             
-            # Haqiqiy Win Rate: trade_history dagi natijalardan (agar mavjud bo'lsa)
+            # Haqiqiy Win Rate: shadow_trade_history dagi natijalardan
             real_win_rate = 0
             try:
-                cursor.execute("SELECT COUNT(*) FROM shadow_states WHERE ai_decision IN ('BUY', 'SELL') AND market_regime != 'UNKNOWN'")
-                total_trades = cursor.fetchone()[0]
-                if total_trades > 0:
-                    # Eng oddiy holat: ma'lumotlar soniga qarab foiz o'sib boradi
-                    real_win_rate = min(85, max(0, int(50 + (total_rows / 100))))
+                cursor.execute("SELECT COUNT(*) FROM shadow_trade_history WHERE profit > 0")
+                winning_trades = cursor.fetchone()[0]
+                
+                cursor.execute("SELECT COUNT(*) FROM shadow_trade_history")
+                closed_trades = cursor.fetchone()[0]
+                
+                if closed_trades > 0:
+                    real_win_rate = int((winning_trades / closed_trades) * 100)
             except:
                 real_win_rate = 0
+            
+            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            
+            # Haqiqiy "Bilimlar" sonini bazadan olish
+            real_knowledge = 0
+            try:
+                mem_db = os.path.join(root_dir, 'ai_memory.db')
+                if os.path.exists(mem_db):
+                    with sqlite3.connect(mem_db) as m_conn:
+                        real_knowledge += m_conn.execute("SELECT COUNT(*) FROM ai_lessons").fetchone()[0]
+            except Exception:
+                pass
+                
+            try:
+                strat_db = os.path.join(root_dir, 'strategist_db.sqlite')
+                if os.path.exists(strat_db):
+                    with sqlite3.connect(strat_db) as s_conn:
+                        real_knowledge += s_conn.execute("SELECT COUNT(*) FROM strategy_insights").fetchone()[0]
+            except Exception:
+                pass
             
             stats = {
                 "total_shadow_trades": trade_decisions,
                 "dataset_size": total_rows,
                 "overall_win_rate": real_win_rate, 
-                "knowledge_points": (total_rows // 5) + 12
+                "knowledge_points": real_knowledge
             }
             
-            root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             public_dir = os.path.join(root_dir, 'public')
             if not os.path.exists(public_dir):
                 try:

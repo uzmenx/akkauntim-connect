@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { guestMock } from "@/lib/guestMock";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Loader2, Save, Sparkles, Settings2, Sliders, Play, Code, X, Check, ListPlus, Pencil, TriangleAlert } from "lucide-react";
+import { Loader2, Save, Sparkles, Settings2, Sliders, Play, Code, X, Check, ListPlus, Pencil, TriangleAlert, FlaskConical } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { BotSettings, BotStatus } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
+import { BacktestPage } from "./BacktestPage";
 
 const MAJOR_TIMEFRAME_OPTIONS = [
   { value: "D1", label: "D1 (1 kun)" },
@@ -150,6 +151,7 @@ export function SettingsPage() {
         loop_interval_minutes: 5,
         ai_enabled: true,
         ai_model: "kimi-k3",
+        shadow_mode: true,
         prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
         prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
         prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
@@ -189,6 +191,7 @@ export function SettingsPage() {
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
         ai_enabled: form.ai_enabled ?? true,
+        shadow_mode: form.shadow_mode ?? true,
         ai_model: form.ai_model ?? "auto",
         prompt_identity: form.prompt_identity ?? "",
         prompt_strategy: form.prompt_strategy ?? "",
@@ -216,6 +219,7 @@ export function SettingsPage() {
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
         ai_enabled: form.ai_enabled ?? true,
+        shadow_mode: form.shadow_mode ?? true,
         ai_model: form.ai_model ?? "auto",
         prompt_identity: form.prompt_identity ?? "",
         prompt_strategy: form.prompt_strategy ?? "",
@@ -279,6 +283,7 @@ export function SettingsPage() {
           timeframe_minor: "M5",
           loop_interval_minutes: 5,
           ai_enabled: true,
+          shadow_mode: true,
           ai_model: "kimi-k3",
           prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
           prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
@@ -431,6 +436,22 @@ export function SettingsPage() {
             </button>
           </div>
 
+          <div className="flex items-center justify-between py-3 border-b border-white/5">
+            <div className="flex-1 pr-4">
+              <p className="text-sm font-semibold text-white/90">Shadow Mode (Soya Rejimi)</p>
+              <p className="text-[11px] text-white/40 leading-snug mt-0.5">
+                Yoqilgan bo'lsa, bitimlar MT5 ga (Real/Demo) bormaydi. Bot ichki xotirada savdo qilib o'rganadi.
+              </p>
+            </div>
+            <button 
+              type="button"
+              onClick={() => setForm(f => ({ ...f, shadow_mode: !f.shadow_mode }))}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 ease-in-out ${form.shadow_mode !== false ? 'bg-amber-500' : 'bg-white/10'}`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ease-in-out ${form.shadow_mode !== false ? 'translate-x-[18px]' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
           <div className="py-3">
             <p className="text-xs font-semibold text-white/90 mb-2">AI Modeli (3 tagacha tanlash mumkin)</p>
             <CustomSelect
@@ -493,6 +514,15 @@ export function SettingsPage() {
             onChange={(v) => setForm((f) => ({ ...f, max_daily_loss: v }))}
           />
         </div>
+      </Card>
+
+      {/* 4. Test Markazi (Backtest) */}
+      <Card className="glass p-5">
+        <div className="flex items-center gap-2 mb-4 text-pink-500">
+          <FlaskConical size={18} />
+          <h3 className="font-bold text-sm tracking-wide uppercase">Test Markazi (Backtest)</h3>
+        </div>
+        <BacktestPage isEmbedded={true} />
       </Card>
 
 

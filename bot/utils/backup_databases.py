@@ -47,7 +47,10 @@ def backup_databases(config, databases=None):
                     
                 logger.info(f"{db_file} zaxirasi Supabase'ga muvaffaqiyatli yuklandi: {remote_path}")
             except Exception as ex:
-                if "Invalid Compact JWS" in str(ex):
+                err_str = str(ex)
+                if "Bucket not found" in err_str:
+                    logger.error(f"{db_file} ni zaxiralashda xatolik: 'backups' deb nomlangan Storage Bucket topilmadi. Iltimos, Supabase paneliga kiring (Storage qismiga) va 'backups' nomli yangi bucket (jild) yarating!")
+                elif "Invalid Compact JWS" in err_str:
                     logger.error(f"{db_file} ni zaxiralashda xatolik: SUPABASE_PUBLISHABLE_KEY haqiqiy JWT formati emas. Iltimos, .env faylidagi kalitni Supabase panelidagi to'g'ri 'anon' 'public' JWT kalitiga almashtiring.")
                 else:
                     logger.error(f"{db_file} ni zaxiralashda xatolik: {ex}")

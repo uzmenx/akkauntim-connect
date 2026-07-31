@@ -967,7 +967,13 @@ export function ShadowLearningPage() {
                 <Target size={14} className="text-blue-400" /> Multi-Strategy AI Vaznlari
               </h3>
               <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-3">
-                {portfolioState.data.strategies.map((strat) => (
+                {(stratPerf.data && stratPerf.data.length > 0 
+                  ? stratPerf.data.map(sp => ({ name: sp.strategy_name, weight: Math.round(sp.recommended_weight * 50) }))
+                  : [
+                      {name: "SMC", weight: 60}, {name: "PATTERN", weight: 60}, {name: "NEWS", weight: 60},
+                      {name: "WYCKOFF", weight: 50}, {name: "SR_VOLUME", weight: 50}, {name: "AUTO_PATTERN", weight: 50}
+                    ]
+                ).map((strat) => (
                   <div key={strat.name} className="bg-black/30 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1.5 group hover:border-white/20 transition-all">
                     <span className="text-[11px] font-bold text-white/80 uppercase">{strat.name}</span>
                     <div className="flex items-end justify-between">
@@ -977,7 +983,7 @@ export function ShadowLearningPage() {
                       <span className="text-[9px] text-white/40 mb-1">Max 100</span>
                     </div>
                     <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
-                      <div className="h-full bg-blue-500" style={{ width: `${strat.weight}%` }} />
+                      <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(0, strat.weight))}%` }} />
                     </div>
                   </div>
                 ))}

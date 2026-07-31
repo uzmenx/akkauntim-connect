@@ -648,16 +648,17 @@ class OrderManager:
                         logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 
-    def manage_virtual_shadow_trades(self):
+    def manage_virtual_shadow_trades(self) -> list:
         """
         SHADOW MODE da ochilgan virtual pozitsiyalarni (SL/TP) boshqarish.
         """
         import sqlite3
         import os
+        closed_shadow_trades = []
         try:
             db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'bot_learning.db')
             if not os.path.exists(db_path):
-                return
+                return closed_shadow_trades
                 
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
@@ -666,7 +667,7 @@ class OrderManager:
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shadow_live_trades'")
             if not cursor.fetchone():
                 conn.close()
-                return
+                return closed_shadow_trades
                 
             cursor.execute("SELECT ticket, symbol, type, volume, price_open, sl, tp FROM shadow_live_trades WHERE status='OPEN'")
             open_trades = cursor.fetchall()
@@ -716,11 +717,20 @@ class OrderManager:
                                        (symbol, profit, reason, datetime.datetime.now().isoformat()))
                     except Exception as e:
                         logger.error(f"Shadow history saqlashda xato: {e}")
+                        
+                    closed_shadow_trades.append({
+                        "ticket": ticket,
+                        "symbol": symbol,
+                        "profit": profit,
+                        "reason": reason
+                    })
             
             conn.commit()
             conn.close()
         except Exception as e:
             logger.error(f"manage_virtual_shadow_trades error: {e}")
+            
+        return closed_shadow_trades
 
     def close_position(self, position: Any, comment: str = "AI Close") -> bool:
         symbol = position.symbol

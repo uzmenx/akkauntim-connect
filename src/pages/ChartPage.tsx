@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createChart, IChartApi, ISeriesApi, LineStyle, CandlestickSeries } from 'lightweight-charts';
 import { supabase } from '@/integrations/supabase/client';
 import { CandlestickChart } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
 interface CandleData {
   time: string | number;
@@ -29,17 +30,27 @@ interface Position {
 }
 
 export function ChartPage() {
+  const [searchParams] = useSearchParams();
+  const initialSymbol = searchParams.get('symbol') || 'EURUSD';
+
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
-  const [symbol, setSymbol] = useState('EURUSD');
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [timeframe, setTimeframe] = useState('H1');
   const [loading, setLoading] = useState(true);
   
   const [candles, setCandles] = useState<CandleData[]>([]);
   const [zones, setZones] = useState<SmcZone[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+
+  useEffect(() => {
+    const sym = searchParams.get('symbol');
+    if (sym) {
+      setSymbol(sym);
+    }
+  }, [searchParams]);
 
   // Fetch initial data
   const fetchData = async () => {

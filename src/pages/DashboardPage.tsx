@@ -5,7 +5,7 @@ import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
   Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot, CandlestickChart
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot, CandlestickChart, Globe
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -237,16 +237,30 @@ export function DashboardPage() {
           </Link>
         )}
 
-        {/* Card 22%: Main Blue Card */}
-        <div className="w-full h-[25dvh] min-h-[235px] bg-gradient-to-b from-[#0052e0] to-[#00258a] rounded-[32px] p-4 shadow-2xl relative overflow-hidden border border-white/10 flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        {/* Card 22%: Main Neumorphic Card */}
+        <div className="w-full h-[24dvh] min-h-[220px] bg-[#11131a] rounded-[36px] p-3.5 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_10px_40px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
+          {/* Subtle Ambient Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] pointer-events-none" />
+
           {/* Card Top Header */}
-          <div className="flex justify-between items-center">
-            <div className="relative" ref={profileMenuRef}>
-              <div 
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full backdrop-blur-md cursor-pointer hover:bg-white/20 transition-all border border-white/10"
+          <div className="flex justify-between items-center relative z-30">
+            <div className="flex items-center gap-2">
+              <a 
+                href="https://akkauntim-connect.vercel.app/" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-8 h-8 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-blue-400 hover:text-blue-300 transition-colors cursor-pointer active:scale-95"
+                title="Vebsaytni ochish"
               >
+                <Globe size={14} />
+              </a>
+
+              <div className="relative" ref={profileMenuRef}>
+                <div 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-2 bg-[#1a1d29] px-3 py-1.5 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),0_1px_2px_rgba(255,255,255,0.05)] border border-[#2a2f42] cursor-pointer hover:bg-[#1e2230] transition-all"
+                >
                 <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden">
                   <img 
                     src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email || "Ana"}`} 
@@ -254,13 +268,13 @@ export function DashboardPage() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <span className="text-white text-xs font-bold tracking-tight">
+                <span className="text-white/90 text-xs font-bold tracking-tight">
                   {settings.data?.mt5_login || "109545213"}
                 </span>
               </div>
               
               {showProfileMenu && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-[#1e1a1d] border border-white/10 rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute top-full left-0 mt-2 w-48 bg-[#1a1d29] border border-[#2a2f42] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                   <div className="p-2 space-y-1">
                     <button 
                       onClick={async () => {
@@ -288,88 +302,101 @@ export function DashboardPage() {
                 </div>
               )}
             </div>
+            </div>
             
-            <Link to="/pricing" className="flex items-center gap-1 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-1.5 rounded-full backdrop-blur-md transition-all border border-amber-500/30 cursor-pointer shadow-lg shadow-amber-500/5">
-              <Crown size={12} className="text-amber-400 fill-amber-400/20" />
+            <Link to="/pricing" className="flex items-center gap-1.5 bg-[#1a1d29] hover:bg-[#1e2230] px-3 py-1.5 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),0_1px_2px_rgba(255,255,255,0.05)] transition-all border border-[#2a2f42] cursor-pointer group">
+              <Crown size={12} className="text-amber-400 fill-amber-400/20 group-hover:scale-110 transition-transform" />
               <span className="text-[9px] font-extrabold text-amber-400 uppercase tracking-widest">Premium</span>
             </Link>
           </div>
 
           {/* Balance Area */}
-          <div className="text-center flex flex-col items-center justify-center flex-1 py-0.5">
-            <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight tabular-nums drop-shadow-md">
+          <div className="text-center flex flex-col items-center justify-center flex-1 py-0 relative z-10">
+            <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tracking-tight tabular-nums drop-shadow-sm">
               {equity != null ? fmtMoney(Number(equity), currency) : "$89,405.18"}
             </h1>
             {isGuest && (
-              <span className="mt-1.5 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                Demo Reja (Taqdimot Balansi)
+              <span className="mt-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-extrabold uppercase tracking-widest backdrop-blur-md">
+                Demo Reja
               </span>
             )}
           </div>
 
           {/* Avatars Row */}
-          <a href="https://t.me/Ai_bot_akcume" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-2 cursor-pointer">
+          <a href="https://t.me/akcume_signal" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-1.5 cursor-pointer relative z-10">
             {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
-              <div key={seed} className={`w-8 h-8 rounded-full border-[2px] border-[#004ade] bg-white shadow-xl overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-2" : ""}`}>
+              <div key={seed} className={`w-12 h-12 rounded-full border-2 border-[#11131a] bg-white shadow-md overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-4" : ""}`}>
                 <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
               </div>
             ))}
           </a>
 
           {/* Action Buttons Row */}
-          <div className="flex gap-1.5 min-[360px]:gap-2 w-full items-center overflow-x-auto no-scrollbar mt-auto px-1 pb-1">
+          <div className="flex justify-around items-start w-full mt-auto px-1 relative z-10">
+            
             {/* Button 1: Settings */}
-            <Link to="/settings" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.2),inset_0_-2px_4px_rgba(0,0,0,0.3),0_4px_12px_rgba(71,85,105,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white/90 transition-all group border border-slate-500/50" aria-label="Settings">
-              <Settings size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:rotate-90 transition-transform duration-500" />
+            <Link to="/settings" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Settings">
+              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-slate-400/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Settings size={18} className="text-slate-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:rotate-90 transition-transform duration-500" />
+              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Sozlama</span>
             </Link>
             
             {/* Button 2: Signals */}
-            <Link to="/signals" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(249,115,22,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-orange-300/50" aria-label="Signals">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="min-[360px]:w-[22px] min-[360px]:h-[22px] group-hover:scale-110 transition-transform">
-                <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
-                  <path stroke="currentColor" d="M40 48v24"/>
-                  <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
-                  <path stroke="currentColor" d="M17.373 62.627A32 32 0 0 1 40 8m22.627 54.627A32 32 0 0 0 40 8"/>
-                  <path stroke="currentColor" d="M25.858 54.142A20 20 0 0 1 40 20m14.142 34.142A20 20 0 0 0 40 20"/>
-                </g>
-              </svg>
+            <Link to="/signals" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Signals">
+              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="text-orange-400 min-[360px]:w-[22px] min-[360px]:h-[22px] group-hover:scale-110 transition-transform">
+                  <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
+                    <path stroke="currentColor" d="M40 48v24"/>
+                    <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
+                    <path stroke="currentColor" d="M17.373 62.627A32 32 0 0 1 40 8m22.627 54.627A32 32 0 0 0 40 8"/>
+                    <path stroke="currentColor" d="M25.858 54.142A20 20 0 0 1 40 20m14.142 34.142A20 20 0 0 0 40 20"/>
+                  </g>
+                </svg>
+              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Signallar</span>
             </Link>
 
             {/* Button 3: Filter */}
-            <button onClick={toggleFilter} className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.3),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(139,92,246,0.4)] hover:brightness-110 active:scale-95 flex items-center justify-center transition-all group border border-violet-400/50" aria-label="Filter Mode">
-              <div className="flex items-center justify-center w-6 h-6 min-[360px]:w-7 min-[360px]:h-7">
-                {filterMode === "all" && (
-                  <div className="relative w-full h-full group-hover:scale-110 transition-transform flex items-center justify-center">
-                    <TrendingUp size={16} className="text-emerald-400 absolute top-0 left-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
-                    <TrendingDown size={16} className="text-rose-400 absolute bottom-0 right-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
-                  </div>
-                )}
-                {filterMode === "profit" && <TrendingUp size={22} className="text-emerald-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
-                {filterMode === "loss" && <TrendingDown size={22} className="text-rose-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
+            <button onClick={toggleFilter} className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Filter Mode">
+              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center justify-center w-6 h-6 min-[360px]:w-7 min-[360px]:h-7">
+                  {filterMode === "all" && (
+                    <div className="relative w-full h-full group-hover:scale-110 transition-transform flex items-center justify-center">
+                      <TrendingUp size={16} className="text-emerald-400 absolute top-0 left-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
+                      <TrendingDown size={16} className="text-rose-400 absolute bottom-0 right-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
+                    </div>
+                  )}
+                  {filterMode === "profit" && <TrendingUp size={22} className="text-emerald-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
+                  {filterMode === "loss" && <TrendingDown size={22} className="text-rose-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
+                </div>
               </div>
+              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Filtr</span>
             </button>
 
             {/* Button 4: AI Send */}
-            <button onClick={() => setShowPrompt(true)} className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(251,191,36,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-amber-300/50" aria-label="AI Send">
-              <Sparkles size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
+            <button onClick={() => setShowPrompt(true)} className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="AI Send">
+              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Sparkles size={18} className="text-amber-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform" />
+              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">AI Yordam</span>
             </button>
 
             {/* Button 5: Shadow Learning AI */}
-            <Link to="/shadow-learning" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-teal-400 to-emerald-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(20,184,166,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-teal-300/50" aria-label="Shadow Learning AI">
-              <Brain size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
-            </Link>
-            
-            {/* Button 6: Backtest */}
-            <Link to="/backtest" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(244,63,94,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-pink-400/50" aria-label="Backtest">
-              <FlaskConical size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
-            </Link>
-
-            {/* Button 7: Chart */}
-            <Link to="/chart" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(59,130,246,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-blue-400/50" aria-label="Chart">
-              <CandlestickChart size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
+            <Link to="/shadow-learning" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Shadow Learning AI">
+              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Brain size={18} className="text-emerald-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform" />
+              </div>
+              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">O'rganish</span>
             </Link>
           </div>
         </div>
+
 
         <div className="flex-1 overflow-y-auto pb-4 space-y-2 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
           
@@ -544,8 +571,12 @@ export function EmptyLine({ text }: { text: string }) {
 function PositionRow({ p }: { p: Position }) {
   const isBuy = String(p.side).toUpperCase() === "BUY";
   const profit = Number(p.profit ?? 0);
+  const navigate = useNavigate();
   return (
-    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2">
+    <div 
+      onClick={() => navigate(`/chart?symbol=${p.symbol}`)}
+      className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2 cursor-pointer hover:bg-[#132140] transition-all duration-200 active:scale-[0.99]"
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
