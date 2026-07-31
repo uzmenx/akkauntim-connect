@@ -61,6 +61,18 @@ type BlackBoxData = {
   updated_at: string;
 };
 
+type PortfolioState = {
+  sentiment_score: number;
+  strategies: { name: string; weight: number }[];
+};
+
+type ShadowStats = {
+  total_shadow_trades: number;
+  dataset_size: number;
+  overall_win_rate: number;
+  knowledge_points: number;
+};
+
 export function ShadowLearningPage() {
   const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'blackbox'>('overview');
   const [uploading, setUploading] = useState(false);
@@ -159,6 +171,51 @@ export function ShadowLearningPage() {
     refetchInterval: 15000,
   });
 
+  // Python Model Network State
+  const netState = useQuery({
+    queryKey: ["network_state"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/network_state.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 3000,
+  });
+
+  // Portfolio State (Dynamic Weights & Sentiment)
+  const portfolioState = useQuery({
+    queryKey: ["portfolio_state"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/portfolio_state.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as PortfolioState;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 3000,
+  });
+
+  // Shadow Stats (Data Pipeline)
+  const shadowStats = useQuery({
+    queryKey: ["shadow_stats"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/shadow_stats.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as ShadowStats;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 5000,
+  });
+
   // Learning metrics hisoblash
   const learningData = useMemo(() => {
     const trades = tradeHistory.data;
@@ -190,16 +247,77 @@ export function ShadowLearningPage() {
     const insightCount = insights.data?.length || 0;
     const lessonCount = lessons.data?.length || 0;
     const knowledge = insightCount + lessonCount;
+    
+    const nodes: { x: number; y: number; layer: number; active: number }[] = [];
+    const edges: { from: number; to: number; strength: number }[] = [];
+    
+    // Haqiqiy Python modelidan ma'lumot
+    const realNet = netState.data;
+    if (realNet && realNet.status === 'active') {
+       let lstm = realNet.lstm_nodes || [];
+       let hidden = realNet.hidden_nodes || [];
+       const out = realNet.output_probabilities || [];
+       
+       // Haqiqiy real-time o'sish dinamikasi (Dataset va Bilimlar soniga qarab tugunlar ko'payadi)
+       // Har 10 ta yangi ma'lumot bitta yangi tugunni "uyg'otadi"
+       const dataSize = shadowStats.data?.dataset_size || 0;
+       const dynamicLstmCount = Math.min(lstm.length, Math.max(3, 3 + Math.floor(dataSize / 10) + Math.floor(knowledge / 2)));
+       const dynamicHiddenCount = Math.min(hidden.length, Math.max(3, 2 + Math.floor(dataSize / 15) + Math.floor(knowledge / 3)));
+       
+       lstm = lstm.slice(0, dynamicLstmCount);
+       hidden = hidden.slice(0, dynamicHiddenCount);
+       
+       const layers = [Math.min(6, 3 + Math.floor(dataSize / 20)), lstm.length, hidden.length, 3];
+       const acts = [
+           Array(layers[0]).fill(0.6), 
+           lstm, 
+           hidden, 
+           out
+       ];
+       
+       const svgW = 320;
+       const svgH = 140;
+       const layerSpacing = svgW / (layers.length + 1);
 
-    // Layer sizes: input, hidden1, hidden2, output
+       layers.forEach((count, li) => {
+           const x = layerSpacing * (li + 1);
+           const spacing = svgH / (count + 1);
+           const layerActs = acts[li];
+           for (let ni = 0; ni < count; ni++) {
+               // Limit the maximum activation value so the nodes don't grow huge
+               const val = (layerActs[ni] !== undefined) ? Math.min(1.5, Math.abs(layerActs[ni])) : 0.2;
+               nodes.push({ x, y: spacing * (ni + 1), layer: li, active: val });
+           }
+       });
+
+       let nodeIdx = 0;
+       for (let li = 0; li < layers.length - 1; li++) {
+           const nextStart = nodeIdx + layers[li];
+           for (let a = nodeIdx; a < nextStart; a++) {
+               for (let b = nextStart; b < nextStart + layers[li + 1]; b++) {
+                   const aAct = nodes[a].active;
+                   const bAct = nodes[b].active;
+                   // Faqat faol ulanishlarni ko'rsatamiz va bog'liqliklar ham datasetga qarab zichlashadi
+                   const connectionThreshold = Math.max(0.05, 0.2 - (knowledge * 0.005));
+                   if (aAct > connectionThreshold || bAct > connectionThreshold) {
+                       const strength = Math.min(1, (aAct + bAct));
+                       edges.push({ from: a, to: b, strength: strength });
+                   }
+               }
+           }
+           nodeIdx = nextStart;
+       }
+       return { nodes, edges, layers, knowledge, isReal: true, pred: out };
+    }
+
+    // Default dummy logic (agar python model ulanmagan yoki o'qitilmagan bo'lsa)
     const layers = [
       Math.min(6, 3 + Math.floor(knowledge / 10)),    // Input
       Math.min(10, 3 + Math.floor(knowledge / 5)),     // Hidden 1
       Math.min(8, 2 + Math.floor(knowledge / 7)),      // Hidden 2
-      3                                                 // Output (BUY/SELL/HOLD)
+      3                                                 // Output
     ];
 
-    const nodes: { x: number; y: number; layer: number }[] = [];
     const svgW = 320;
     const svgH = 140;
     const layerSpacing = svgW / (layers.length + 1);
@@ -208,18 +326,15 @@ export function ShadowLearningPage() {
       const x = layerSpacing * (li + 1);
       const spacing = svgH / (count + 1);
       for (let ni = 0; ni < count; ni++) {
-        nodes.push({ x, y: spacing * (ni + 1), layer: li });
+        nodes.push({ x, y: spacing * (ni + 1), layer: li, active: 0.5 });
       }
     });
 
-    // Connections between adjacent layers
-    const edges: { from: number; to: number; strength: number }[] = [];
     let nodeIdx = 0;
     for (let li = 0; li < layers.length - 1; li++) {
       const nextStart = nodeIdx + layers[li];
       for (let a = nodeIdx; a < nextStart; a++) {
         for (let b = nextStart; b < nextStart + layers[li + 1]; b++) {
-          // Show more connections as knowledge grows
           const seed = (a * 31 + b * 17 + li * 7) % 100;
           const showProb = Math.min(1, 0.3 + knowledge * 0.03);
           if (seed / 100 < showProb) {
@@ -230,8 +345,8 @@ export function ShadowLearningPage() {
       nodeIdx = nextStart;
     }
 
-    return { nodes, edges, layers, knowledge };
-  }, [insights.data, lessons.data]);
+    return { nodes, edges, layers, knowledge, isReal: false };
+  }, [insights.data, lessons.data, netState.data]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -385,7 +500,8 @@ export function ShadowLearningPage() {
           {/* Neural Network Vizualizatsiyasi */}
           <div className="relative mb-4">
             <div className="text-[9px] text-white/30 text-center font-bold uppercase tracking-[3px] mb-2">
-              {networkData.knowledge === 0 ? "TARMOQ HALI BO'SH" : 
+              {networkData.isReal ? (networkData.knowledge < 5 ? "AI MODEL FAOL - O'RGANISH BOSHLANDI" : "AI MODEL - O'RGANISH DAVOM ETMOQDA") :
+               networkData.knowledge === 0 ? "TARMOQ HALI BO'SH" : 
                networkData.knowledge < 5 ? "BOSHLANG'ICH TARMOQ" :
                networkData.knowledge < 15 ? "O'RGANISH DAVOM ETMOQDA" :
                networkData.knowledge < 30 ? "TARMOQ KUCHAYMOQDA" : "KUCHLI TARMOQ"}
@@ -419,17 +535,19 @@ export function ShadowLearningPage() {
               {networkData.nodes.map((node, i) => {
                 const colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#10b981'];
                 const color = colors[node.layer] || '#8b5cf6';
+                const opacity = networkData.isReal ? Math.max(0.2, Math.min(1, node.active * 2)) : 0.9;
+                const r = networkData.isReal ? 3 + (node.active * 2) : 3.5;
                 return (
                   <g key={`n-${i}`}>
                     <circle
                       cx={node.x} cy={node.y}
-                      r={3.5}
+                      r={r}
                       fill={color}
-                      opacity={0.9}
-                      className="animate-pulse"
-                      style={{ animationDelay: `${(i % 5) * 0.4}s`, animationDuration: `${2 + (i % 4)}s` }}
+                      opacity={opacity}
+                      className={networkData.isReal ? "" : "animate-pulse"}
+                      style={networkData.isReal ? {} : { animationDelay: `${(i % 5) * 0.4}s`, animationDuration: `${2 + (i % 4)}s` }}
                     />
-                    <circle cx={node.x} cy={node.y} r={6} fill={color} opacity={0.15} />
+                    <circle cx={node.x} cy={node.y} r={r*1.8} fill={color} opacity={opacity * 0.2} />
                   </g>
                 );
               })}
@@ -499,26 +617,32 @@ export function ShadowLearningPage() {
 
           {/* Stats Row */}
           <div className="grid grid-cols-4 gap-1 min-[360px]:gap-2">
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Savdolar</div>
-              <div className="text-white font-black text-sm min-[360px]:text-lg">{learningData?.totalTrades || 0}</div>
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
+              <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Savdolar (Shadow)</div>
+              <div className="text-white font-black text-sm min-[360px]:text-lg">
+                {shadowStats.data?.total_shadow_trades || learningData?.totalTrades || 0}
+              </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
+              <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
               <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Win Rate</div>
-              <div className="text-emerald-400 font-black text-sm min-[360px]:text-lg">{learningData?.overallWR || 0}%</div>
+              <div className="text-emerald-400 font-black text-sm min-[360px]:text-lg">
+                {shadowStats.data?.overall_win_rate || learningData?.overallWR || 0}%
+              </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
+              <div className="absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
               <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Bilimlar</div>
-              <div className="text-violet-400 font-black text-sm min-[360px]:text-lg">{networkData.knowledge}</div>
+              <div className="text-violet-400 font-black text-sm min-[360px]:text-lg">
+                {shadowStats.data?.knowledge_points || networkData.knowledge}
+              </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5">
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">O'sish</div>
-              <div className={cn(
-                "font-black text-sm min-[360px]:text-lg",
-                (learningData?.improvement || 0) > 0 ? "text-emerald-400" : 
-                (learningData?.improvement || 0) < 0 ? "text-rose-400" : "text-white/50"
-              )}>
-                {(learningData?.improvement || 0) > 0 ? "+" : ""}{learningData?.improvement || 0}%
+            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
+              <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Dataset Hajmi</div>
+              <div className="font-black text-sm min-[360px]:text-lg text-amber-400">
+                {shadowStats.data?.dataset_size || 0}
               </div>
             </div>
           </div>
@@ -798,6 +922,70 @@ export function ShadowLearningPage() {
           </div>
         )}
 
+        {/* NLP Sentiment va Dinamik Vaznlar */}
+        {activeTab === 'overview' && portfolioState.data && (
+          <div className="mt-4 flex flex-col gap-4">
+            
+            {/* Fundamental NLP Sentiment */}
+            <div className="w-full bg-gradient-to-r from-blue-900/40 to-emerald-900/40 border border-white/10 rounded-2xl p-4 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-3 opacity-20">
+                <Brain size={40} />
+              </div>
+              <h3 className="text-[12px] font-bold text-white/70 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Activity size={14} className="text-emerald-400" /> Bozor Kayfiyati (NLP)
+              </h3>
+              <div className="flex items-center gap-4">
+                <div className={cn(
+                  "text-3xl font-black",
+                  portfolioState.data.sentiment_score > 60 ? "text-emerald-400" : 
+                  portfolioState.data.sentiment_score < 40 ? "text-rose-400" : "text-amber-400"
+                )}>
+                  {portfolioState.data.sentiment_score}
+                </div>
+                <div className="flex-1">
+                  <div className="w-full h-3 bg-black/50 rounded-full overflow-hidden relative">
+                    {/* Gradient bar */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 opacity-50" />
+                    {/* Pointer */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,1)] z-10"
+                      style={{ left: `${portfolioState.data.sentiment_score}%`, transform: 'translateX(-50%)' }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[9px] text-white/40 mt-1 uppercase font-bold">
+                    <span>Kuchli Sell</span>
+                    <span>Neutral</span>
+                    <span>Kuchli Buy</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Dinamik Vaznlar */}
+            <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-2xl p-4">
+              <h3 className="text-[12px] font-bold text-white/70 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Target size={14} className="text-blue-400" /> Multi-Strategy AI Vaznlari
+              </h3>
+              <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-3">
+                {portfolioState.data.strategies.map((strat) => (
+                  <div key={strat.name} className="bg-black/30 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1.5 group hover:border-white/20 transition-all">
+                    <span className="text-[11px] font-bold text-white/80 uppercase">{strat.name}</span>
+                    <div className="flex items-end justify-between">
+                      <span className="text-xl font-black text-white group-hover:text-blue-400 transition-colors">
+                        {strat.weight}
+                      </span>
+                      <span className="text-[9px] text-white/40 mb-1">Max 100</span>
+                    </div>
+                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
+                      <div className="h-full bg-blue-500" style={{ width: `${strat.weight}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* QORA QUTI (BLACK BOX) */}
         {activeTab === 'blackbox' && (
           <div className="flex flex-col gap-6">
@@ -810,6 +998,39 @@ export function ShadowLearningPage() {
                <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-400" size={32} /></div>
             ) : blackbox.data ? (
               <>
+                {/* RL Agent Progress (Qora Quti Simulyatori) */}
+                {blackbox.data.rl_agent_progress && (
+                  <div className="w-full bg-[#10192e]/60 backdrop-blur-xl border border-emerald-500/20 rounded-[24px] p-5 relative overflow-hidden mb-6 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                    <div className="absolute top-0 right-0 p-4">
+                      <span className="flex h-3 w-3 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-white/90 uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <Brain className="text-emerald-400" size={18} /> RL Agent (PPO) Simulyatori
+                    </h3>
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">O'ynalgan Epizodlar</span>
+                        <span className="text-xl font-black text-white">{blackbox.data.rl_agent_progress.episodes_played.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">Simulyator Win Rate</span>
+                        <span className="text-xl font-black text-emerald-400">{blackbox.data.rl_agent_progress.win_rate_simulation}%</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">O'rtacha Daromad (Mukofot)</span>
+                        <span className="text-xl font-black text-violet-400">{blackbox.data.rl_agent_progress.avg_reward.toFixed(1)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">Strategiya O'sishi</span>
+                        <span className="text-xl font-black text-emerald-400">+{blackbox.data.rl_agent_progress.growth}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Close Mechanism Analizi */}
                 <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
                   <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">Close Mechanism bo'yicha Zararlar</h3>

@@ -55,6 +55,9 @@ class BotConfig:
     # Drawdown-based risk reduction
     drawdown_threshold_pct: float = 0.05
     drawdown_risk_multiplier: float = 0.5
+    
+    # 4-Bosqich: Live Shadow Mode
+    shadow_mode: bool = True
 
     @classmethod
     def load(cls, env_path: str = ".env", config_path: str = "config.json") -> "BotConfig":
@@ -102,6 +105,8 @@ class BotConfig:
                     self.ai_model_medium = ai.get("model_medium", self.ai_model_medium)
                     self.ai_model_weak = ai.get("model_weak", self.ai_model_weak)
                     self.ai_system_prompt = ai.get("system_prompt", self.ai_system_prompt)
+                    
+                    self.shadow_mode = data.get("shadow_mode", self.shadow_mode)
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
@@ -130,13 +135,13 @@ class BotConfig:
         if "ai_enabled" in data:
             self.ai_enabled = bool(data["ai_enabled"])
             
-        if "ai_model" in data:
+        if data.get("ai_model"):
             self.ai_model = data["ai_model"]
             
-        if "ai_model_medium" in data:
+        if data.get("ai_model_medium"):
             self.ai_model_medium = data["ai_model_medium"]
             
-        if "ai_model_weak" in data:
+        if data.get("ai_model_weak"):
             self.ai_model_weak = data["ai_model_weak"]
             
         if "max_daily_loss" in data:

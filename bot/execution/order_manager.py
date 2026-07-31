@@ -244,7 +244,39 @@ class OrderManager:
             else:
                 request["type_time"] = self.mt5.ORDER_TIME_GTC
 
-            result = self.mt5.order_send(request)
+            if getattr(self.config, "shadow_mode", False):
+                import time
+                class DummyResult:
+                    def __init__(self, retcode, ticket):
+                        self.retcode = retcode
+                        self.ticket = ticket
+                        self.deal = ticket
+                        self.order = ticket
+                
+                # Shadow bazaga yozamiz
+                import sqlite3
+                import os
+                try:
+                    db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'bot_learning.db')
+                    conn = sqlite3.connect(db_path)
+                    cursor = conn.cursor()
+                    cursor.execute('''CREATE TABLE IF NOT EXISTS shadow_live_trades (
+                        ticket INTEGER PRIMARY KEY, symbol TEXT, type TEXT, volume REAL, price_open REAL, sl REAL, tp REAL, status TEXT
+                    )''')
+                    ticket_id = int(time.time()) + len(tickets) + int(vol * 100)
+                    is_buy_trade = "BUY" in signal
+                    cursor.execute("INSERT INTO shadow_live_trades (ticket, symbol, type, volume, price_open, sl, tp, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN')", 
+                                   (ticket_id, symbol, "BUY" if is_buy_trade else "SELL", vol, price, virtual_sl, tp_price))
+                    conn.commit()
+                    conn.close()
+                except Exception as e:
+                    logger.error(f"Shadow trade yozishda xato: {e}")
+                
+                result = DummyResult(self.mt5.TRADE_RETCODE_DONE, ticket_id)
+                logger.info(f"[{symbol}] 👻 SHADOW MODE: Virtual {signal} order placed. Ticket: {ticket_id}")
+            else:
+                result = self.mt5.order_send(request)
+
             if result is None:
                 return False, f"Order yuborilmadi: {self.mt5.last_error()}", None
             if result.retcode != self.mt5.TRADE_RETCODE_DONE:
@@ -591,7 +623,7 @@ class OrderManager:
             sl = order.sl
             
             # Faqat limit orderlarni tekshiramiz
-            if order_type not in [self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_SELL_LIMIT]:
+            if order_type not in [self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_SELL_LIMIT, self.mt5.ORDER_TYPE_BUY_STOP, self.mt5.ORDER_TYPE_SELL_STOP]:
                 continue
                 
             tick = self.mt5.symbol_info_tick(symbol)
@@ -608,15 +640,122 @@ class OrderManager:
             # Invalidation tekshiruvi
             if sl > 0:
                 if order_type == self.mt5.ORDER_TYPE_BUY_LIMIT:
-                    # Agar narx buy limit olinmasdan SL ga tushib ketgan bo'lsa
                     if tick.ask <= sl:
                         logger.info(f"[{symbol}] Buy Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 elif order_type == self.mt5.ORDER_TYPE_SELL_LIMIT:
-                    # Agar narx sell limit olinmasdan SL dan oshib ketgan bo'lsa
                     if tick.bid >= sl:
                         logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
+                
+    def manage_virtual_shadow_trades(self):
+        """
+        SHADOW MODE da ochilgan virtual pozitsiyalarni (SL/TP) boshqarish.
+        """
+        import sqlite3
+        import os
+        try:
+            db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'bot_learning.db')
+            if not os.path.exists(db_path):
+                return
+                
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            
+            # Check table exists
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shadow_live_trades'")
+            if not cursor.fetchone():
+                conn.close()
+                return
+                
+            cursor.execute("SELECT ticket, symbol, type, volume, price_open, sl, tp FROM shadow_live_trades WHERE status='OPEN'")
+            open_trades = cursor.fetchall()
+            
+            for trade in open_trades:
+                ticket, symbol, trade_type, volume, price_open, sl, tp = trade
+                tick = self.mt5.symbol_info_tick(symbol)
+                if not tick:
+                    continue
+                    
+                current_price = tick.ask if trade_type == "SELL" else tick.bid
+                
+                closed = False
+                profit = 0.0
+                reason = ""
+                
+                if trade_type == "BUY":
+                    if sl and current_price <= sl:
+                        closed, reason = True, "SL"
+                        profit = (sl - price_open) * volume * 1000 # Dummy calc
+                    elif tp and current_price >= tp:
+                        closed, reason = True, "TP"
+                        profit = (tp - price_open) * volume * 1000
+                elif trade_type == "SELL":
+                    if sl and current_price >= sl:
+                        closed, reason = True, "SL"
+                        profit = (price_open - sl) * volume * 1000
+                    elif tp and current_price <= tp:
+                        closed, reason = True, "TP"
+                        profit = (price_open - tp) * volume * 1000
+                        
+                if closed:
+                    cursor.execute("UPDATE shadow_live_trades SET status='CLOSED' WHERE ticket=?", (ticket,))
+                    logger.info(f"[{symbol}] 👻 SHADOW MODE: Trade {ticket} closed by {reason}. P/L: {profit:.2f}")
+                    
+                    # AI xotirasiga o'tkazish (analiz u-n)
+                    try:
+                        cursor.execute('''CREATE TABLE IF NOT EXISTS shadow_trade_history (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            symbol TEXT,
+                            profit REAL,
+                            close_reason TEXT,
+                            timestamp TEXT
+                        )''')
+                        import datetime
+                        cursor.execute("INSERT INTO shadow_trade_history (symbol, profit, close_reason, timestamp) VALUES (?, ?, ?, ?)", 
+                                       (symbol, profit, reason, datetime.datetime.now().isoformat()))
+                    except Exception as e:
+                        logger.error(f"Shadow history saqlashda xato: {e}")
+            
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"manage_virtual_shadow_trades error: {e}")
+
+    def close_position(self, position: Any, comment: str = "AI Close") -> bool:
+        symbol = position.symbol
+        tick = self.mt5.symbol_info_tick(symbol)
+        if not tick:
+            return False
+            
+        if position.type == self.mt5.ORDER_TYPE_BUY:
+            order_type = self.mt5.ORDER_TYPE_SELL
+            price = tick.bid
+        else:
+            order_type = self.mt5.ORDER_TYPE_BUY
+            price = tick.ask
+            
+        request = {
+            "action": self.mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": position.volume,
+            "type": order_type,
+            "position": position.ticket,
+            "price": price,
+            "deviation": 20,
+            "magic": self.magic_number,
+            "comment": comment,
+            "type_time": self.mt5.ORDER_TIME_GTC,
+            "type_filling": self._get_filling_mode(symbol),
+        }
+        
+        result = self.mt5.order_send(request)
+        if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            logger.error(f"Pozitsiyani yopishda xato: {self.mt5.last_error()}")
+            return False
+            
+        self.record_closed(symbol)
+        return True
 
     def manage_virtual_sl(self):
         """

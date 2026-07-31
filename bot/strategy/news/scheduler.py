@@ -103,12 +103,15 @@ def check_recent_news_ai(pair: str, detector: NewsDetector, ai_client=None) -> d
         try:
             logger.info(f"[{pair}] {title} uchun AI Fundamental tahlili so'ralmoqda (Actual: {actual})...")
             ai_response = ai_client.get_simple_response(prompt, system_prompt="Faqat aniq formatda javob qaytaring.")
-            hukm = NewsAIAnalyzer.parse_hukm(ai_response)
+            
+            # Yangi parse_advanced_hukm ni ishlatamiz
+            parsed = NewsAIAnalyzer.parse_advanced_hukm(ai_response)
             
             return {
                 "event": title,
                 "ai_analysis": ai_response,
-                "ai_direction": hukm,
+                "ai_direction": parsed.get("direction", "NEUTRAL"),
+                "sentiment_score": parsed.get("score", 50),
                 "time_since_release_hours": target_event.get('hours_ago')
             }
         except Exception as e:
@@ -141,6 +144,7 @@ def get_news_signal(pair: str, ai_client=None) -> dict:
             "direction": "Neutral", "confidence": 0.0, "sample_size": 0, "avg_move_pct": 0.0
         },
         "ai_analysis": ai_news_data,
+        "sentiment_score": ai_news_data.get("sentiment_score", 50) if ai_news_data else 50,
         "institutional_context": {
             "cot_trend": cot_data.get("cot_trend", "Unknown"),
             "note": cot_data.get("note", "")

@@ -68,6 +68,26 @@ type Body = {
     agreed_strategies?: string[];
     ai_used?: boolean;
   }>;
+  candles?: Array<{
+    symbol: string;
+    timeframe: string;
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume?: number;
+  }>;
+  smc_zones?: Array<{
+    symbol: string;
+    timeframe: string;
+    zone_type: 'order_block' | 'fvg';
+    direction: 'demand' | 'supply';
+    top: number;
+    bottom: number;
+    status: 'fresh' | 'mitigated' | 'invalidated';
+    formed_at: string;
+  }>;
 };
 
 function json(status: number, body: unknown) {
@@ -171,6 +191,21 @@ Deno.serve(async (req) => {
     const rows = body.closed_trades.map((t) => ({ ...t, user_id }));
     const { error } = await supabase.from("trade_history").upsert(rows, { onConflict: "user_id,ticket" });
     results.closed_trades = error ? { error: error.message } : `ok:${rows.length}`;
+  }
+
+  if (body.candles && body.candles.length > 0) {
+    const rows = body.candles.map(c => ({ ...c, user_id }));
+    const { error } = await supabase.from("candles").upsert(rows, { onConflict: "user_id,symbol,timeframe,time" });
+    results.candles = error ? { error: error.message } : `ok:${rows.length}`;
+  }
+
+  if (body.smc_zones && body.smc_zones.length > 0) {
+    const symbol = body.smc_zones[0].symbol;
+    const timeframe = body.smc_zones[0].timeframe;
+    await supabase.from("smc_zones").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+    const rows = body.smc_zones.map(z => ({ ...z, user_id }));
+    const { error } = await supabase.from("smc_zones").insert(rows);
+    results.smc_zones = error ? { error: error.message } : `ok:${rows.length}`;
   }
 
   return json(200, { ok: true, user_id, results, settings });

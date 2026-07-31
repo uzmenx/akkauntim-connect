@@ -37,6 +37,7 @@ from bot.strategy.kill_zones.engine import analyze_kill_zones
 from bot.engine.confluence import compute_atr
 from bot.engine.voting import aggregate_signals
 from bot.engine.dynamic_levels import calculate_dynamic_levels
+from bot.core.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,11 @@ class Backtester:
         # Haqiqiy BotConfig ishlatamiz — shu bilan weight/threshold'lar
         # live bot bilan avtomatik sinxron bo'ladi (qo'lda nusxa ko'chirilmaydi).
         self.config = config or BotConfig()
+        self.ai_client = AIClient(self.config)
         self.error_counts = {}
 
-    def run(self, start_date: datetime, end_date: datetime, split_ratio: float = 0.5):
-        print(f"--- Backtest Boshlandi: {self.strategy_name} on {self.symbol} ---")
+    def run(self, start_date: datetime, end_date: datetime, split_ratio: float = 0.5, mode: str = "ai_siz"):
+        print(f"--- Backtest Boshlandi: {self.strategy_name} on {self.symbol} (Mode: {mode}) ---")
 
         df = self.data_loader.fetch_history(self.symbol, self.timeframe, start_date, end_date)
         if df is None or df.empty:
@@ -73,7 +75,7 @@ class Backtester:
         print("\n--- IN-SAMPLE (IS) SIMULYATSIYA BOSHLANDI ---")
         self.broker.reset()
         self.error_counts = {}
-        self._run_simulation(is_df)
+        self._run_simulation(is_df, mode)
         is_stats = self.broker.get_stats()
         print(f"IS Natijalar: {is_stats}")
         self._print_error_summary("IS")
@@ -81,7 +83,7 @@ class Backtester:
         print("\n--- OUT-OF-SAMPLE (OOS) SIMULYATSIYA BOSHLANDI ---")
         self.broker.reset()
         self.error_counts = {}
-        self._run_simulation(oos_df)
+        self._run_simulation(oos_df, mode)
         oos_stats = self.broker.get_stats()
         print(f"OOS Natijalar: {oos_stats}")
         self._print_error_summary("OOS")
@@ -103,7 +105,7 @@ class Backtester:
     def _get_pip_divisor(self) -> float:
         return 0.01 if "JPY" in self.symbol.upper() else 0.0001
 
-    def _run_simulation(self, df):
+    def _run_simulation(self, df, mode: str = "ai_siz"):
         min_bars = 100
         if len(df) <= min_bars:
             print("Kandelalar soni yetarli emas (min 100)!")
@@ -150,6 +152,18 @@ class Backtester:
             risk_pct = voting_result.get("risk_pct", 0.0)
             if risk_pct <= 0:
                 continue
+                
+            # --- AI FILTER (GIBRID YONDASHUV) ---
+            if mode == "ai_bilan":
+                print(f"[{current_row['time']}] Mexanik signal topildi: {signal}. AI ga yuborilmoqda...")
+                ai_prompt = f"Bozorda {signal} signali shakllandi. Narx: {current_price}. Iltimos, buni tasdiqlang. Javobingizni faqat JSON formatida bering: {{'approved': true/false, 'reasoning': '...'}}"
+                ai_response = self.ai_client.get_decision(prompt=ai_prompt, system_prompt="Sen savdo bo'yicha tahlilchisan.")
+                
+                if not ai_response or not ai_response.get("approved", False):
+                    print(f"[{current_row['time']}] AI rad etdi: {ai_response.get('reasoning', 'No reason') if ai_response else 'No response'}")
+                    continue
+                else:
+                    print(f"[{current_row['time']}] AI tasdiqladi!")
 
             levels = calculate_dynamic_levels(
                 signal=signal,

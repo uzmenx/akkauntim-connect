@@ -59,8 +59,9 @@ class JobListener:
         symbol = job['symbol']
         timeframe_str = job['timeframe']
         mode = job['mode']
+        period_str = job.get('period', '1m')
         
-        logger.info(f"Yangi backtest vazifasi qabul qilindi: {job_id} ({symbol})")
+        logger.info(f"Yangi backtest vazifasi qabul qilindi: {job_id} ({symbol}, period: {period_str})")
         
         # Statusni running ga o'tkazamiz
         self.supabase.table("backtest_jobs").update({"status": "running"}).eq("id", job_id).execute()
@@ -75,11 +76,16 @@ class JobListener:
 
             bt = Backtester(symbol, tf, self.config)
             
-            # Oxirgi 3 oy ma'lumotlari
+            # Tarixiy ma'lumotlar davri
             end_date = datetime.now()
-            start_date = end_date - timedelta(days=30) # Default 1 oy (Webdan so'rash rejasida qolgan ochiq savolga ko'ra)
+            days = 30
+            if period_str == '3m': days = 90
+            elif period_str == '6m': days = 180
+            elif period_str == '1y': days = 365
+                
+            start_date = end_date - timedelta(days=days)
             
-            results = bt.run(start_date, end_date, split_ratio=1.0) # Hammasi IS ga o'tadi
+            results = bt.run(start_date, end_date, split_ratio=1.0, mode=mode)
             
             if results and "IS" in results:
                 stats = results["IS"]
@@ -97,7 +103,7 @@ class JobListener:
                     "total_trades": total_trades,
                     "win_rate": round(win_rate, 2),
                     "total_profit": round(profit, 2),
-                    "reasoning": f"Tarixiy ma'lumotlarda (oxirgi 1 oy) Voting Engine orqali tekshirildi." if mode == 'ai_siz' else "AI simulyatsiya (Kelajakda to'liq ulanadi)."
+                    "reasoning": f"Tarixiy ma'lumotlarda (oxirgi {days} kun) Voting Engine orqali tekshirildi." if mode == 'ai_siz' else f"AI Bilan Gibrid test (oxirgi {days} kun). AI qarorlari qo'llanildi."
                 }
                 
                 self.supabase.table("test_results").insert(test_result).execute()

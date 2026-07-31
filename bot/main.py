@@ -26,7 +26,11 @@ from bot.execution.risk_manager import RiskManager
 from bot.engine.ai_call_gate import should_call_ai
 from bot.execution.order_manager import OrderManager
 from bot.learning.trade_reviewer import TradeReviewer
+from bot.learning.ai_strategist import AIStrategist
 from bot.learning.ai_memory import AIMemory
+from bot.learning.shadow_collector import ShadowStateCollector
+from bot.learning.simulator import RLAgentRunner
+from bot.learning.predictor import PredictorEngine
 from bot.sync.supabase_sync import SupabaseSync
 from bot.sync.telegram_sync import TelegramSync
 from bot.engine.close_mechanism_classifier import classify_close_mechanism
@@ -64,9 +68,23 @@ class TradingBot:
 
         # Engine
         self.prompt_builder = PromptBuilder(config)
-        self.reviewer = TradeReviewer(self.mt5, self.ai, config)
         self.regime_detector = RegimeDetector()
-        self.portfolio_manager = StrategyPortfolioManager()
+        
+        # O'rganuvchi AI komponentlari
+        self.ai_memory = AIMemory()
+        self.reviewer = TradeReviewer(self.mt5, self.ai, self.config)
+        self.shadow_collector = ShadowStateCollector()
+        self.rl_agent = RLAgentRunner()
+
+        # Multi-Strategy Portfolio
+        from bot.engine.portfolio_manager import PortfolioManager, SMCStrategy, PatternStrategy, NewsStrategy, WyckoffStrategy, SRVolumeStrategy, AutoPatternStrategy
+        self.portfolio_manager = PortfolioManager(self.config)
+        self.portfolio_manager.register_strategy(SMCStrategy(self))
+        self.portfolio_manager.register_strategy(PatternStrategy(self))
+        self.portfolio_manager.register_strategy(NewsStrategy(self))
+        self.portfolio_manager.register_strategy(WyckoffStrategy(self))
+        self.portfolio_manager.register_strategy(SRVolumeStrategy(self))
+        self.portfolio_manager.register_strategy(AutoPatternStrategy(self))
 
         # Execution
         self.risk = RiskManager(self.mt5, config, self.state)
@@ -77,9 +95,11 @@ class TradingBot:
         self.sync = SupabaseSync(config)
         self.telegram = TelegramSync(config)
         
-        # AI Memory (doimiy xotira)
-        self.ai_memory = AIMemory()
+        # AI Memory sync
         self.ai_memory.sync_client = self.sync
+        
+        # Deep Learning Predictor (LSTM)
+        self.predictor = PredictorEngine()
         
         # Reviewer ichidagi ai_memory ni ham cloud ga ulaymiz
         self.reviewer.ai_memory.sync_client = self.sync
@@ -126,6 +146,60 @@ class TradingBot:
         except Exception as e:
             logger.error(f"SMC Engine xatolik: {e}")
             return None
+
+    def _sync_chart(self, symbol: str, timeframe: str, df: pd.DataFrame, smc_data: Dict[str, Any]):
+        """Yangi chart (Candles + SMC) ma'lumotlarini jo'natish"""
+        try:
+            import datetime
+            candles_list = []
+            if df is not None and not df.empty:
+                for idx, row in df.tail(300).iterrows():
+                    candles_list.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "time": str(idx),
+                        "open": float(row['open']),
+                        "high": float(row['high']),
+                        "low": float(row['low']),
+                        "close": float(row['close']),
+                        "volume": float(row.get('tick_volume', 0.0))
+                    })
+            
+            zones_list = []
+            if smc_data and isinstance(smc_data, dict):
+                ob_dict = smc_data.get('order_blocks', {})
+                fvg_dict = smc_data.get('fvg', {})
+                
+                blocks = ob_dict.get('demand', []) + ob_dict.get('supply', []) if isinstance(ob_dict, dict) else []
+                fvgs = fvg_dict.get('demand', []) + fvg_dict.get('supply', []) if isinstance(fvg_dict, dict) else []
+                
+                for ob in blocks:
+                    zones_list.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "zone_type": "order_block",
+                        "direction": ob.get("ob_type", "demand"),
+                        "top": float(ob.get("top", 0)),
+                        "bottom": float(ob.get("bottom", 0)),
+                        "status": ob.get("status", "fresh"),
+                        "formed_at": str(ob.get("timestamp", datetime.datetime.now().isoformat()))
+                    })
+                for fvg in fvgs:
+                    zones_list.append({
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "zone_type": "fvg",
+                        "direction": fvg.get("type", "demand"),
+                        "top": float(fvg.get("top", 0)),
+                        "bottom": float(fvg.get("bottom", 0)),
+                        "status": fvg.get("status", "fresh"),
+                        "formed_at": str(fvg.get("timestamp", datetime.datetime.now().isoformat()))
+                    })
+
+            if hasattr(self, 'sync') and hasattr(self.sync, 'sync_chart_data'):
+                self.sync.sync_chart_data(symbol, timeframe, candles_list, zones_list)
+        except Exception as e:
+            logger.error(f"Chart sync failed for {symbol}: {e}")
 
     def _get_harmonic_patterns(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Harmonic pattern aniqlash."""
@@ -298,15 +372,6 @@ class TradingBot:
     def run_cycle(self, symbol: str) -> None:
         """
         Bitta symbol uchun to'liq trading siklini bajarish.
-
-        YANGI OQIM (Confluence Engine):
-        1. Ma'lumot olish (H1)
-        2. Texnik tahlil (SMC + Harmonic + News)
-        3. Confluence Ball hisoblash (0-140)
-        4. Qaror: EXECUTE (70+) / AI_DECIDE (50-69) / REJECT (<50)
-        5. Dinamik SL/TP hisoblash
-        6. Risk tekshiruv
-        7. Order joylashtirish
         """
         logger.info(f"=== [{symbol}] Tahlil boshlandi ===")
 
@@ -324,7 +389,6 @@ class TradingBot:
         # 1.5. REJIM ANIQLASH VA STRATEGIYALAR PORTFELI
         # ============================================================
         current_regime = self.regime_detector.update(df_major)
-        active_strategies = self.portfolio_manager.get_active_strategies(current_regime)
         
         try:
             adx_val = self.regime_detector.last_adx
@@ -334,28 +398,48 @@ class TradingBot:
             logger.debug(f"Rejimni log qilishda xatolik: {e}")
 
         # ============================================================
-        # 2. TEXNIK TAHLIL — barcha strategiyalarni ishga tushirish
+        # 2. TEXNIK TAHLIL VA PORTFEL BOSHQARUVI (Multi-Strategy)
         # ============================================================
-        smc_result = self._get_smc_full_analysis(df_major)
-        if smc_result:
-            try:
-                from bot.strategy.smc.engine import to_voting_signal as smc_voting
-                sig_data = smc_voting(smc_result)
-                smc_result["signal"] = sig_data.get("signal", "HOLD")
-                smc_result["confidence"] = sig_data.get("confidence", 0)
-            except Exception as e:
-                logger.error(f"SMC to_voting_signal xatosi: {e}")
-                
-        smc_context = self._get_smc_data(df_major)
+        
+        kill_zones_result = self._get_kill_zones_analysis(df_major)
+        
+        strat_context = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "kill_zones": kill_zones_result,
+            "regime": current_regime.value
+        }
+        
+        # Portfolio Manager barcha registratsiyadan o'tgan strategiyalarni ishga tushiradi
+        portfolio_result = self.portfolio_manager.analyze_all(df_major, strat_context)
+        voting_result = portfolio_result
+        
+        # 3. SHADOW AI DATA PIPELINE — (Faqat birinchi yozuv, qaror oldidan vaziyatni qayd etamiz)
+        # Ikkinchi (yakuniy) record_state faqat final_decision bilan pastda chaqiriladi
+        smc_details = voting_result.get('details', {}).get('SMC', {})
+        
+        # ============================================================
+        # 4. Qaror qabul qilish (EXECUTE/REJECT) uchun kerakli ma'lumotlarni ajratib olamiz
+        smc_result = portfolio_result["details"].get("SMC", {})
+        
+        # Frontend Chart uchun ma'lumotlarni sinxronizatsiya qilamiz
+        self._sync_chart(symbol, self.config.timeframe_major, df_major, smc_result)
+        
+        pattern_result = portfolio_result["details"].get("Pattern", {})
+        news_result = portfolio_result["details"].get("News", {})
+        wyckoff_result = portfolio_result["details"].get("Wyckoff", {})
+        sr_volume_result = portfolio_result["details"].get("SR_Volume", {})
+        auto_patterns_result = portfolio_result["details"].get("Auto_Pattern", {})
         
         # Minor timeframe ma'lumotlarini qo'shish
         tf_minor = self.config.timeframe_minor
         df_minor = self._fetch_data(symbol, tf_minor, 150)
         smc_minor = self._get_smc_data(df_minor) if not df_minor.empty else {}
+        smc_context = self._get_smc_data(df_major)
         
-        pattern_result = self._get_harmonic_patterns(df_major)
-        news_result = self._get_news_context(symbol)
         memory_bank_text = self._get_memory_bank_alerts(symbol, current_price)
+        anti_manipulation_result = self._get_anti_manipulation_analysis(df_major, smc_result or smc_context, current_price)
+        trap_detector_result = self._get_trap_detection_analysis(df_major)
         
         # Balans va ochiq pozitsiyalarni olish
         acc_info = self.mt5.get_account_info()
@@ -368,45 +452,20 @@ class TradingBot:
             for p in open_positions:
                 positions_info.append(f"{'BUY' if p.type == self.mt5.ORDER_TYPE_BUY else 'SELL'} {p.volume} lot at {p.price_open}")
 
-        try:
-            from bot.strategy.wyckoff.engine import analyze_wyckoff, to_voting_signal as wyckoff_voting
-            wyckoff_result = analyze_wyckoff(df_major)
-            if wyckoff_result:
-                sig_data = wyckoff_voting(wyckoff_result)
-                wyckoff_result["signal"] = sig_data.get("signal", "HOLD")
-                wyckoff_result["confidence"] = sig_data.get("confidence", 0)
-        except Exception as e:
-            logger.error(f"Wyckoff tahlil xatosi: {e}")
-            wyckoff_result = {}
-
-        sr_volume_result = self._get_sr_volume_analysis(df_major)
-        auto_patterns_result = self._get_auto_patterns_analysis(df_major, current_price)
-        kill_zones_result = self._get_kill_zones_analysis(df_major)
-        anti_manipulation_result = self._get_anti_manipulation_analysis(df_major, smc_result or smc_context, current_price)
-        trap_detector_result = self._get_trap_detection_analysis(df_major)
-
         # ============================================================
         # 3. CONFLUENCE ENGINE — ball tizimi asosida savdo qarori
         # ============================================================
         adj = getattr(self, "last_adjustments", self.reviewer.get_active_adjustments())
-
-        voting_result = aggregate_signals(
-            smc_data=smc_result or smc_context,
-            pattern_data=pattern_result,
-            news_data=news_result,
-            wyckoff_data=wyckoff_result,
-            sr_volume_data=sr_volume_result,
-            auto_pattern_data=auto_patterns_result,
-            kill_zones_data=kill_zones_result,
-            config=self.config,
-            active_strategies=active_strategies
-        )
+        
+        # active_strategies o'rniga portfeldan faollarni uzatamiz (faqat prompt uchun kerak bo'lsa)
+        active_strategies = portfolio_result.get("agreed_strategies", [])
 
         # ============================================================
         # AI AGENT AUTONOMOUS DECISION
         # ============================================================
         
         recent_candles_text = "Vaqt, O, H, L, C\n"
+        recent_candles_list = []
         if not df_major.empty:
             for _, row in df_major.tail(30).iterrows():
                 try:
@@ -414,6 +473,43 @@ class TradingBot:
                 except Exception:
                     time_str = str(row['time'])
                 recent_candles_text += f"{time_str}, {row['open']:.5f}, {row['high']:.5f}, {row['low']:.5f}, {row['close']:.5f}\n"
+                recent_candles_list.append({
+                    'open': float(row['open']), 'high': float(row['high']), 
+                    'low': float(row['low']), 'close': float(row['close']), 
+                    'tick_volume': float(row['tick_volume'])
+                })
+
+        # Deep Learning Prediction
+        dl_prediction = self.predictor.predict(recent_candles_list)
+        if dl_prediction.get("prediction") != "HOLD":
+            logger.info(f"[{symbol}] 🧠 DL Predictor Signali: {dl_prediction['prediction']} (Conf: {dl_prediction['confidence']}%)")
+
+        # RL Agent Action (Jonli qaror)
+        try:
+            position_status = 0.0
+            unrealized_profit_ratio = 0.0
+            if open_positions:
+                for p in open_positions:
+                    position_status = 1.0 if p.type == self.mt5.ORDER_TYPE_BUY else -1.0
+                    unrealized_profit_ratio = (p.profit / balance) if balance > 0 else 0.0
+                    break
+                    
+            obs_data = [
+                (balance / 1000.0) if balance > 0 else 1.0,
+                float(df_major.iloc[-1]['open']),
+                float(df_major.iloc[-1]['high']),
+                float(df_major.iloc[-1]['low']),
+                float(df_major.iloc[-1]['close']),
+                float(df_major.iloc[-1]['tick_volume']),
+                position_status,
+                unrealized_profit_ratio
+            ]
+            rl_action = self.rl_agent.predict_action(obs_data)
+            if rl_action != "HOLD":
+                logger.info(f"[{symbol}] 🤖 RL Agent Signali (Live Shadow): {rl_action}")
+        except Exception as e:
+            logger.debug(f"RL agent action olishda xatolik: {e}")
+            rl_action = "HOLD"
 
         context = self.prompt_builder.build_context_summary(
             smc_result=smc_result or smc_context,
@@ -434,6 +530,8 @@ class TradingBot:
         context["active_strategies"] = active_strategies
         context["timeframe"] = self.config.timeframe_major
         context["current_price"] = current_price
+        context["dl_prediction"] = dl_prediction  # Add DL prediction to prompt context
+        context["rl_action"] = rl_action          # Add RL Agent prediction
         context["timeframe_minor"] = tf_minor
         context["smc_minor"] = smc_minor
         context["balance"] = balance
@@ -541,26 +639,86 @@ class TradingBot:
                 logger.error(f"[{symbol}] AI javob bermadi! AI-siz algoritmik rejimga o'tilmoqda.")
 
         if not ai_decision:
-            # Fallback to pure algorithmic decision based on voting_result
+            # Smart Fallback to pure algorithmic decision based on voting_result
             final_signal = voting_result.get("signal", "HOLD")
+            confidence = voting_result.get("score", 0)
+            reasoning = f"⚙️ [AI-siz Rejim] Sof algoritmik xulosa (Ball: {confidence}). "
+            
+            pip_div = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
+            
+            entry_price = current_price
+            sl_price = None
+            tp_price = None
+            
+            if final_signal in ["BUY", "SELL"]:
+                try:
+                    from bot.engine.confluence import compute_atr, _extract_fresh_zones
+                    atr = compute_atr(df_major)
+                    if atr <= 0:
+                        atr = 15 * pip_div
+                        
+                    smc_for_fallback = smc_result if smc_result else smc_context
+                    direction = "demand" if final_signal == "BUY" else "supply"
+                    
+                    zones = _extract_fresh_zones(smc_for_fallback, direction, current_price, atr, max_distance_atr=3.0)
+                    
+                    if zones:
+                        best_zone = zones[0]  # Eng yaqin zona
+                        zone_top = best_zone["top"]
+                        zone_bottom = best_zone["bottom"]
+                        zone_dist = best_zone["distance_atr"]
+                        
+                        if zone_dist > 0.5:
+                            # Narx uzoqda bo'lsa LIMIT order
+                            final_signal = "LIMIT_BUY" if final_signal == "BUY" else "LIMIT_SELL"
+                            entry_price = zone_top if final_signal == "LIMIT_BUY" else zone_bottom
+                            reasoning += f"Narx uzoqda ({zone_dist:.1f} ATR). {entry_price:.5f} dagi {best_zone['type'].upper()} ga LIMIT qo'yildi. "
+                        else:
+                            # Narx yaqin bo'lsa Market order
+                            reasoning += f"Narx joriy {best_zone['type'].upper()} ichida. Market order. "
+                            entry_price = current_price
+                            
+                        # SL zonasini himoyalash
+                        if final_signal in ["BUY", "LIMIT_BUY"]:
+                            sl_price = zone_bottom - (atr * 0.5)
+                        else:
+                            sl_price = zone_top + (atr * 0.5)
+                    else:
+                        # Zonalar topilmasa, ATR asosida SL
+                        reasoning += "Yaqin SMC topilmadi. ATR asosida kirish. "
+                        entry_price = current_price
+                        if final_signal == "BUY":
+                            sl_price = current_price - (atr * 1.5)
+                        else:
+                            sl_price = current_price + (atr * 1.5)
+                    
+                    # TP = 1:2 RRR
+                    sl_diff = abs(entry_price - sl_price)
+                    if final_signal in ["BUY", "LIMIT_BUY"]:
+                        tp_price = entry_price + (sl_diff * 2.0)
+                    else:
+                        tp_price = entry_price - (sl_diff * 2.0)
+                        
+                except Exception as e:
+                    logger.error(f"Smart Fallback error: {e}")
+                    entry_price = current_price
+                    default_sl_pips = getattr(self.config, "default_sl_pips", 30)
+                    if final_signal == "BUY":
+                        sl_price = current_price - (default_sl_pips * pip_div)
+                        tp_price = current_price + ((default_sl_pips * 2) * pip_div)
+                    elif final_signal == "SELL":
+                        sl_price = current_price + (default_sl_pips * pip_div)
+                        tp_price = current_price - ((default_sl_pips * 2) * pip_div)
+            
             ai_decision = {
                 "decision": final_signal,
-                "confidence": voting_result.get("score", 0),
-                "reasoning": f"⚙️ [AI-siz Rejim] Sof algoritmik xulosa (Ball: {voting_result.get('score', 0)})",
+                "confidence": confidence,
+                "reasoning": reasoning,
                 "risk_pct": self.config.risk_per_trade,
-                "entry_price": current_price
+                "entry_price": entry_price,
+                "stop_loss": sl_price,
+                "take_profit": tp_price
             }
-            
-            # Simple algorithmic SL/TP placement if BUY/SELL
-            pip_div = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
-            default_sl_pips = getattr(self.config, "default_sl_pips", 30)
-            
-            if final_signal in ["BUY", "LIMIT_BUY"]:
-                ai_decision["stop_loss"] = current_price - (default_sl_pips * pip_div)
-                ai_decision["take_profit"] = current_price + ((default_sl_pips * 2) * pip_div)
-            elif final_signal in ["SELL", "LIMIT_SELL"]:
-                ai_decision["stop_loss"] = current_price + (default_sl_pips * pip_div)
-                ai_decision["take_profit"] = current_price - ((default_sl_pips * 2) * pip_div)
 
         final_decision = ai_decision.get("decision", "HOLD")
         reasoning_text = ai_decision.get("reasoning", "")
@@ -579,6 +737,30 @@ class TradingBot:
             regime=regime_str,
             ai_decision=final_decision,
         )
+
+        # === YANGI: SHADOW AI DATA PIPELINE ===
+        try:
+            indicators_data = {
+                "pattern": pattern_result.get("signal", "NEUTRAL") if pattern_result else "NEUTRAL",
+                "voting_score": voting_result.get("score", 0),
+                "adx": self.regime_detector.last_adx,
+                "volatility": self.regime_detector.last_vol_pct
+            }
+            last_candle = df_major.iloc[-1].to_dict() if not df_major.empty else {}
+            if 'time' in last_candle:
+                last_candle['time'] = str(last_candle['time'])
+                
+            self.shadow_collector.record_state(
+                symbol=symbol,
+                timeframe=self.config.timeframe_major,
+                candle=last_candle,
+                smc_context=smc_result or smc_context or {},
+                indicators=indicators_data,
+                market_regime=regime_str,
+                ai_decision=final_decision
+            )
+        except Exception as e:
+            logger.error(f"[{symbol}] Shadow DB yozishda xatolik: {e}")
 
         if final_decision == "HOLD":
             reasoning_lower = reasoning_text.lower()
@@ -754,13 +936,13 @@ class TradingBot:
             logger.error(f"❌ [{symbol}] Order xatolik: {order_msg}")
 
     def manage_positions(self) -> None:
-        """Ochiq pozitsiyalarni boshqarish (partial close, trailing)."""
+        """Ochiq pozitsiyalarni boshqarish"""
         try:
-            self.orders.manage_open_trades(
-                trailing_decision_fn=self._get_trailing_decision
-            )
+            self.orders.manage_open_trades(self._get_trailing_decision)
+            if getattr(self.config, "shadow_mode", False):
+                self.orders.manage_virtual_shadow_trades()
         except Exception as e:
-            logger.error(f"Pozitsiya boshqarishda xatolik: {e}")
+            logger.error(f"manage_open_trades error: {e}")
 
     def start(self) -> None:
         """Bot siklini ishga tushirish (graceful shutdown bilan)."""
@@ -781,6 +963,24 @@ class TradingBot:
         
         # Job Listener (Veb orqali backtest boshlash u-n) ni ishga tushirish
         self.job_listener.start()
+        
+        # DL va RL modellarni orqa fonda davriy o'qitish (har 4 soatda)
+        import threading
+        def periodic_retrain():
+            import time
+            while self._running:
+                try:
+                    logger.info("🔄 Davriy o'qitish boshlandi (LSTM + PPO)...")
+                    # LSTM Predictor
+                    self.predictor.train_incremental()
+                    # RL Agent (PPO) - 1,000,000 qadam (taxminan 10,000 ta epizod)
+                    self.rl_agent.train_agent(total_timesteps=1000000)
+                    logger.info("✅ Davriy o'qitish yakunlandi. Keyingisi 4 soatdan keyin.")
+                except Exception as e:
+                    logger.error(f"Davriy o'qitishda xato: {e}")
+                time.sleep(4 * 3600)  # 4 soat kutish
+                
+        threading.Thread(target=periodic_retrain, daemon=True).start()
 
         try:
             while self._running:
@@ -941,7 +1141,6 @@ class TradingBot:
                     try:
                         last_backup = self.state.get_trade_info("system_last_backup") or {}
                         last_backup_time = last_backup.get("time", 0)
-                        import time
                         if time.time() - last_backup_time > 86400: # 24 soat
                             logger.info("24 soatlik ma'lumotlar bazasi zaxirasi boshlandi...")
                             from bot.utils.backup_databases import backup_databases
@@ -983,13 +1182,13 @@ class TradingBot:
 
 
 def create_bot(env_path: str = ".env", config_path: str = "config.json") -> TradingBot:
-    """BotConfig yuklab TradingBot yaratish."""
+    "BotConfig yuklab TradingBot yaratish."
     config = BotConfig.load(env_path, config_path)
     return TradingBot(config)
 
 
 def run_cli() -> None:
-    """Console entry point: `yuksalish` CLI command."""
+    "Console entry point: `yuksalish` CLI command."
     import logging, os, sys
     logging.basicConfig(
         level=logging.INFO,

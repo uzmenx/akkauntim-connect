@@ -5,7 +5,7 @@ import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import {
   Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot, CandlestickChart
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -362,6 +362,11 @@ export function DashboardPage() {
             {/* Button 6: Backtest */}
             <Link to="/backtest" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(244,63,94,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-pink-400/50" aria-label="Backtest">
               <FlaskConical size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
+            </Link>
+
+            {/* Button 7: Chart */}
+            <Link to="/chart" className="flex-shrink-0 w-10 h-10 min-[360px]:w-11 min-[360px]:h-11 min-[390px]:w-[50px] min-[390px]:h-[50px] rounded-xl min-[360px]:rounded-2xl bg-gradient-to-br from-blue-400 to-blue-600 shadow-[inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(0,0,0,0.2),0_6px_16px_rgba(59,130,246,0.5)] hover:brightness-110 active:scale-95 flex items-center justify-center text-white transition-all group border border-blue-400/50" aria-label="Chart">
+              <CandlestickChart size={18} className="min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform text-white" />
             </Link>
           </div>
         </div>

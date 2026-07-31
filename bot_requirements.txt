@@ -22,3 +22,12 @@ python-dateutil>=2.8.2
 
 # Vector DB
 chromadb>=0.4.0
+
+# PDF Parsing
+pypdf>=3.0.0
+
+# Deep Learning / AI Models
+torch>=2.0.0
+scikit-learn>=1.2.0
+gymnasium>=0.29.0
+stable-baselines3>=2.2.1

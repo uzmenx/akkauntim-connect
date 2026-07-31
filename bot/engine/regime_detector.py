@@ -7,6 +7,7 @@ class MarketRegime(Enum):
     TREND = "TREND"
     RANGE = "RANGE"
     VOLATILE = "VOLATILE"
+    BLACK_SWAN = "BLACK_SWAN"
     UNKNOWN = "UNKNOWN"
 
 class RegimeDetector:
@@ -124,8 +125,17 @@ class RegimeDetector:
         self.last_adx = adx
         self.last_vol_pct = vol_pct
         
+        # Qora Oqqush (Black Swan) tekshiruvi: 
+        # Juda kuchli gap (bo'shliq) yoki anomaliya darajasidagi volatillik.
+        atr = df['tr'].ewm(alpha=1/14, adjust=False).mean().iloc[-1] if 'tr' in df.columns else (df['high'] - df['low']).mean()
+        gap = abs(df['open'].iloc[-1] - df['close'].iloc[-2]) if len(df) > 1 else 0
+        is_gap_swan = gap > (3 * atr) if atr > 0 else False
+        is_vol_swan = vol_pct > 98.0
+        
         # Soddalashtirilgan logika
-        if vol_pct > 80.0:
+        if is_gap_swan or is_vol_swan:
+            detected_regime = MarketRegime.BLACK_SWAN
+        elif vol_pct > 80.0:
             detected_regime = MarketRegime.VOLATILE
         elif adx > 25.0:
             detected_regime = MarketRegime.TREND

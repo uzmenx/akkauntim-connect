@@ -30,6 +30,7 @@ Shu ma'lumotlarga asoslanib, menga quyidagi formatda o'ta aniq tahlil ber:
 2. Smart Money Pozitsiyasi: Yirik investorlar ushbu xabardan keyin qaysi tomonga (BUY yoki SELL) katta hajmda pozitsiya ochadi?
 3. Likvidlik Ovi (Stop-Hunt): Katta o'yinchilar retail treyderlarni aldash uchun qanday manipulyatsiya qilishi mumkin?
 [HUKM]: BUY, SELL, yoki NEUTRAL (faqat bitta so'z yozing)
+[SCORE]: 0 dan 100 gacha bo'lgan kayfiyat balli (0=Juda yomon/Kuchli SELL, 100=Juda yaxshi/Kuchli BUY, 50=Neytral)
 [TP]: Take Profit uchun masofa pips hisobida (faqat raqam yozing, masalan: 150)
 [SL]: Stop Loss uchun masofa pips hisobida (faqat raqam yozing, masalan: 50)"""
 
@@ -49,6 +50,7 @@ Menga quyidagilarni aniq tahlil qilib ber:
 2. Katta Kapitalning Harakati: BlackRock kabi fondlar bunday sharoitda {symbol} juftligida qaysi tomonga yuzlanadi? (Risk-on yoki Risk-off?)
 3. Qisqa Muddatli Reaksiya: Keyingi 4-12 soat ichida bozorda qanday tebranish kutiladi?
 [HUKM]: BUY, SELL, yoki NEUTRAL (faqat bitta so'z yozing)
+[SCORE]: 0 dan 100 gacha bo'lgan kayfiyat balli (0=Juda yomon/Kuchli SELL, 100=Juda yaxshi/Kuchli BUY, 50=Neytral)
 [TP]: Take Profit uchun masofa pips hisobida (faqat raqam yozing, masalan: 120)
 [SL]: Stop Loss uchun masofa pips hisobida (faqat raqam yozing, masalan: 40)"""
 
@@ -68,6 +70,7 @@ Sening vazifang - chakana (retail) treyderlar nima qilishini va unga qarshi yiri
 2. Haqiqiy Yo'nalish: Institutsional investorlar {symbol} ni sotib olyaptimi yoki sotyaptimi?
 3. Volatillik Xaritasi: Dastlabki shpilka (spike) qaysi tomonga bo'lishi ehtimoli yuqori?
 [HUKM]: BUY, SELL, yoki NEUTRAL (faqat bitta so'z yozing)
+[SCORE]: 0 dan 100 gacha bo'lgan kayfiyat balli (0=Juda yomon/Kuchli SELL, 100=Juda yaxshi/Kuchli BUY, 50=Neytral)
 [TP]: Take Profit uchun masofa pips hisobida (faqat raqam yozing, masalan: 200)
 [SL]: Stop Loss uchun masofa pips hisobida (faqat raqam yozing, masalan: 60)"""
 
@@ -88,6 +91,7 @@ Quyidagi savollarga javob bering:
 2. Yirik banklar va hedge-fondlar ushbu yangilikdan so'ng qaysi yo'nalishga (BUY/SELL) pul kiritadi?
 3. Retail treyderlarning ehtimoliy xatosi nimada bo'ladi (stop-loss hunting qayerda bo'ladi)?
 [HUKM]: BUY, SELL, yoki NEUTRAL (faqat bitta so'z yozing)
+[SCORE]: 0 dan 100 gacha bo'lgan kayfiyat balli (0=Juda yomon/Kuchli SELL, 100=Juda yaxshi/Kuchli BUY, 50=Neytral)
 [TP]: Take Profit uchun masofa pips hisobida (faqat raqam yozing, masalan: 100)
 [SL]: Stop Loss uchun masofa pips hisobida (faqat raqam yozing, masalan: 30)"""
 
@@ -118,7 +122,7 @@ Quyidagi savollarga javob bering:
         """
         AI qaytargan javobdan HUKM, TP va SL ni ajratib oladi.
         """
-        result = {"direction": "NEUTRAL", "tp_pips": 100, "sl_pips": 50} # Defaults
+        result = {"direction": "NEUTRAL", "tp_pips": 100, "sl_pips": 50, "score": 50} # Defaults
         
         if not ai_response:
             return result
@@ -127,6 +131,12 @@ Quyidagi savollarga javob bering:
         hukm_match = re.search(r'\[HUKM\][:\s]+(BUY|SELL|NEUTRAL)', ai_response, re.IGNORECASE)
         if hukm_match:
             result["direction"] = hukm_match.group(1).upper()
+            
+        # Parse SCORE
+        score_match = re.search(r'\[SCORE\][:\s]+(\d+)', ai_response, re.IGNORECASE)
+        if score_match:
+            score_val = int(score_match.group(1))
+            result["score"] = max(0, min(100, score_val))
             
         # Parse TP
         tp_match = re.search(r'\[TP\][:\s]+(\d+)', ai_response, re.IGNORECASE)

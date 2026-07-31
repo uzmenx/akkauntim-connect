@@ -27,18 +27,42 @@ class BacktestDataLoader:
         return df
         
     def _generate_dummy_data(self, start: datetime, end: datetime) -> pd.DataFrame:
-        """Testing uchun dummy ma'lumotlar."""
-        # Sodda trend
+        """Testing uchun tasodifiy (tebranuvchan) dummy ma'lumotlar."""
+        import random
+        import math
+        
         periods = int((end.timestamp() - start.timestamp()) / 3600)
         dates = pd.date_range(start=start, end=end, periods=max(10, periods))
         
+        current_price = 1.1000
+        opens, highs, lows, closes = [], [], [], []
+        
+        # Sine wave + random noise to create realistic swings
+        for i in range(len(dates)):
+            trend = math.sin(i / 20.0) * 0.005  # Macro trend wave
+            noise = (random.random() - 0.5) * 0.004 # Micro noise
+            
+            step = trend + noise
+            
+            op = current_price
+            cl = current_price + step
+            hi = max(op, cl) + (random.random() * 0.002)
+            lo = min(op, cl) - (random.random() * 0.002)
+            
+            opens.append(op)
+            highs.append(hi)
+            lows.append(lo)
+            closes.append(cl)
+            
+            current_price = cl
+            
         df = pd.DataFrame({
             'time': dates,
-            'open': [1.0 + (i * 0.001) for i in range(len(dates))],
-            'high': [1.0 + (i * 0.001) + 0.002 for i in range(len(dates))],
-            'low': [1.0 + (i * 0.001) - 0.002 for i in range(len(dates))],
-            'close': [1.0 + (i * 0.001) + 0.001 for i in range(len(dates))],
-            'tick_volume': [100 for _ in range(len(dates))],
-            'spread': [2 for _ in range(len(dates))]
+            'open': opens,
+            'high': highs,
+            'low': lows,
+            'close': closes,
+            'tick_volume': [random.randint(100, 500) for _ in range(len(dates))],
+            'spread': [random.randint(1, 3) for _ in range(len(dates))]
         })
         return df

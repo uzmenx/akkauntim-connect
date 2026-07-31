@@ -107,30 +107,9 @@ export function BacktestPage() {
       });
       
       if (error) {
-        console.warn("Backend error (probably table doesn't exist yet). Using MVP Mock simulation.", error);
-      }
-      
-      // MVP Simulation (Backend hali to'liq ulanmaganligi sababli UI ni simulyatsiya qilamiz)
-      setTimeout(() => {
+        console.error("Vazifa qo'shishda xatolik:", error);
         setRunning(false);
-        
-        const newFakeResult: TestResultProps = {
-          id: Math.random().toString(),
-          type: activeTab === 'ai_siz' ? 'ai_siz' : 'ai_bilan',
-          created_at: new Date().toISOString(),
-          symbol,
-          timeframe,
-          total_trades: Math.floor(Math.random() * 40) + 15,
-          win_rate: 45 + Math.random() * 35,
-          total_profit: (Math.random() * 1500) - 300,
-          reasoning: activeTab === 'ai_bilan' 
-            ? "AI SMC va Garmonik patternlarni tahlil qildi. Asosiy trend kuchli Uptrend, kutilmagan yangiliklar ta'siri hisobga olindi." 
-            : undefined
-        };
-        
-        setResults(prev => [newFakeResult, ...prev]);
-        setActiveTab("history");
-      }, 10000); // 10 soniya kutamiz
+      }
       
     } catch (e) {
       console.error(e);

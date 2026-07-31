@@ -156,15 +156,19 @@ Kill Zones: {kz_summary}
 {anti_manip}
 {trap_detect}
 
-=== 6. AI TRADE REVIEWER (O'RGANISH MODULI) XULOSASI ===
+=== 6. QUANTITATIVE SHADOW AI SIGNALS (DL/RL) ===
+Deep Learning (LSTM) Model bashorati: {(context.get('dl_prediction') or {}).get('prediction', 'HOLD')} (Ishonch: {(context.get('dl_prediction') or {}).get('confidence', 0)}%)
+Reinforcement Learning (PPO) Agent tavsiyasi: {context.get('rl_action', 'HOLD')}
+
+=== 7. AI TRADE REVIEWER (O'RGANISH MODULI) XULOSASI ===
 Quyidagi tavsiyalar avvalgi xatolaringdan o'rganilgan:
 {json.dumps(context.get('learning_adjustments', {}))}
 
-=== 7. KITOBLARDAN O'RGANILGAN QOIDALAR ===
+=== 8. KITOBLARDAN O'RGANILGAN QOIDALAR ===
 Quyidagi qoidalar sening o'qigan kitoblaringdan olingan. Ularning tarixiy samaradorligiga e'tibor ber:
 {context.get('book_knowledge', "Hali kitob o'qilmagan.")}
 
-=== 8. AI XOTIRASI (OLDINGI SABOQLAR) ===
+=== 9. AI XOTIRASI (OLDINGI SABOQLAR) ===
 Quyidagi saboqlar sening oldingi savdolaring va xatolaringdan olingan. ULARGA AMAL QIL:
 {context.get('ai_memory', "Xotira hali bo'sh.")}
 
@@ -182,6 +186,12 @@ ZAIF TASDIQ QOIDASI: Agar eng asosiy strategiyalar (SMC va Auto Patterns) bir yo
 QAT'IY ZIDDIYAT (HOLD): Faqatgina SMC va Auto Patterns ning IKKALASI ham HOLD desa yoki bir-biriga mutlaqo qarama-qarshi signal (biri BUY, ikkinchisi SELL) bersa, yoxud bozor aniq yo'nalishga ega bo'lmay haddan tashqari beqaror bo'lsa — "HOLD" qarorini qaytar.
 
 Barcha strategiyalar xulosasiga asoslanib, kirish narxini (entry_price), SL va TP (aniq narx ko'rinishida) hamda Risk foizini (0.01 - 0.05 atrofida) belgilagin.
+
+SHADOW AI TASDIQ QOIDASI:
+- Agar DL (LSTM) ishonch darajasi > 75% VA RL (PPO) tavsiyasi SMC/Auto Patterns bilan BIR YO'NALISHDA bo'lsa — bu KUCHLI qo'shimcha tasdiq. Ishonchli kirish qil.
+- Agar DL ishonch darajasi 50-75% bo'lsa — O'RTACHA tasdiq. Ehtiyotkorroq kirish (kengroq SL yoki limit order).
+- Agar DL ishonch darajasi < 50% bo'lsa — ZAIF signal, e'tiborga olma.
+- Agar Shadow AI (DL/RL) va SMC bir-biriga QARAMA-QARSHI signal bersa (masalan DL=UP lekin SMC=SELL) — bu xavf belgisi! HOLD yoki LIMIT order bilan ehtiyot bo'l.
 
 JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday qo'shimcha matn (masalan markdown ```json) yozma! Sof JSON qaytar:
 {{

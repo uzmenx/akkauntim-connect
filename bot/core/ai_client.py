@@ -79,7 +79,7 @@ class AIClient:
         else:
             models_to_try = [selected_model, weak]
             
-        models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
+        models_to_try = [m for m in dict.fromkeys(models_to_try) if m]  # Remove duplicates and empty strings
 
         import time
         import anthropic
@@ -304,7 +304,7 @@ class AIClient:
         else:
             models_to_try = [selected_model, weak]
             
-        models_to_try = list(dict.fromkeys(models_to_try))  # Remove duplicates preserving order
+        models_to_try = [m for m in dict.fromkeys(models_to_try) if m]  # Remove duplicates and empty strings
 
         import time
         import anthropic

@@ -191,6 +191,16 @@ class SupabaseSync:
         
         return closed_rows
 
+    def sync_chart_data(self, symbol: str, timeframe: str, candles: List[dict], smc_zones: List[dict]) -> None:
+        """SMC va Candles ma'lumotlarini UI uchun yuboradi"""
+        payload = {
+            "candles": candles,
+            "smc_zones": smc_zones
+        }
+        res = self._post(payload)
+        if res:
+            logger.info(f"Chart data sync OK: {symbol} {timeframe} - {len(candles)} candles, {len(smc_zones)} zones")
+
     def log_ai_signal(self, symbol: str, signal: str, confidence: int, reasoning: str = "",
                       entry_price: Optional[float] = None, sl_price: Optional[float] = None,
                       tp_price: Optional[float] = None, rr_ratio: Optional[float] = None,
