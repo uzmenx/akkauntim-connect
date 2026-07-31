@@ -276,7 +276,7 @@ export function ShadowLearningPage() {
        ];
        
        const svgW = 320;
-       const svgH = 140;
+       const svgH = 240;
        const layerSpacing = svgW / (layers.length + 1);
 
        layers.forEach((count, li) => {
@@ -319,7 +319,7 @@ export function ShadowLearningPage() {
     ];
 
     const svgW = 320;
-    const svgH = 140;
+    const svgH = 240;
     const layerSpacing = svgW / (layers.length + 1);
 
     layers.forEach((count, li) => {
@@ -409,72 +409,56 @@ export function ShadowLearningPage() {
         <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20" />
       </div>
 
-      <div className="w-full h-full mx-auto px-3 sm:px-4 pt-4 sm:pt-6 relative z-10 flex flex-col gap-4 sm:gap-6">
+      <div className="w-full h-full mx-auto px-2 pt-2 relative z-10 flex flex-col gap-2">
+        <input 
+          type="file" 
+          accept=".pdf,.txt,.docx" 
+          className="hidden" 
+          ref={fileInputRef}
+          onChange={handleUpload}
+          disabled={uploading}
+        />
         
-        {/* Header Area */}
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "w-12 h-12 rounded-[16px] flex items-center justify-center border shrink-0 transition-all duration-500",
-                isLearning 
-                  ? "bg-blue-500/10 border-blue-400/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] animate-pulse" 
-                  : "bg-emerald-500/10 border-emerald-400/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-              )}>
-                <Brain className={isLearning ? "text-blue-400" : "text-emerald-400"} size={24} />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white tracking-tight">Shadow AI</h1>
-                <p className={cn(
-                  "text-xs font-medium flex items-center gap-1.5 transition-colors duration-500",
-                  isLearning ? "text-blue-400" : "text-white/40"
-                )}>
-                  {isLearning ? (
-                    <><Loader2 size={12} className="animate-spin" /> Tahlil qilinmoqda...</>
-                  ) : (
-                    <><Sparkles size={12} className="text-emerald-400/70" /> Faol o'rganish</>
-                  )}
-                </p>
-              </div>
-            </div>
-            
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="px-4 h-11 rounded-[14px] bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-[#070b13] flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(16,185,129,0.35)] hover:shadow-[0_0_30px_rgba(16,185,129,0.55)] active:scale-95 transition-all duration-300 shrink-0 border border-emerald-300/30 group"
-              title="Fayl yuklash"
-            >
-              {uploading ? (
-                <Loader2 size={20} className="animate-spin text-[#070b13]" />
-              ) : (
-                <>
-                  <Icon icon="pixel:machine-learning" className="w-[20px] h-[20px] transition-transform group-hover:scale-110" />
-                  <Icon icon="mage:file-upload-fill" className="w-[20px] h-[20px] transition-transform group-hover:scale-110" />
-                </>
-              )}
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-1 min-[360px]:gap-1.5 bg-white/5 p-1 rounded-xl border border-white/10 overflow-x-auto no-scrollbar w-fit">
+        {/* Header Area - Minimalist Ribbon */}
+        <div className="w-full bg-[#10192e]/45 backdrop-blur-xl border border-white/5 rounded-2xl p-1.5 flex items-center justify-between gap-1.5 min-[360px]:gap-3">
+          {/* Center: Tabs (No container background/border for cleaner design) */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             <button 
               onClick={() => setActiveTab('overview')}
-              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'overview' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'overview' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
             >
               Asosiy
             </button>
             <button 
               onClick={() => setActiveTab('memory')}
-              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'memory' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'memory' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
             >
               Xotira
             </button>
             <button 
               onClick={() => setActiveTab('blackbox')}
-              className={cn("px-3 py-1.5 min-[360px]:px-4 min-[360px]:py-2 rounded-lg text-[11px] min-[360px]:text-xs font-bold transition-all whitespace-nowrap uppercase tracking-wider flex items-center gap-1", activeTab === 'blackbox' ? "bg-white/10 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]" : "text-white/40 hover:text-white/70")}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider flex items-center gap-1", activeTab === 'blackbox' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
             >
-              <Icon icon="mdi:box-cutter" className="w-3.5 h-3.5" /> Qora Quti
+              Qora Quti
             </button>
           </div>
+
+          {/* Right: Upload Button (Larger & Glowing) */}
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-[#070b13] flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_22px_rgba(16,185,129,0.6)] active:scale-95 transition-all duration-300 shrink-0 border border-emerald-200/30 group"
+            title="Fayl yuklash"
+          >
+            {uploading ? (
+              <Loader2 size={14} className="animate-spin text-[#070b13]" />
+            ) : (
+              <div className="flex items-center gap-0.5 scale-105">
+                <Icon icon="pixel:machine-learning" className="w-[14px] h-[14px]" />
+                <Icon icon="mage:file-upload-fill" className="w-[14px] h-[14px]" />
+              </div>
+            )}
+          </button>
         </div>
 
         {/* === AI O'RGANISH JARAYONI VIZUALIZATSIYASI === */}
@@ -483,14 +467,14 @@ export function ShadowLearningPage() {
           <div className="absolute top-0 left-0 w-40 h-40 bg-violet-500/10 blur-[60px] rounded-full pointer-events-none" />
           <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
           
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <Brain size={18} className="text-violet-400" />
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-white/50 flex items-center gap-1.5">
+              <Brain size={14} className="text-violet-400/50" />
               AI O'rganish Jarayoni
             </h2>
             {learningData && (
-              <div className="bg-violet-500/20 px-2 py-0.5 min-[360px]:px-3 min-[360px]:py-1 rounded-full">
-                <span className="text-violet-300 text-[10px] min-[360px]:text-[12px] font-black tracking-wider">
+              <div className="bg-violet-500/10 px-1.5 py-0.5 rounded-md">
+                <span className="text-violet-300/50 text-[9px] font-bold tracking-wider">
                   SAVDO #{learningData.totalTrades}
                 </span>
               </div>
@@ -498,15 +482,15 @@ export function ShadowLearningPage() {
           </div>
 
           {/* Neural Network Vizualizatsiyasi */}
-          <div className="relative mb-4">
-            <div className="text-[9px] text-white/30 text-center font-bold uppercase tracking-[3px] mb-2">
+          <div className="relative mb-2">
+            <div className="text-[8px] text-white/20 text-center font-bold uppercase tracking-[2px] mb-1">
               {networkData.isReal ? (networkData.knowledge < 5 ? "AI MODEL FAOL - O'RGANISH BOSHLANDI" : "AI MODEL - O'RGANISH DAVOM ETMOQDA") :
                networkData.knowledge === 0 ? "TARMOQ HALI BO'SH" : 
                networkData.knowledge < 5 ? "BOSHLANG'ICH TARMOQ" :
                networkData.knowledge < 15 ? "O'RGANISH DAVOM ETMOQDA" :
                networkData.knowledge < 30 ? "TARMOQ KUCHAYMOQDA" : "KUCHLI TARMOQ"}
             </div>
-            <svg width="100%" viewBox="0 0 320 140" className="rounded-xl overflow-hidden">
+            <svg width="100%" viewBox="0 0 320 240" className="rounded-xl overflow-hidden">
               <defs>
                 <linearGradient id="nnEdgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                   <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.6" />
@@ -539,7 +523,7 @@ export function ShadowLearningPage() {
                 const r = networkData.isReal ? 3 + (node.active * 2) : 3.5;
                 return (
                   <g key={`n-${i}`}>
-                    <circle
+                     <circle
                       cx={node.x} cy={node.y}
                       r={r}
                       fill={color}
@@ -552,28 +536,28 @@ export function ShadowLearningPage() {
                 );
               })}
               {/* Layer labels */}
-              <text x="65" y="136" fill="white" opacity="0.25" fontSize="7" textAnchor="middle" fontWeight="bold">BOZOR</text>
-              <text x="255" y="136" fill="white" opacity="0.25" fontSize="7" textAnchor="middle" fontWeight="bold">QAROR</text>
+              <text x="65" y="232" fill="white" opacity="0.15" fontSize="6.5" textAnchor="middle" fontWeight="bold">BOZOR</text>
+              <text x="255" y="232" fill="white" opacity="0.15" fontSize="6.5" textAnchor="middle" fontWeight="bold">QAROR</text>
             </svg>
           </div>
 
-          {/* Learning Curve */}
+          {/* Learning Curve (simpler and more compact) */}
           {learningData && learningData.batches.length >= 2 && (
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] text-white/40 font-bold uppercase">Win Rate egri chizig'i</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/40">{learningData.firstWR}%</span>
-                  <span className="text-[11px] text-white/30">{"\u2192"}</span>
+            <div className="mb-2 opacity-50 scale-95 origin-center">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] text-white/40 font-bold uppercase">Win Rate egri chizig'i</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-white/40">{learningData.firstWR}%</span>
+                  <span className="text-[9px] text-white/30">{"\u2192"}</span>
                   <span className={cn(
-                    "text-[12px] font-black",
+                    "text-[10px] font-black",
                     learningData.improvement > 0 ? "text-emerald-400" : learningData.improvement < 0 ? "text-rose-400" : "text-white/60"
                   )}>
                     {learningData.lastWR}%
                   </span>
                 </div>
               </div>
-              <svg width="100%" viewBox="0 0 300 60" className="rounded-lg overflow-hidden">
+              <svg width="100%" viewBox="0 0 300 45" className="rounded-lg overflow-hidden">
                 <defs>
                   <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stopColor="#8b5cf6" />
@@ -581,75 +565,82 @@ export function ShadowLearningPage() {
                   </linearGradient>
                 </defs>
                 {[0, 25, 50, 75, 100].map(v => (
-                  <line key={v} x1="0" y1={60 - v * 0.55} x2="300" y2={60 - v * 0.55} stroke="white" opacity="0.05" strokeDasharray="2,4" />
+                  <line key={v} x1="0" y1={45 - v * 0.4} x2="300" y2={45 - v * 0.4} stroke="white" opacity="0.03" strokeDasharray="2,4" />
                 ))}
                 <polyline
                   fill="none"
                   stroke="url(#curveGrad)"
-                  strokeWidth="2"
+                  strokeWidth="1.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   points={learningData.batches.map((b, i) => {
                     const x = (i / (learningData.batches.length - 1)) * 290 + 5;
-                    const y = 55 - (b.winRate / 100) * 50;
+                    const y = 40 - (b.winRate / 100) * 35;
                     return `${x},${y}`;
                   }).join(' ')}
                 />
                 <polygon
                   fill="url(#curveGrad)"
-                  opacity="0.1"
+                  opacity="0.05"
                   points={
                     learningData.batches.map((b, i) => {
                       const x = (i / (learningData.batches.length - 1)) * 290 + 5;
-                      const y = 55 - (b.winRate / 100) * 50;
+                      const y = 40 - (b.winRate / 100) * 35;
                       return `${x},${y}`;
-                    }).join(' ') + ' 295,58 5,58'
+                    }).join(' ') + ' 295,43 5,43'
                   }
                 />
                 {learningData.batches.map((b, i) => {
                   const x = (i / (learningData.batches.length - 1)) * 290 + 5;
-                  const y = 55 - (b.winRate / 100) * 50;
-                  return <circle key={i} cx={x} cy={y} r="2.5" fill="#8b5cf6" opacity="0.8" />;
+                  const y = 40 - (b.winRate / 100) * 35;
+                  return <circle key={i} cx={x} cy={y} r="2" fill="#8b5cf6" opacity="0.8" />;
                 })}
               </svg>
             </div>
           )}
 
           {/* Stats Row */}
-          <div className="grid grid-cols-4 gap-1 min-[360px]:gap-2">
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
-              <div className="absolute inset-0 bg-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Savdolar (Shadow)</div>
-              <div className="text-white font-black text-sm min-[360px]:text-lg">
+          <div className="grid grid-cols-4 gap-0.5 bg-white/[0.01] border border-white/[0.03] rounded-xl p-0.5 backdrop-blur-md opacity-60">
+            <div className="py-1 px-0.5 text-center relative group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate" title="Savdolar (Shadow)">
+                Savdolar <span className="hidden min-[360px]:inline text-[6px] opacity-60">(Shadow)</span>
+              </div>
+              <div className="text-white/80 font-bold text-[9px] min-[340px]:text-[10px]">
                 {shadowStats.data?.total_shadow_trades || learningData?.totalTrades || 0}
               </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
-              <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Win Rate</div>
-              <div className="text-emerald-400 font-black text-sm min-[360px]:text-lg">
+            
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate">
+                Win Rate
+              </div>
+              <div className="text-emerald-400/80 font-bold text-[9px] min-[340px]:text-[10px]">
                 {shadowStats.data?.overall_win_rate || learningData?.overallWR || 0}%
               </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
-              <div className="absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Bilimlar</div>
-              <div className="text-violet-400 font-black text-sm min-[360px]:text-lg">
+
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate">
+                Bilimlar
+              </div>
+              <div className="text-violet-400/80 font-bold text-[9px] min-[340px]:text-[10px]">
                 {shadowStats.data?.knowledge_points || networkData.knowledge}
               </div>
             </div>
-            <div className="bg-black/30 rounded-xl p-1.5 min-[360px]:p-2.5 text-center border border-white/5 relative group">
-              <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-              <div className="text-[9px] min-[360px]:text-[10px] text-white/40 font-bold uppercase mb-1">Dataset Hajmi</div>
-              <div className="font-black text-sm min-[360px]:text-lg text-amber-400">
+
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate" title="Dataset Hajmi">
+                Dataset <span className="hidden min-[360px]:inline text-[6px] opacity-60">Hajmi</span>
+              </div>
+              <div className="font-bold text-[9px] min-[340px]:text-[10px] text-amber-400/80">
                 {shadowStats.data?.dataset_size || 0}
               </div>
             </div>
           </div>
 
           {/* Learning tagline */}
-          <div className="mt-3 text-center">
-            <p className="text-[10px] text-violet-400/60 font-bold uppercase tracking-[4px]">
+          <div className="mt-1.5 text-center opacity-30">
+            <p className="text-[8px] text-violet-400/60 font-bold uppercase tracking-[2px]">
               Learning from every trade
             </p>
           </div>
@@ -658,45 +649,34 @@ export function ShadowLearningPage() {
 
         {/* Upload Zone */}
         {activeTab === 'overview' && (
-        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
+        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
           
-          <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-            <BookOpen size={18} className="text-emerald-400" />
+          <h2 className="text-xs font-bold text-white mb-1 flex items-center gap-1.5">
+            <BookOpen size={14} className="text-emerald-400" />
             Baza qo'shish
           </h2>
-          <p className="text-[13px] text-white/50 mb-5 leading-relaxed">
-            Trading, psixologiya yoki matematika kitoblarini turli formatlarda (PDF, TXT, DOCX) yuklang. Bot uni o'qib, yangi qoidalarni o'zlashtiradi.
+          <p className="text-[10px] text-white/40 mb-2">
+            Kitob yuklang (PDF, TXT, DOCX) — AI undan yangi qoidalar o'rganadi.
           </p>
-
-          <input 
-            type="file" 
-            accept=".pdf,.txt,.docx" 
-            className="hidden" 
-            ref={fileInputRef}
-            onChange={handleUpload}
-            disabled={uploading}
-          />
           
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
             className={cn(
-              "w-full h-24 rounded-2xl border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-2 transition-all group",
-              uploading ? "bg-white/5" : "hover:bg-white/5 hover:border-emerald-400/50 cursor-pointer"
+              "w-full h-12 rounded-xl border border-dashed border-white/15 flex items-center justify-center gap-1.5 transition-all group",
+              uploading ? "bg-white/5" : "hover:bg-white/5 hover:border-emerald-400/30 cursor-pointer"
             )}
           >
             {uploading ? (
               <>
-                <Loader2 size={28} className="text-emerald-400 animate-spin" />
-                <span className="text-sm font-bold text-white/80">{uploadProgress}% Yuklanmoqda...</span>
+                <Loader2 size={16} className="text-emerald-400 animate-spin" />
+                <span className="text-[10px] font-bold text-white/70">{uploadProgress}% Yuklanmoqda...</span>
               </>
             ) : (
               <>
-                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                  <UploadCloud size={20} />
-                </div>
-                <span className="text-xs font-bold text-white/60 group-hover:text-white/90">Faylni tanlang yoki shu yerga tashlang</span>
+                <UploadCloud size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-white/60 group-hover:text-white/90">Faylni yuklash</span>
               </>
             )}
           </button>
@@ -751,14 +731,14 @@ export function ShadowLearningPage() {
 
         {/* AI Insights List */}
         {activeTab === 'memory' && (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2.5">
         <div>
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 px-1">
-            <Activity size={20} className="text-blue-400" />
+          <h2 className="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5 px-1">
+            <Activity size={14} className="text-blue-400" />
             AI Xulosalari (Fikrlari)
           </h2>
           
-          <div className="space-y-4">
+          <div className="space-y-2">
             {insights.isLoading ? (
               Array.from({length: 3}).map((_, i) => (
                 <div key={i} className="w-full h-32 bg-[#10192e]/50 rounded-[24px] border border-white/5 animate-pulse" />
@@ -818,9 +798,9 @@ export function ShadowLearningPage() {
                 </div>
               ))
             ) : (
-              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-[24px] p-8 text-center flex flex-col items-center justify-center gap-3">
-                <Brain size={32} className="text-white/20" />
-                <p className="text-sm text-white/50">Hozircha AI qoidalari yo'q.<br/>Birinchi kitobingizni yuklang!</p>
+              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-1.5">
+                <Brain size={20} className="text-white/20" />
+                <p className="text-xs text-white/55">AI qoidalari yo'q. Kitob yuklang!</p>
               </div>
             )}
           </div>
@@ -828,12 +808,12 @@ export function ShadowLearningPage() {
 
         {/* AI Memory (Saboqlar) */}
         <div>
-          <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 px-1">
-            <Lightbulb size={20} className="text-amber-400" />
+          <h2 className="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5 px-1">
+            <Lightbulb size={14} className="text-amber-400" />
             AI Xotirasi (Saboqlar)
           </h2>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {lessons.data && lessons.data.length > 0 ? (
               lessons.data.map((lesson) => {
                 const categoryEmoji: Record<string, string> = {
@@ -876,9 +856,9 @@ export function ShadowLearningPage() {
                 );
               })
             ) : (
-              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-2xl p-6 text-center flex flex-col items-center justify-center gap-2">
-                <Lightbulb size={28} className="text-white/20" />
-                <p className="text-sm text-white/50">Hali saboqlar yo'q.<br/>Savdolar va kitoblardan AI o'rganib boradi.</p>
+              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-1.5">
+                <Lightbulb size={20} className="text-white/20" />
+                <p className="text-xs text-white/55">Saboqlar yo'q. Savdo va kitoblardan o'rganiladi.</p>
               </div>
             )}
           </div>
@@ -924,26 +904,26 @@ export function ShadowLearningPage() {
 
         {/* NLP Sentiment va Dinamik Vaznlar */}
         {activeTab === 'overview' && portfolioState.data && (
-          <div className="mt-4 flex flex-col gap-4">
+          <div className="mt-2 flex flex-col gap-2">
             
             {/* Fundamental NLP Sentiment */}
-            <div className="w-full bg-gradient-to-r from-blue-900/40 to-emerald-900/40 border border-white/10 rounded-2xl p-4 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-3 opacity-20">
-                <Brain size={40} />
+            <div className="w-full bg-gradient-to-r from-blue-900/40 to-emerald-900/40 border border-white/10 rounded-xl p-2.5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2 opacity-10">
+                <Brain size={24} />
               </div>
-              <h3 className="text-[12px] font-bold text-white/70 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Activity size={14} className="text-emerald-400" /> Bozor Kayfiyati (NLP)
+              <h3 className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <Activity size={12} className="text-emerald-400" /> Bozor Kayfiyati (NLP)
               </h3>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <div className={cn(
-                  "text-3xl font-black",
+                  "text-lg font-black",
                   portfolioState.data.sentiment_score > 60 ? "text-emerald-400" : 
                   portfolioState.data.sentiment_score < 40 ? "text-rose-400" : "text-amber-400"
                 )}>
                   {portfolioState.data.sentiment_score}
                 </div>
                 <div className="flex-1">
-                  <div className="w-full h-3 bg-black/50 rounded-full overflow-hidden relative">
+                  <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden relative">
                     {/* Gradient bar */}
                     <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 opacity-50" />
                     {/* Pointer */}
@@ -952,7 +932,7 @@ export function ShadowLearningPage() {
                       style={{ left: `${portfolioState.data.sentiment_score}%`, transform: 'translateX(-50%)' }}
                     />
                   </div>
-                  <div className="flex justify-between text-[9px] text-white/40 mt-1 uppercase font-bold">
+                  <div className="flex justify-between text-[7.5px] text-white/40 mt-0.5 uppercase font-bold">
                     <span>Kuchli Sell</span>
                     <span>Neutral</span>
                     <span>Kuchli Buy</span>
@@ -962,11 +942,11 @@ export function ShadowLearningPage() {
             </div>
 
             {/* AI Dinamik Vaznlar */}
-            <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-2xl p-4">
-              <h3 className="text-[12px] font-bold text-white/70 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <Target size={14} className="text-blue-400" /> Multi-Strategy AI Vaznlari
+            <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-2.5">
+              <h3 className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <Target size={12} className="text-blue-400" /> Multi-Strategy AI Vaznlari
               </h3>
-              <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-1.5">
                 {(stratPerf.data && stratPerf.data.length > 0 
                   ? stratPerf.data.map(sp => ({ name: sp.strategy_name, weight: Math.round(sp.recommended_weight * 50) }))
                   : [
@@ -974,15 +954,15 @@ export function ShadowLearningPage() {
                       {name: "WYCKOFF", weight: 50}, {name: "SR_VOLUME", weight: 50}, {name: "AUTO_PATTERN", weight: 50}
                     ]
                 ).map((strat) => (
-                  <div key={strat.name} className="bg-black/30 rounded-xl p-2.5 border border-white/5 flex flex-col gap-1.5 group hover:border-white/20 transition-all">
-                    <span className="text-[11px] font-bold text-white/80 uppercase">{strat.name}</span>
+                  <div key={strat.name} className="bg-black/30 rounded-lg p-1.5 border border-white/5 flex flex-col gap-0.5 group hover:border-white/20 transition-all">
+                    <span className="text-[9px] font-bold text-white/60 uppercase">{strat.name}</span>
                     <div className="flex items-end justify-between">
-                      <span className="text-xl font-black text-white group-hover:text-blue-400 transition-colors">
+                      <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">
                         {strat.weight}
                       </span>
-                      <span className="text-[9px] text-white/40 mb-1">Max 100</span>
+                      <span className="text-[7.5px] text-white/30 mb-0.5">Max 100</span>
                     </div>
-                    <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mt-1">
+                    <div className="w-full h-0.5 bg-white/10 rounded-full overflow-hidden mt-0.5">
                       <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(0, strat.weight))}%` }} />
                     </div>
                   </div>
@@ -994,105 +974,105 @@ export function ShadowLearningPage() {
 
         {/* QORA QUTI (BLACK BOX) */}
         {activeTab === 'blackbox' && (
-          <div className="flex flex-col gap-6">
-            <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2 px-1">
-              <Icon icon="mdi:box-cutter" className="text-emerald-400 w-5 h-5" />
+          <div className="flex flex-col gap-2.5">
+            <h2 className="text-xs font-bold text-white mb-1 flex items-center gap-1.5 px-1">
+              <Icon icon="mdi:box-cutter" className="text-emerald-400 w-4 h-4" />
               Qora Quti Tahlili
             </h2>
 
             {blackbox.isLoading ? (
-               <div className="flex justify-center py-10"><Loader2 className="animate-spin text-emerald-400" size={32} /></div>
+               <div className="flex justify-center py-6"><Loader2 className="animate-spin text-emerald-400" size={24} /></div>
             ) : blackbox.data ? (
               <>
                 {/* RL Agent Progress (Qora Quti Simulyatori) */}
                 {blackbox.data.rl_agent_progress && (
-                  <div className="w-full bg-[#10192e]/60 backdrop-blur-xl border border-emerald-500/20 rounded-[24px] p-5 relative overflow-hidden mb-6 shadow-[0_0_30px_rgba(16,185,129,0.1)]">
-                    <div className="absolute top-0 right-0 p-4">
-                      <span className="flex h-3 w-3 relative">
+                  <div className="w-full bg-[#10192e]/60 backdrop-blur-xl border border-emerald-500/20 rounded-xl p-3 relative overflow-hidden mb-2 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                    <div className="absolute top-0 right-0 p-2">
+                      <span className="flex h-2 w-2 relative">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold text-white/90 uppercase tracking-wider mb-4 flex items-center gap-2">
-                      <Brain className="text-emerald-400" size={18} /> RL Agent (PPO) Simulyatori
+                    <h3 className="text-[10px] font-bold text-white/90 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Brain className="text-emerald-400" size={14} /> RL Agent (PPO) Simulyatori
                     </h3>
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">O'ynalgan Epizodlar</span>
-                        <span className="text-xl font-black text-white">{blackbox.data.rl_agent_progress.episodes_played.toLocaleString()}</span>
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">Epizodlar</span>
+                        <span className="text-sm font-bold text-white">{blackbox.data.rl_agent_progress.episodes_played.toLocaleString()}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">Simulyator Win Rate</span>
-                        <span className="text-xl font-black text-emerald-400">{blackbox.data.rl_agent_progress.win_rate_simulation}%</span>
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">Simulyator WR</span>
+                        <span className="text-sm font-bold text-emerald-400">{blackbox.data.rl_agent_progress.win_rate_simulation}%</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">O'rtacha Daromad (Mukofot)</span>
-                        <span className="text-xl font-black text-violet-400">{blackbox.data.rl_agent_progress.avg_reward.toFixed(1)}</span>
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">O'rtacha mukofot</span>
+                        <span className="text-sm font-bold text-violet-400">{blackbox.data.rl_agent_progress.avg_reward.toFixed(1)}</span>
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-white/50 uppercase font-bold mb-1">Strategiya O'sishi</span>
-                        <span className="text-xl font-black text-emerald-400">+{blackbox.data.rl_agent_progress.growth}%</span>
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">O'sish</span>
+                        <span className="text-sm font-bold text-emerald-400">+{blackbox.data.rl_agent_progress.growth}%</span>
                       </div>
                     </div>
                   </div>
                 )}
 
                 {/* Close Mechanism Analizi */}
-                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
-                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">Close Mechanism bo'yicha Zararlar</h3>
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">Close Mechanism bo'yicha Zararlar</h3>
                   {blackbox.data.close_mechanism.length > 0 ? (
-                    <div className="space-y-4">
+                    <div className="space-y-2">
                       {blackbox.data.close_mechanism.map((stat, i) => {
                         const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
                         return (
-                          <div key={i} className="flex flex-col gap-1.5">
+                          <div key={i} className="flex flex-col gap-1">
                             <div className="flex justify-between items-end">
-                              <span className="text-xs font-bold text-white/90 uppercase">{stat.mechanism}</span>
-                              <div className="text-[10px] text-white/50 space-x-2">
+                              <span className="text-[10px] font-bold text-white/90 uppercase">{stat.mechanism}</span>
+                              <div className="text-[9px] text-white/40 space-x-1.5">
                                 <span>{stat.trade_count} ta savdo</span>
                                 <span className="text-rose-400">{stat.loss_count} ta zarar</span>
                                 <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
                               </div>
                             </div>
-                            <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden flex">
+                            <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden flex">
                               <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
                               <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${100 - winRate}%` }} />
                             </div>
-                            <div className="text-[9px] text-white/30 text-right">Win Rate: {winRate}%</div>
+                            <div className="text-[8px] text-white/20 text-right">Win Rate: {winRate}%</div>
                           </div>
                         )
                       })}
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-white/40 text-xs italic">
-                      Yangi qoidalar bo'yicha yopilgan savdolar hali yo'q. Kutmoqdamiz...
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      Savdolar hali yo'q.
                     </div>
                   )}
                 </div>
 
                 {/* News Coverage Gap Analizi */}
-                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden mt-4">
-                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">News Coverage bo'yicha Zararlar</h3>
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden mt-2">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">News Coverage bo'yicha Zararlar</h3>
                   {blackbox.data.news_coverage_gap.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {blackbox.data.news_coverage_gap.map((stat, i) => {
                         const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
                         const label = stat.gap === "1" ? "Yangilik Gap Bor" : stat.gap === "0" ? "Yangilik Gap Yo'q" : "Noma'lum";
                         return (
-                          <div key={i} className="bg-black/30 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
-                            <span className="text-[11px] font-bold text-white/80 uppercase">{label}</span>
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-lg p-2 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-white/80 uppercase">{label}</span>
                             <div className="flex justify-between items-center">
-                              <div className="text-xl font-black text-white">{stat.trade_count}</div>
-                              <div className="text-xs text-rose-400">-{stat.loss_count}L</div>
+                              <div className="text-sm font-bold text-white">{stat.trade_count}</div>
+                              <div className="text-[10px] text-rose-400">-{stat.loss_count}L</div>
                             </div>
-                            <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                            <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
                               <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
                             </div>
-                            <div className="flex justify-between items-center text-[10px]">
+                            <div className="flex justify-between items-center text-[9px]">
                               <span className="text-white/40">Win Rate</span>
                               <span className="text-white/70 font-bold">{winRate}%</span>
                             </div>
-                            <div className="text-[10px] text-right mt-1">
+                            <div className="text-[9px] text-right mt-0.5">
                               P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
                             </div>
                           </div>
@@ -1100,35 +1080,35 @@ export function ShadowLearningPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-white/40 text-xs italic">
-                      Hali yangiliklar tekshiruvi asosida yopilgan savdolar yo'q.
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      Yangiliklar bo'yicha savdo yo'q.
                     </div>
                   )}
                 </div>
 
                 {/* News Strategy Style Analizi */}
-                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden mt-4">
-                  <h3 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">News Strategy bo'yicha Zararlar</h3>
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden mt-2">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">News Strategy bo'yicha Zararlar</h3>
                   {blackbox.data.news_strategy_style && blackbox.data.news_strategy_style.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-2 gap-2">
                       {blackbox.data.news_strategy_style.map((stat, i) => {
                         const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
-                        const label = stat.style === "BEFORE_NEWS" ? "Yangilikdan Oldin (Straddle)" : stat.style === "AFTER_NEWS" ? "Yangilikdan Keyin (Fundamental)" : stat.style || "Noma'lum";
+                        const label = stat.style === "BEFORE_NEWS" ? "Yangilikdan Oldin" : stat.style === "AFTER_NEWS" ? "Yangilikdan Keyin" : stat.style || "Noma'lum";
                         return (
-                          <div key={i} className="bg-black/30 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
-                            <span className="text-[11px] font-bold text-white/80 uppercase">{label}</span>
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-lg p-2 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-white/80 uppercase">{label}</span>
                             <div className="flex justify-between items-center">
-                              <div className="text-xl font-black text-white">{stat.trade_count}</div>
-                              <div className="text-xs text-rose-400">-{stat.loss_count}L</div>
+                              <div className="text-sm font-bold text-white">{stat.trade_count}</div>
+                              <div className="text-[10px] text-rose-400">-{stat.loss_count}L</div>
                             </div>
-                            <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                            <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
                               <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
                             </div>
-                            <div className="flex justify-between items-center text-[10px]">
+                            <div className="flex justify-between items-center text-[9px]">
                               <span className="text-white/40">Win Rate</span>
                               <span className="text-white/70 font-bold">{winRate}%</span>
                             </div>
-                            <div className="text-[10px] text-right mt-1">
+                            <div className="text-[9px] text-right mt-0.5">
                               P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
                             </div>
                           </div>
@@ -1136,16 +1116,16 @@ export function ShadowLearningPage() {
                       })}
                     </div>
                   ) : (
-                    <div className="py-6 text-center text-white/40 text-xs italic">
-                      Hali yangiliklar strategiyasi asosida yopilgan savdolar yo'q.
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      News strategiyasida savdo yo'q.
                     </div>
                   )}
                 </div>
               </>
             ) : (
-               <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-[24px] p-8 text-center flex flex-col items-center justify-center gap-3">
-                 <Icon icon="mdi:box-cutter" className="text-white/20 w-10 h-10" />
-                 <p className="text-sm text-white/50">Qora quti ma'lumotlari hozircha yo'q yoki bot ishlamayapti.</p>
+               <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-2">
+                 <Icon icon="mdi:box-cutter" className="text-white/20 w-8 h-8" />
+                 <p className="text-xs text-white/55">Qora quti ma'lumotlari hozircha yo'q.</p>
                </div>
             )}
             

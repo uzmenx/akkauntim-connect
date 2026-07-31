@@ -802,8 +802,10 @@ class TradingBot:
             logger.info(f"[{symbol}] Savdo bekor qilindi (AI o'rganish moduli: avoid_symbols).")
             return
             
-        sl_mult = active_adjustments.get("sl_multiplier", 1.0)
-        tp_mult = active_adjustments.get("tp_multiplier", 1.0)
+        try: sl_mult = max(0.5, min(1.5, float(active_adjustments.get("sl_multiplier", 1.0))))
+        except: sl_mult = 1.0
+        try: tp_mult = max(0.5, min(1.5, float(active_adjustments.get("tp_multiplier", 1.0))))
+        except: tp_mult = 1.0
         
         sl_price_diff = sl_price_diff * sl_mult
         
@@ -991,7 +993,54 @@ class TradingBot:
                     logger.error(f"Davriy o'qitishda xato: {e}")
                 time.sleep(4 * 3600)  # 4 soat kutish
                 
+        # Kitoblarni orqa fonda tahlil qilish (Shadow Learning)
+        def periodic_book_processor():
+            import time
+            import urllib.request
+            import tempfile
+            import os
+            while self._running:
+                try:
+                    pending_books = self.sync.check_pending_books()
+                    if pending_books:
+                        for book in pending_books:
+                            if not self._running:
+                                break
+                            logger.info(f"Yangi kitob topildi: {book['file_name']}")
+                            self.sync.update_book_status(book["id"], "processing")
+                            
+                            temp_dir = tempfile.gettempdir()
+                            temp_path = os.path.join(temp_dir, book["file_name"])
+                            
+                            try:
+                                urllib.request.urlretrieve(book["file_url"], temp_path)
+                                self.reviewer.ai_strategist.sync_client = self.sync
+                                result = self.reviewer.ai_strategist.add_knowledge_source(temp_path, book["file_name"])
+                                
+                                if isinstance(result, tuple) and result[0]:
+                                    _, saved, total = result
+                                    self.sync.update_book_status(book["id"], f"done|{saved}|{total}")
+                                elif result is True:
+                                    self.sync.update_book_status(book["id"], "done")
+                                else:
+                                    self.sync.update_book_status(book["id"], "error_processing")
+                            except Exception as e:
+                                logger.error(f"Kitobni ishlashda xato: {e}")
+                                self.sync.update_book_status(book["id"], "error_download")
+                            finally:
+                                if os.path.exists(temp_path):
+                                    try:
+                                        os.remove(temp_path)
+                                    except:
+                                        pass
+                except Exception as e:
+                    logger.error(f"Shadow Learning tekshirishda xatolik: {e}")
+                
+                # Har 60 soniyada tekshirish
+                time.sleep(60)
+
         threading.Thread(target=periodic_retrain, daemon=True).start()
+        threading.Thread(target=periodic_book_processor, daemon=True).start()
 
         try:
             while self._running:
@@ -1002,43 +1051,6 @@ class TradingBot:
                         if settings:
                             self.config.update_from_dict(settings)
                             logger.info("Bot sozlamalari yangilandi.")
-                            
-                        # === YANGI: PENDING BOOKLARNI TEKSHIRISH ===
-                        try:
-                            pending_books = self.sync.check_pending_books()
-                            if pending_books:
-                                for book in pending_books:
-                                    logger.info(f"Yangi kitob topildi: {book['file_name']}")
-                                    self.sync.update_book_status(book["id"], "processing")
-                                    
-                                    import urllib.request
-                                    import tempfile
-                                    import os
-                                    
-                                    temp_dir = tempfile.gettempdir()
-                                    temp_path = os.path.join(temp_dir, book["file_name"])
-                                    
-                                    try:
-                                        urllib.request.urlretrieve(book["file_url"], temp_path)
-                                        self.reviewer.ai_strategist.sync_client = self.sync
-                                        result = self.reviewer.ai_strategist.add_knowledge_source(temp_path, book["file_name"])
-                                        
-                                        if isinstance(result, tuple) and result[0]:
-                                            _, saved, total = result
-                                            self.sync.update_book_status(book["id"], f"done|{saved}|{total}")
-                                        elif result is True:
-                                            self.sync.update_book_status(book["id"], "done")
-                                        else:
-                                            self.sync.update_book_status(book["id"], "error_processing")
-                                    except Exception as e:
-                                        logger.error(f"Kitobni ishlashda xato: {e}")
-                                        self.sync.update_book_status(book["id"], "error_download")
-                                    finally:
-                                        if os.path.exists(temp_path):
-                                            os.remove(temp_path)
-                        except Exception as e:
-                            logger.error(f"Shadow Learning tekshirishda xatolik: {e}")
-                            
                     except Exception as e:
                         logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
 
@@ -1078,19 +1090,10 @@ class TradingBot:
                         time.sleep(60)
                         continue
                         
-                    batch_size = getattr(self.config, "batch_size", 3)
-                    end_index = self.current_symbol_index + batch_size
-                    current_batch = all_symbols[self.current_symbol_index:end_index]
-                    
-                    if end_index > len(all_symbols):
-                        current_batch += all_symbols[0:end_index - len(all_symbols)]
-                        
-                    self.current_symbol_index = end_index % len(all_symbols)
-                    
-                    logger.info(f"Navbatdagi Batch ({len(current_batch)} ta juftlik): {current_batch}")
+                    logger.info(f"Navbatdagi sikl ({len(all_symbols)} ta juftlik): {all_symbols}")
 
-                    # Har bir symbol uchun tahlil (faqat joriy batch)
-                    for symbol in current_batch:
+                    # Har bir symbol uchun tahlil
+                    for symbol in all_symbols:
                         if not self._running:
                             break
                         self.run_cycle(symbol)
@@ -1113,8 +1116,8 @@ class TradingBot:
                     # Cloud sync
                     try:
                         status_msg = "Bot is running"
-                        if getattr(self.config, "auto_discover_symbols", True) and 'all_symbols' in locals() and 'current_batch' in locals():
-                            status_msg = f"Avto-qidiruv yoniq. Ruxsat: {len(all_symbols)} ta juftlik. Joriy tahlil: {', '.join(current_batch)}"
+                        if getattr(self.config, "auto_discover_symbols", True) and 'all_symbols' in locals():
+                            status_msg = f"Avto-qidiruv yoniq. Ruxsat: {len(all_symbols)} ta juftlik. Tahlil yakunlandi."
                         closed_trades = self.sync.sync_all(self.mt5, is_running=True, message=status_msg)
                         if closed_trades:
                             for ct in closed_trades:

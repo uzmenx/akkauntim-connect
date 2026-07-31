@@ -262,8 +262,8 @@ Vazifang - faqat quyidagi JSON formatida sozlamalar kiritish (qo'shimcha matnsiz
 {{
   "analysis_summary": "Nima xato va nima to'g'ri bo'lgani xulosasi. 3-5 gapda yoz.",
   "adjustments": {{
-    "sl_multiplier": 1.0,
-    "tp_multiplier": 1.0, 
+    "sl_multiplier": 1.0,  # 0.5 dan 1.5 gacha bo'lishi SHART
+    "tp_multiplier": 1.0,  # 0.5 dan 1.5 gacha bo'lishi SHART
     "avoid_symbols": []
   }},
   "strategy_weights": {{
@@ -326,6 +326,13 @@ Agar biror strategiya ko'p to'g'ri signal bergan bo'lsa, vaznini oshir (masalan 
             logger.error(f"Error during AI review cycle: {e}")
 
     def save_adjustments(self, review_type: str, trades_analyzed: int, win_rate: float, avg_rr: float, recommendations: str, adjustments: Dict):
+        if "sl_multiplier" in adjustments:
+            try: adjustments["sl_multiplier"] = max(0.5, min(1.5, float(adjustments["sl_multiplier"])))
+            except: adjustments["sl_multiplier"] = 1.0
+        if "tp_multiplier" in adjustments:
+            try: adjustments["tp_multiplier"] = max(0.5, min(1.5, float(adjustments["tp_multiplier"])))
+            except: adjustments["tp_multiplier"] = 1.0
+            
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()

@@ -200,7 +200,7 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
       className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
     >
       {stats && (
-        <div className="absolute top-2 left-3.5 right-3.5 z-10 flex items-center justify-between pointer-events-none">
+        <div className="absolute bottom-2 left-3.5 right-3.5 z-10 flex items-center justify-between pointer-events-none">
           <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             <span className="hidden min-[360px]:inline text-[8px] font-bold text-white/50 tracking-wider uppercase">TREND</span>
@@ -248,7 +248,7 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
       )}
       
       {/* The Chart */}
-      <div className="absolute inset-0 pt-4 pb-2 px-0 w-full h-full pointer-events-none opacity-80 flex items-center">
+      <div className="absolute inset-0 pt-2 pb-6 px-0 w-full h-full pointer-events-none opacity-80 flex items-center">
         <svg viewBox="0 0 300 50" preserveAspectRatio="none" className="w-full h-full overflow-visible drop-shadow-md">
           <defs>
             <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">

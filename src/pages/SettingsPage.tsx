@@ -485,32 +485,32 @@ export function SettingsPage() {
       </Card>
 
       {/* 3. Risk Management */}
-      <Card className="glass p-5">
-        <div className="flex items-center gap-2 mb-4 text-amber-500">
-          <TriangleAlert size={18} />
-          <h3 className="font-bold text-sm tracking-wide uppercase">Riskni Boshqarish</h3>
+      <Card className="glass p-3 rounded-xl">
+        <div className="flex items-center gap-1.5 mb-2 text-amber-500">
+          <TriangleAlert size={14} />
+          <h3 className="font-bold text-xs tracking-wide uppercase">Riskni Boshqarish</h3>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-2">
           <Slider
-            label="Har bir bitim uchun Risk (Risk per Trade)"
+            label="Risk per Trade"
             value={Number(form.risk_per_trade ?? 0.02)}
             min={0.001} max={0.10} step={0.001}
-            format={(v) => `${(v * 100).toFixed(1)}% balansdan`}
+            format={(v) => `${(v * 100).toFixed(1)}%`}
             onChange={(v) => setForm((f) => ({ ...f, risk_per_trade: v }))}
           />
           <Slider
-            label="Maksimal Lot Hajmi"
+            label="Max Lot"
             value={Number(form.max_lot_size ?? 5.0)}
             min={0.01} max={10} step={0.01}
-            format={(v) => `${v.toFixed(2)} lot`}
+            format={(v) => `${v.toFixed(2)} Lot`}
             onChange={(v) => setForm((f) => ({ ...f, max_lot_size: v }))}
           />
           <Slider
-            label="Kunlik Maksimal Zarar (Max Drawdown)"
+            label="Max Drawdown"
             value={Number(form.max_daily_loss ?? 0.10)}
             min={0.01} max={0.30} step={0.01}
-            format={(v) => `${(v * 100).toFixed(0)}% balansdan`}
+            format={(v) => `${(v * 100).toFixed(0)}%`}
             onChange={(v) => setForm((f) => ({ ...f, max_daily_loss: v }))}
           />
         </div>
@@ -657,19 +657,19 @@ function Slider({
 }) {
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between">
-        <label className="text-xs font-semibold text-fg-muted">{label}</label>
-        <span className="tabular rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-brand">
+      <div className="mb-1 flex items-center justify-between">
+        <label className="text-[10px] font-bold text-white/40 uppercase tracking-wide">{label}</label>
+        <span className="tabular rounded-full bg-white/5 px-2 py-0.5 text-[9px] font-bold text-brand">
           {format(value)}
         </span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full accent-[color:var(--color-brand)] h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+        className="w-full accent-[color:var(--color-brand)] h-2.5 bg-white/10 rounded-lg appearance-none cursor-pointer"
       />
       {(leftLabel || rightLabel) && (
-        <div className="flex justify-between text-[10px] text-fg-muted/60 mt-1.5 px-0.5 font-medium">
+        <div className="flex justify-between text-[9px] text-fg-muted/40 mt-1 px-0.5 font-medium">
           <span>{leftLabel}</span>
           <span>{rightLabel}</span>
         </div>

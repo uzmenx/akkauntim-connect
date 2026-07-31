@@ -437,14 +437,9 @@ export function DashboardPage() {
             </button>
           </div>
 
-          {/* Swipeable Tab Contents */}
-          <div 
-            ref={tabContainerRef}
-            onScroll={handleScroll}
-            className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar scroll-smooth w-full h-full pb-10"
-          >
-            {/* Positions Tab */}
-            <div className="w-full shrink-0 snap-center px-1">
+          {/* Active Tab Content */}
+          <div className="w-full h-full pb-10 px-1 animate-in fade-in duration-300">
+            {activeTab === "positions" && (
               <div className="space-y-2">
                 {positions.isLoading ? (
                   <SkeletonRows />
@@ -454,10 +449,9 @@ export function DashboardPage() {
                   <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
                 )}
               </div>
-            </div>
+            )}
 
-            {/* Limits Tab */}
-            <div className="w-full shrink-0 snap-center px-1">
+            {activeTab === "limits" && (
               <div className="space-y-2">
                 {pending.isLoading ? (
                   <SkeletonRows count={2} />
@@ -467,10 +461,9 @@ export function DashboardPage() {
                   <EmptyBox text="Hozircha kutilayotgan order yo'q" />
                 )}
               </div>
-            </div>
+            )}
 
-            {/* History Tab */}
-            <div className="w-full shrink-0 snap-center px-1">
+            {activeTab === "history" && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between px-2 mb-1">
                   <span className="text-[10px] text-white/40 font-bold">SAVDO TARIXI</span>
@@ -484,7 +477,7 @@ export function DashboardPage() {
                   <EmptyBox text="Hozircha yopilgan savdo yo'q" />
                 )}
               </div>
-            </div>
+            )}
           </div>
           
         </div>
@@ -575,38 +568,38 @@ function PositionRow({ p }: { p: Position }) {
   return (
     <div 
       onClick={() => navigate(`/chart?symbol=${p.symbol}`)}
-      className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2 cursor-pointer hover:bg-[#132140] transition-all duration-200 active:scale-[0.99]"
+      className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5 cursor-pointer hover:bg-[#132140] transition-all duration-200 active:scale-[0.99]"
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
             {isBuy ? "BUY" : "SELL"}
           </span>
-          <span className="text-sm font-bold text-white truncate">{p.symbol}</span>
-          <span className="text-[10px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot</span>
+          <span className="text-xs font-bold text-white truncate">{p.symbol}</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot</span>
         </div>
-        <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className={`text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
           {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
         </span>
       </div>
       
       {/* Badges Row */}
       {(p.agreed_strategies?.length || p.ai_used) ? (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
           {p.ai_used && (
-            <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
-              <Bot size={10} /> AI
+            <div className="flex items-center gap-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0 rounded text-[8px] font-bold tracking-wider">
+              <Bot size={8} /> AI
             </div>
           )}
           {p.agreed_strategies?.map((strat) => (
-            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-1.5 py-0 rounded text-[8px] font-bold tracking-wider uppercase">
               {strat}
             </div>
           ))}
         </div>
       ) : null}
 
-      <div className="grid grid-cols-4 gap-1 text-[10px] mt-1">
+      <div className="grid grid-cols-4 gap-1 text-[9px] mt-0.5">
         <MiniField label="Open" value={fmtNum(p.open_price, 5)} />
         <MiniField label="Now" value={fmtNum(p.current_price, 5)} />
         <MiniField label="SL" value={p.stop_loss ? fmtNum(p.stop_loss, 5) : "—"} tone={p.stop_loss ? "danger" : undefined} />
@@ -619,18 +612,18 @@ function PositionRow({ p }: { p: Position }) {
 function PendingRow({ o }: { o: PendingOrder }) {
   const isBuy = o.type.toLowerCase().startsWith("buy");
   return (
-    <div className="rounded-2xl bg-[#10192e]/80 backdrop-blur-md border border-white/5 p-3">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
+    <div className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
             {o.type.replace("_", " ")}
           </span>
-          <span className="text-sm font-bold text-white truncate">{o.symbol}</span>
-          <span className="text-[10px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot</span>
+          <span className="text-xs font-bold text-white truncate">{o.symbol}</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot</span>
         </div>
-        <Clock size={14} className="text-white/40" />
+        <Clock size={12} className="text-white/40" />
       </div>
-      <div className="grid grid-cols-3 gap-1 text-[10px]">
+      <div className="grid grid-cols-3 gap-1 text-[9px]">
         <MiniField label="Price" value={fmtNum(o.price, 5)} />
         <MiniField label="SL" value={o.stop_loss ? fmtNum(o.stop_loss, 5) : "—"} tone={o.stop_loss ? "danger" : undefined} />
         <MiniField label="TP" value={o.take_profit ? fmtNum(o.take_profit, 5) : "—"} tone={o.take_profit ? "success" : undefined} />
@@ -643,30 +636,30 @@ function HistoryRow({ t }: { t: TradeHistory }) {
   const isBuy = String(t.side).toUpperCase() === "BUY";
   const profit = Number(t.profit ?? 0);
   return (
-    <div className="rounded-2xl bg-[#10192e]/60 backdrop-blur-md border border-white/5 p-3 flex flex-col gap-2">
+    <div className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
             {isBuy ? "BUY" : "SELL"}
           </span>
-          <span className="text-sm font-bold text-white truncate">{t.symbol}</span>
-          <span className="text-[10px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
+          <span className="text-xs font-bold text-white truncate">{t.symbol}</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
         </div>
-        <span className={`text-sm font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+        <span className={`text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
           {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
         </span>
       </div>
       
       {/* Badges Row */}
       {(t.agreed_strategies?.length || t.ai_used) ? (
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-1 flex-wrap">
           {t.ai_used && (
-            <div className="flex items-center gap-1 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider">
-              <Bot size={10} /> AI
+            <div className="flex items-center gap-0.5 bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0 rounded text-[8px] font-bold tracking-wider">
+              <Bot size={8} /> AI
             </div>
           )}
           {t.agreed_strategies?.map((strat) => (
-            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-2 py-0.5 rounded-md text-[9px] font-bold tracking-wider uppercase">
+            <div key={strat} className="bg-white/10 text-white/70 border border-white/5 px-1.5 py-0 rounded text-[8px] font-bold tracking-wider uppercase">
               {strat}
             </div>
           ))}

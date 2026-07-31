@@ -141,7 +141,7 @@ class AIStrategist:
                 (title, author, language, str(file_path), content_hash, category, datetime.now().isoformat()),
             )
             source_id = cursor.lastrowid
-                conn.commit()
+            conn.commit()
         except sqlite3.IntegrityError:
             print(f"⚠️ '{title}' allaqachon mavjud (bir xil kontent)")
             return False

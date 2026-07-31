@@ -164,6 +164,11 @@ class RiskManager:
         # 5. O'zimizning xavfsizlik chegaramiz
         max_lot = getattr(self.config, "max_lot_size", 5.0)
         lot_size = min(lot_size, max_lot)
+        
+        # Yakuniy xavfsizlik tekshiruvi: broker cheklovlari yoki lot yaxlitlash natijasida dollar zarar oshib ketmasligi
+        actual_risk_amount = lot_size * loss_for_1_lot
+        if actual_risk_amount > risk_amount * 1.25:  # 25% gacha farqqa ruxsat beramiz
+            return None, f"Haqiqiy zarar (${actual_risk_amount:.2f}) ruxsat etilgan riskdan (${risk_amount:.2f}) juda yuqori! Katta ehtimol SL masofasi hisoblangan lot uchun juda katta."
 
         logger.info(
             f"[{symbol}] Risk Hisob-kitobi: Balans=${balance:.2f}, Risk={risk_pct*100:.2f}% (${risk_amount:.2f}), "

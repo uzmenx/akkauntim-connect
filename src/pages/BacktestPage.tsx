@@ -118,73 +118,73 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
   };
 
   return (
-    <div className={`${isEmbedded ? "space-y-4" : "pb-24 pt-4 space-y-6"} animate-in fade-in duration-300`}>
+    <div className={`${isEmbedded ? "space-y-2.5" : "pb-12 pt-2 space-y-4"} animate-in fade-in duration-300`}>
       
       {/* Header Info */}
       {!isEmbedded && (
-        <div className="px-4">
-          <h2 className="text-2xl font-black text-white drop-shadow-md mb-2">
+        <div className="px-3">
+          <h2 className="text-sm font-black text-white drop-shadow-md mb-1">
             Test Markazi
           </h2>
-          <p className="text-sm text-white/60 mb-4">
-            Strategiyalarni mexanik yoki AI yordamida tarixiy ma'lumotlarda sinab ko'ring.
+          <p className="text-[10px] text-white/50 mb-2">
+            Mexanik yoki AI yordamida tarixiy sinovlarni o'tkazing.
           </p>
         </div>
       )}
 
       {/* Tabs */}
-      <div className={`${isEmbedded ? "" : "px-4"} flex gap-2`}>
+      <div className={`${isEmbedded ? "" : "px-3"} flex gap-1`}>
         <button
           onClick={() => setActiveTab("ai_siz")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeTab === "ai_siz" 
-              ? "bg-blue-500 text-white shadow-lg shadow-blue-500/20" 
+              ? "bg-blue-500 text-white shadow-md shadow-blue-500/20" 
               : "bg-[#1e293b] text-white/50 border border-white/5"
           }`}
         >
-          <Zap className="w-4 h-4" />
+          <Zap className="w-3.5 h-3.5" />
           AI Siz
         </button>
         <button
           onClick={() => setActiveTab("ai_bilan")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeTab === "ai_bilan" 
-              ? "bg-purple-500 text-white shadow-lg shadow-purple-500/20" 
+              ? "bg-purple-500 text-white shadow-md shadow-purple-500/20" 
               : "bg-[#1e293b] text-white/50 border border-white/5"
           }`}
         >
-          <Cpu className="w-4 h-4" />
+          <Cpu className="w-3.5 h-3.5" />
           AI Bilan
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+          className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all flex items-center justify-center gap-1.5 ${
             activeTab === "history" 
-              ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" 
+              ? "bg-amber-500 text-white shadow-md shadow-amber-500/20" 
               : "bg-[#1e293b] text-white/50 border border-white/5"
           }`}
         >
-          <History className="w-4 h-4" />
+          <History className="w-3.5 h-3.5" />
           Tarix
         </button>
       </div>
 
       {/* Settings Panel for Tests */}
       {activeTab !== "history" && !running && (
-        <div className={isEmbedded ? "space-y-4 animate-in slide-in-from-bottom-2" : "px-4 space-y-4 animate-in slide-in-from-bottom-2"}>
-          <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 p-5 rounded-2xl shadow-xl">
-            <h3 className="text-base font-bold text-white flex items-center gap-2 mb-4">
-              <Activity className={`w-5 h-5 ${activeTab === 'ai_bilan' ? 'text-purple-400' : 'text-blue-400'}`} />
+        <div className={isEmbedded ? "space-y-3 animate-in slide-in-from-bottom-2" : "px-3 space-y-3 animate-in slide-in-from-bottom-2"}>
+          <div className="bg-[#0f172a]/80 backdrop-blur-xl border border-white/15 p-3 rounded-xl shadow-xl">
+            <h3 className="text-xs font-bold text-white flex items-center gap-1.5 mb-2">
+              <Activity className={`w-4 h-4 ${activeTab === 'ai_bilan' ? 'text-purple-400' : 'text-blue-400'}`} />
               {activeTab === 'ai_bilan' ? 'AI Test Sozlamalari' : 'Mexanik Backtest Sozlamalari'}
             </h3>
             
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-white/60 pl-1">Valyuta Juftligi</label>
+            <div className="space-y-2">
+              <div className="space-y-0.5">
+                <label className="text-[9px] font-bold text-white/40 uppercase pl-0.5">Valyuta Juftligi</label>
                 <select 
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value)}
-                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
+                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
                 >
                   <option value="EURUSD">EUR/USD</option>
                   <option value="GBPUSD">GBP/USD</option>
@@ -193,12 +193,12 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
               </div>
 
               {activeTab === "ai_siz" && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-white/60 pl-1">Strategiya (Agar faqat bitta kerak bo'lsa)</label>
+                <div className="space-y-0.5">
+                  <label className="text-[9px] font-bold text-white/40 uppercase pl-0.5">Strategiya (Agar faqat bitta kerak bo'lsa)</label>
                   <select 
                     value={strategy}
                     onChange={(e) => setStrategy(e.target.value)}
-                    className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
+                    className="w-full bg-[#1e293b]/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
                   >
                     <option value="all">Barchasi (Voting Engine)</option>
                     <option value="smc">Smart Money Concepts (SMC)</option>
@@ -208,12 +208,12 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-white/60 pl-1">Vaqt Oralig'i (Timeframe)</label>
+              <div className="space-y-0.5">
+                <label className="text-[9px] font-bold text-white/40 uppercase pl-0.5">Vaqt Oralig'i (Timeframe)</label>
                 <select 
                   value={timeframe}
                   onChange={(e) => setTimeframe(e.target.value)}
-                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
+                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
                 >
                   <option value="15m">15 Minut (M15)</option>
                   <option value="1h">1 Soat (H1)</option>
@@ -221,12 +221,12 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
                 </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-white/60 pl-1">Test Davri (Qancha tarix)</label>
+              <div className="space-y-0.5">
+                <label className="text-[9px] font-bold text-white/40 uppercase pl-0.5">Test Davri (Qancha tarix)</label>
                 <select 
                   value={period}
                   onChange={(e) => setPeriod(e.target.value)}
-                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
+                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
                 >
                   <option value="1m">So'nggi 1 oy</option>
                   <option value="3m">So'nggi 3 oy</option>
@@ -238,22 +238,22 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
               <button 
                 onClick={handleStart}
                 disabled={running}
-                className={`w-full mt-4 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all active:scale-95 ${
+                className={`w-full mt-2 flex items-center justify-center gap-1.5 py-2 rounded-lg font-bold text-xs transition-all active:scale-95 ${
                   running 
                     ? "bg-[#1e293b] text-white/50 cursor-not-allowed" 
                     : activeTab === "ai_bilan"
-                      ? "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-600/25 border border-white/10"
-                      : "bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/25 border border-white/10"
+                      ? "bg-purple-600 hover:bg-purple-500 text-white shadow-md shadow-purple-600/25 border border-white/10"
+                      : "bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/25 border border-white/10"
                 }`}
               >
                 {running ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Hisoblanmoqda...
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4 fill-white" />
+                    <Play className="w-3.5 h-3.5 fill-white" />
                     {activeTab === "ai_bilan" ? "AI orqali Testni Boshlash" : "Mexanik Testni Boshlash"}
                   </>
                 )}
