@@ -8,6 +8,7 @@ export function BacktestPage() {
   const [activeTab, setActiveTab] = useState<"ai_siz" | "ai_bilan" | "history">("ai_siz");
   const [strategy, setStrategy] = useState("smc");
   const [timeframe, setTimeframe] = useState("1h");
+  const [period, setPeriod] = useState("6m");
   const [symbol, setSymbol] = useState("EURUSD");
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<TestResultProps[]>([]);
@@ -99,6 +100,7 @@ export function BacktestPage() {
       const { error } = await supabase.from('backtest_jobs').insert({
         symbol,
         timeframe,
+        period, // Added period
         strategy: activeTab === "ai_siz" ? strategy : null,
         mode: activeTab === "ai_bilan" ? "ai_bilan" : "ai_siz",
         status: "pending"
@@ -235,6 +237,20 @@ export function BacktestPage() {
                   <option value="15m">15 Minut (M15)</option>
                   <option value="1h">1 Soat (H1)</option>
                   <option value="4h">4 Soat (H4)</option>
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-white/60 pl-1">Test Davri (Qancha tarix)</label>
+                <select 
+                  value={period}
+                  onChange={(e) => setPeriod(e.target.value)}
+                  className="w-full bg-[#1e293b]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-brand/50 transition-colors appearance-none"
+                >
+                  <option value="1m">So'nggi 1 oy</option>
+                  <option value="3m">So'nggi 3 oy</option>
+                  <option value="6m">So'nggi 6 oy</option>
+                  <option value="1y">So'nggi 1 yil</option>
                 </select>
               </div>
               
