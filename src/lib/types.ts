@@ -26,6 +26,9 @@ export type BotSettings = {
   strategy_weight_smc?: number;
   strategy_weight_pattern?: number;
   strategy_weight_news?: number;
+  strategy_weight_wyckoff?: number;
+  strategy_weight_sr_volume?: number;
+  strategy_weight_auto_pattern?: number;
   loop_interval_minutes?: number;
   updated_at: string;
 };
@@ -42,6 +45,8 @@ export type BotStatus = {
   message: string | null;
   claude_limit: number | null;
   claude_used: number | null;
+  available_symbols?: Record<string, string[]> | null;
+  market_sentiment?: number | null;
   updated_at: string;
 };
 

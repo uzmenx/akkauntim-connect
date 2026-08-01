@@ -1,0 +1,1 @@
+ALTER TABLE bot_status ADD COLUMN IF NOT EXISTS available_symbols JSONB DEFAULT NULL;

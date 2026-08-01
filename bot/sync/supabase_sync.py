@@ -174,12 +174,18 @@ class SupabaseSync:
                 })
         self.last_sync_time = datetime.datetime.now()
 
+        # get available symbols
+        available_symbols = {}
+        if hasattr(mt5_client, "get_grouped_symbols"):
+            available_symbols = mt5_client.get_grouped_symbols()
+
         payload = {
             "status": {
                 "is_running": is_running, "message": message,
                 "account_equity": info.equity,
                 "account_balance": info.balance,
                 "account_currency": info.currency,
+                "available_symbols": available_symbols,
             },
             "positions": pos_rows,
             "pending_orders": pending_rows,

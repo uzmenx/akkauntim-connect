@@ -28,9 +28,9 @@ class BotConfig:
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
-    ai_model_medium: str = "kimi-k3"
-    ai_model_weak: str = "kimi-k3"
-    ai_model: str = "kimi-k3"
+    ai_model_medium: str = "openrouter/deepseek/deepseek-chat"
+    ai_model_weak: str = "openrouter/deepseek/deepseek-chat"
+    ai_model: str = "openrouter/deepseek/deepseek-chat"
     ai_system_prompt: str = ""
     
     # Hardcoded defaults
@@ -81,7 +81,7 @@ class BotConfig:
         self.mt5_server = os.environ.get("MT5_SERVER", "")
         
         self.supabase_url = os.environ.get("SUPABASE_URL", os.environ.get("VITE_SUPABASE_URL", ""))
-        self.supabase_key = os.environ.get("SUPABASE_PUBLISHABLE_KEY", os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY", ""))
+        self.supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", os.environ.get("SUPABASE_PUBLISHABLE_KEY", os.environ.get("VITE_SUPABASE_PUBLISHABLE_KEY", "")))
         self.bot_sync_secret = os.environ.get("BOT_SYNC_SECRET", "")
         self.telegram_bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
         self.telegram_chat_id = os.environ.get("TELEGRAM_CHAT_ID", "@avlodona")
@@ -102,6 +102,7 @@ class BotConfig:
                     self.risk_level_multiple_confirmation = trading.get("risk_level_multiple_confirmation", self.risk_level_multiple_confirmation)
                     
                     ai = data.get("ai", {})
+                    self.ai_model = ai.get("model", self.ai_model)
                     self.ai_model_medium = ai.get("model_medium", self.ai_model_medium)
                     self.ai_model_weak = ai.get("model_weak", self.ai_model_weak)
                     self.ai_system_prompt = ai.get("system_prompt", self.ai_system_prompt)

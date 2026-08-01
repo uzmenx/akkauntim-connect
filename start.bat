@@ -6,7 +6,7 @@ cd /d %~dp0
 echo ===================================================
 echo [%date% %time%] Bot ishga tushirilmoqda...
 echo ===================================================
-python run_bot.py
+python bot_manager.py
 echo.
 echo ===================================================
 echo [WARNING] Bot to'xtadi yoki xatolik berdi!

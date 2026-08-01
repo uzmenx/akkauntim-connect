@@ -13,6 +13,24 @@ import { Link, useNavigate } from "react-router-dom";
 import { BalanceTrendChart } from "@/components/BalanceTrendChart";
 import { PaywallModal } from "@/components/PaywallModal";
 
+const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
+  const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
+  return {
+    x: centerX + radius * Math.cos(angleInRadians),
+    y: centerY + radius * Math.sin(angleInRadians)
+  };
+};
+
+const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
+  const start = polarToCartesian(x, y, radius, endAngle);
+  const end = polarToCartesian(x, y, radius, startAngle);
+  const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+  return [
+    "M", start.x, start.y, 
+    "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+  ].join(" ");
+};
+
 const MoneyCoinDuoIcon = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
     {/* Bottom/underneath coin */}
@@ -31,6 +49,7 @@ const MoneyCoinDuoIcon = () => (
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const isGuest = user?.id === "guest";
+
 
   const status = useQuery({
     queryKey: ["bot_status", user?.id],
@@ -86,6 +105,17 @@ export function DashboardPage() {
     },
   });
 
+  const strategyWeights = useMemo(() => ({
+    smc: settings.data?.strategy_weight_smc ?? 60,
+    pattern: settings.data?.strategy_weight_pattern ?? 60,
+    news: settings.data?.strategy_weight_news ?? 60,
+    wyckoff: settings.data?.strategy_weight_wyckoff ?? 50,
+    sr_volume: settings.data?.strategy_weight_sr_volume ?? 50,
+    auto_pattern: settings.data?.strategy_weight_auto_pattern ?? 50
+  }), [settings.data]);
+
+  const sentiment = useMemo(() => status.data?.market_sentiment ?? 50, [status.data]);
+
   const stats = useMemo(() => {
     const open = positions.data ?? [];
     const done = history.data ?? [];
@@ -98,15 +128,39 @@ export function DashboardPage() {
 
   async function toggleBot() {
     const running = !!status.data?.is_running;
-    if (isGuest) {
-      guestMock.saveBotStatus({ is_running: !running, message: !running ? "Panel started" : "Panel paused" });
+    const aiEnabled = !!settings.data?.ai_enabled;
+    
+    let nextRunning = false;
+    let nextAiEnabled = false;
+
+    if (!running) {
+      nextRunning = true;
+      nextAiEnabled = false;
+    } else if (running && !aiEnabled) {
+      nextRunning = true;
+      nextAiEnabled = true;
     } else {
-      await supabase.from("bot_status").upsert(
-        { user_id: user!.id, is_running: !running, message: !running ? "Panel started" : "Panel paused" },
-        { onConflict: "user_id" },
-      );
+      nextRunning = false;
+      nextAiEnabled = false;
+    }
+
+    if (isGuest) {
+      guestMock.saveBotStatus({ is_running: nextRunning, message: nextRunning ? "Panel started" : "Panel paused" });
+      guestMock.saveSettings({ ai_enabled: nextAiEnabled });
+    } else {
+      await Promise.all([
+        supabase.from("bot_status").upsert(
+          { user_id: user!.id, is_running: nextRunning, message: nextRunning ? "Panel started" : "Panel paused" },
+          { onConflict: "user_id" }
+        ),
+        supabase.from("bot_settings").upsert(
+          { user_id: user!.id, ai_enabled: nextAiEnabled },
+          { onConflict: "user_id" }
+        )
+      ]);
     }
     status.refetch();
+    settings.refetch();
   }
 
   const [filterMode, setFilterMode] = useState<"all" | "profit" | "loss">("all");
@@ -187,6 +241,7 @@ export function DashboardPage() {
   }
 
   const running = !!status.data?.is_running;
+  const aiEnabled = !!settings.data?.ai_enabled;
   const equity = status.data?.account_equity ?? status.data?.account_balance ?? null;
   const currency = status.data?.account_currency ?? "USD";
 
@@ -238,116 +293,301 @@ export function DashboardPage() {
         )}
 
         {/* Card 22%: Main Neumorphic Card */}
-        <div className="w-full h-[24dvh] min-h-[220px] bg-[#11131a] rounded-[36px] p-3.5 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_10px_40px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden flex flex-col justify-between shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
+        <div className="w-full h-[17dvh] min-h-[145px] min-[340px]:min-h-[155px] bg-[#11131a] rounded-[24px] min-[340px]:rounded-[28px] p-1.5 min-[340px]:p-2 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_10px_40px_rgba(0,0,0,0.6)] border border-white/5 relative overflow-hidden flex shrink-0 animate-in fade-in slide-in-from-top-2 duration-700">
           
           {/* Subtle Ambient Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-blue-500/10 rounded-full blur-[60px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-blue-500/10 rounded-full blur-[50px] pointer-events-none" />
 
-          {/* Card Top Header */}
-          <div className="flex justify-between items-center relative z-30">
-            <div className="flex items-center gap-2">
+          {/* Left Column: AI Yordam & Sozlama */}
+          <div className="flex flex-col justify-around items-center h-full z-10 py-0 shrink-0 gap-0.5 pr-0.5 border-r border-white/5 w-[42px] min-[360px]:w-[48px]">
+            {/* Button 4: AI Send */}
+            <button onClick={() => setShowPrompt(true)} className="flex flex-col items-center group transition-all" aria-label="AI Send">
+              <div className="w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 rounded-lg bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_3px_8px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Sparkles size={12} className="text-amber-400 group-hover:scale-110 transition-transform" />
+              </div>
+              <span className="text-[7px] min-[360px]:text-[8px] font-bold text-white/50 group-hover:text-white/80 transition-colors mt-0.5">AI Yordam</span>
+            </button>
+
+            {/* Button 1: Settings */}
+            <Link to="/settings" className="flex flex-col items-center group transition-all" aria-label="Settings">
+              <div className="w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 rounded-lg bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_3px_8px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+                <div className="absolute inset-0 bg-slate-400/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Settings size={12} className="text-slate-400 group-hover:rotate-90 transition-transform duration-500" />
+              </div>
+              <span className="text-[7px] min-[360px]:text-[8px] font-bold text-white/50 group-hover:text-white/80 transition-colors mt-0.5">Sozlama</span>
+            </Link>
+          </div>
+
+          {/* Center Column: Header, Balance */}
+          <div className="flex-1 flex flex-col justify-between h-full px-1.5 min-[340px]:px-2 z-10 min-w-0">
+            {/* Card Top Header */}
+            <div className="flex items-center justify-between w-full gap-1 px-0.5">
+              
+              {/* 1. Akkaunt */}
+              <div className="relative min-w-0" ref={profileMenuRef}>
+                <div 
+                  onClick={() => setShowProfileMenu(!showProfileMenu)}
+                  className="flex items-center gap-1 bg-[#1a1d29] px-1.5 py-0.5 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),0_1px_2px_rgba(255,255,255,0.05)] border border-[#2a2f42] cursor-pointer hover:bg-[#1e2230] transition-all min-w-0"
+                >
+                  <div className="w-3 h-3 min-[340px]:w-3.5 min-[340px]:h-3.5 rounded-full bg-white flex items-center justify-center overflow-hidden shrink-0">
+                    <img 
+                      src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email || "Ana"}`} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="text-white/90 text-[8px] min-[340px]:text-[9px] font-bold tracking-tight truncate">
+                    {settings.data?.mt5_login || "109545213"}
+                  </span>
+                </div>
+                
+                {showProfileMenu && (
+                  <div className="absolute top-full left-0 mt-1 w-32 bg-[#1a1d29] border border-[#2a2f42] rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-1 space-y-0.5">
+                      <button 
+                        onClick={async () => {
+                          setShowProfileMenu(false);
+                          await logout();
+                          navigate("/auth");
+                        }}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-medium text-white/80 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                      >
+                        <UserPlus size={11} className="text-blue-400 shrink-0" />
+                        <span>Qo'shish</span>
+                      </button>
+                      <button 
+                        onClick={async () => {
+                          setShowProfileMenu(false);
+                          await logout();
+                          navigate("/auth");
+                        }}
+                        className="w-full flex items-center gap-1.5 px-2 py-1.5 text-[9px] font-medium text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                      >
+                        <LogOut size={11} className="shrink-0" />
+                        <span>Chiqish</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Web */}
               <a 
                 href="https://akkauntim-connect.vercel.app/" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="w-8 h-8 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-blue-400 hover:text-blue-300 transition-colors cursor-pointer active:scale-95"
+                className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-blue-400 hover:text-blue-300 transition-colors cursor-pointer active:scale-95 shrink-0"
                 title="Vebsaytni ochish"
               >
-                <Globe size={14} />
+                <Globe size={10} />
               </a>
 
-              <div className="relative" ref={profileMenuRef}>
-                <div 
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 bg-[#1a1d29] px-3 py-1.5 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),0_1px_2px_rgba(255,255,255,0.05)] border border-[#2a2f42] cursor-pointer hover:bg-[#1e2230] transition-all"
-                >
-                <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={`https://api.dicebear.com/7.x/bottts/svg?seed=${user?.email || "Ana"}`} 
-                    alt="Profile" 
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span className="text-white/90 text-xs font-bold tracking-tight">
-                  {settings.data?.mt5_login || "109545213"}
-                </span>
-              </div>
+              {/* 3. Telegram */}
+              <a 
+                href="https://t.me/akcume_signal" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-[#229ED9] hover:text-[#28a8e9] transition-colors cursor-pointer active:scale-95 shrink-0"
+                title="Telegram kanali"
+              >
+                <svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1 .22-1.6 1.5-1.55 2.76-2.97 2.84-3.37.01-.09-.01-.13-.06-.15-.05-.02-.12-.01-.17.01-.08.02-1.28.82-3.61 2.39-.34.23-.65.35-.93.34-.3-.01-.89-.17-1.32-.31-.53-.17-.95-.26-.91-.56.02-.15.22-.3.6-.45 2.34-1.02 3.9-1.69 4.67-2.01 2.21-.92 2.67-1.08 2.97-1.08.07 0 .21.02.3.1.08.07.1.16.11.23.01.06.02.19.01.29z"/>
+                </svg>
+              </a>
+
+              {/* 4. Tarif */}
+              <Link 
+                to="/pricing" 
+                className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-amber-400 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 shrink-0"
+                title="Tariflar / Premium"
+              >
+                <Crown size={11} className="fill-amber-400/10" />
+              </Link>
+
+            </div>
+
+            {/* Balance Dial Container with Legends */}
+            <div className="flex-1 flex items-center justify-between w-full select-none gap-1 px-1">
               
-              {showProfileMenu && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-[#1a1d29] border border-[#2a2f42] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="p-2 space-y-1">
-                    <button 
-                      onClick={async () => {
-                        setShowProfileMenu(false);
-                        await logout();
-                        navigate("/auth");
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-white/80 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
-                    >
-                      <UserPlus size={14} className="text-blue-400" />
-                      <span>Akkaunt qo'shish</span>
-                    </button>
-                    <button 
-                      onClick={async () => {
-                        setShowProfileMenu(false);
-                        await logout();
-                        navigate("/auth");
-                      }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-medium text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-colors"
-                    >
-                      <LogOut size={14} />
-                      <span>Chiqish</span>
-                    </button>
+              {/* Left Legend: SMC, PAT, NWS */}
+              <div className="flex flex-col gap-1 items-start text-[7px] font-extrabold text-white/50 leading-none shrink-0 pl-0.5">
+                <div className="flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-[#06b6d4] shrink-0 animate-pulse" />
+                  <span>SMC</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-[#3b82f6] shrink-0" />
+                  <span>PAT</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-1 h-1 rounded-full bg-[#a855f7] shrink-0" />
+                  <span>NWS</span>
+                </div>
+              </div>
+
+              <div 
+                onClick={toggleBot}
+                className="relative w-[95px] h-[95px] min-[340px]:w-[108px] min-[340px]:h-[108px] min-[375px]:w-[122px] min-[375px]:h-[122px] flex items-center justify-center rounded-full cursor-pointer active:scale-95 transition-all duration-300 group shrink-0"
+              >
+                
+                {/* SVG circular track, glowing progress rings, sentiment, and AI weights */}
+                <svg viewBox="0 0 120 120" className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
+                  <defs>
+                    <linearGradient id="botActiveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#10b981" />
+                      <stop offset="100%" stopColor="#06b6d4" />
+                    </linearGradient>
+                    <linearGradient id="sentimentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#f43f5e" />     {/* Strong Sell */}
+                      <stop offset="50%" stopColor="#eab308" />    {/* Neutral */}
+                      <stop offset="100%" stopColor="#10b981" />   {/* Strong Buy */}
+                    </linearGradient>
+                    <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+                      <feGaussianBlur stdDeviation="1.5" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  
+                  {/* Outer Rings & HUD elements */}
+                  
+                  {/* 1. Multi-Strategy AI Weights Ring (Radius 50) */}
+                  {/* SMC (0-50 deg) */}
+                  <path d={describeArc(60, 60, 50, 0, 50)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 0, (strategyWeights.smc / 100) * 50)} stroke="#06b6d4" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+                  {/* Pattern (60-110 deg) */}
+                  <path d={describeArc(60, 60, 50, 60, 110)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 60, 60 + (strategyWeights.pattern / 100) * 50)} stroke="#3b82f6" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+                  {/* News (120-170 deg) */}
+                  <path d={describeArc(60, 60, 50, 120, 170)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 120, 120 + (strategyWeights.news / 100) * 50)} stroke="#a855f7" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+                  {/* Wyckoff (180-230 deg) */}
+                  <path d={describeArc(60, 60, 50, 180, 230)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 180, 180 + (strategyWeights.wyckoff / 100) * 50)} stroke="#ec4899" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+                  {/* SR Volume (240-290 deg) */}
+                  <path d={describeArc(60, 60, 50, 240, 290)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 240, 240 + (strategyWeights.sr_volume / 100) * 50)} stroke="#f59e0b" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+                  {/* Auto Pattern (300-350 deg) */}
+                  <path d={describeArc(60, 60, 50, 300, 350)} stroke="rgba(255,255,255,0.03)" strokeWidth="2.2" fill="none" strokeLinecap="round" />
+                  <path d={describeArc(60, 60, 50, 300, 300 + (strategyWeights.auto_pattern / 100) * 50)} stroke="#10b981" strokeWidth="2.2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+
+                  {/* 2. NLP Market Sentiment Ring (Radius 44) */}
+                  {/* Sweep from 210 deg (bottom-left) to 150 deg (bottom-right) or standard 60-300 deg */}
+                  <path d={describeArc(60, 60, 43, 60, 300)} stroke="rgba(255,255,255,0.04)" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeDasharray="2.5 1.5" />
+                  <path d={describeArc(60, 60, 43, 60, 60 + (sentiment / 100) * 240)} stroke="url(#sentimentGrad)" strokeWidth="2" fill="none" strokeLinecap="round" filter="url(#glowEffect)" />
+
+
+                  {/* 3. Bot Control Ring (Radius 36) */}
+                  <circle cx="60" cy="60" r="36" stroke="rgba(255,255,255,0.02)" strokeWidth="2" fill="none" />
+                  <circle 
+                    cx="60" cy="60" r="36" 
+                    stroke={running ? "url(#botActiveGrad)" : "#f43f5e"} 
+                    strokeWidth="2.5" 
+                    fill="none" 
+                    strokeDasharray="226.2"
+                    strokeDashoffset={running ? "40" : "160"}
+                    strokeLinecap="round"
+                    filter="url(#glowEffect)"
+                    className="transition-all duration-1000 ease-out origin-center -rotate-90"
+                  />
+
+
+                  {/* 4. Center 3D Dial Core (Radius 31) */}
+                  <circle 
+                    cx="60" cy="60" r="31" 
+                    className="fill-gradient from-[#1b1e2c] to-[#0a0b12] stroke-white/5" 
+                    style={{ fill: "#0c0e17", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.8))" }}
+                  />
+                </svg>
+
+                {/* Inner Balance & Status Info */}
+                <div className="text-center z-10 flex flex-col items-center justify-center p-1 select-none pointer-events-none gap-0.5">
+                  {/* Market Sentiment Mini Badge */}
+                  <div className="flex items-center justify-center gap-1 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 backdrop-blur-md">
+                    {sentiment > 55 ? (
+                      <TrendingUp size={9} className="text-emerald-400 shrink-0" strokeWidth={2.5} />
+                    ) : sentiment < 45 ? (
+                      <TrendingDown size={9} className="text-rose-400 shrink-0" strokeWidth={2.5} />
+                    ) : (
+                      <Sparkles size={8} className="text-amber-400 shrink-0 animate-pulse" />
+                    )}
+                    <span className={cn(
+                      "text-[8px] font-black leading-none tracking-tight",
+                      sentiment > 55 ? "text-emerald-400" : sentiment < 45 ? "text-rose-400" : "text-amber-400"
+                    )}>
+                      {sentiment}%
+                    </span>
+                  </div>
+                  
+                  {/* Balance Value */}
+                  <h1 className="text-[14px] min-[340px]:text-[16px] min-[375px]:text-[18px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/80 tracking-tight tabular-nums drop-shadow-md leading-none py-1">
+                    {equity != null ? (
+                      new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: currency || "USD",
+                        maximumFractionDigits: 0,
+                      }).format(Math.round(Number(equity)))
+                    ) : "$89,405"}
+                  </h1>
+
+                  {/* Status Badge */}
+                  <div className="flex items-center justify-center">
+                    {!running ? (
+                      <span className="text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase">
+                        <span className="w-1 h-1 rounded-full bg-rose-400" />
+                        STOP
+                      </span>
+                    ) : aiEnabled ? (
+                      <span className="text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase animate-pulse">
+                        <Bot size={8} className="text-cyan-400" />
+                        AI FAOL
+                      </span>
+                    ) : (
+                      <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase">
+                        <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+                        FAOL
+                      </span>
+                    )}
                   </div>
                 </div>
-              )}
+
+              </div>
+
+              {/* Right Legend: WYC, SRV, AUT */}
+              <div className="flex flex-col gap-1 items-end text-[7px] font-extrabold text-white/50 leading-none shrink-0 pr-0.5">
+                <div className="flex items-center gap-1">
+                  <span>WYC</span>
+                  <span className="w-1 h-1 rounded-full bg-[#ec4899] shrink-0" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>SRV</span>
+                  <span className="w-1 h-1 rounded-full bg-[#f59e0b] shrink-0" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span>AUT</span>
+                  <span className="w-1 h-1 rounded-full bg-[#10b981] shrink-0" />
+                </div>
+              </div>
+
             </div>
-            </div>
-            
-            <Link to="/pricing" className="flex items-center gap-1.5 bg-[#1a1d29] hover:bg-[#1e2230] px-3 py-1.5 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.2),0_1px_2px_rgba(255,255,255,0.05)] transition-all border border-[#2a2f42] cursor-pointer group">
-              <Crown size={12} className="text-amber-400 fill-amber-400/20 group-hover:scale-110 transition-transform" />
-              <span className="text-[9px] font-extrabold text-amber-400 uppercase tracking-widest">Premium</span>
-            </Link>
           </div>
 
-          {/* Balance Area */}
-          <div className="text-center flex flex-col items-center justify-center flex-1 py-0 relative z-10">
-            <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tracking-tight tabular-nums drop-shadow-sm">
-              {equity != null ? fmtMoney(Number(equity), currency) : "$89,405.18"}
-            </h1>
-            {isGuest && (
-              <span className="mt-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[9px] font-extrabold uppercase tracking-widest backdrop-blur-md">
-                Demo Reja
-              </span>
-            )}
-          </div>
-
-          {/* Avatars Row */}
-          <a href="https://t.me/akcume_signal" target="_blank" rel="noopener noreferrer" className="flex justify-center mb-1.5 cursor-pointer relative z-10">
-            {["Fluffy", "Cotton", "Snow", "Coco", "Bugs"].map((seed, idx) => (
-              <div key={seed} className={`w-12 h-12 rounded-full border-2 border-[#11131a] bg-white shadow-md overflow-hidden flex items-center justify-center transform hover:scale-110 transition-transform ${idx !== 0 ? "-ml-4" : ""}`}>
-                <img src={`https://api.dicebear.com/7.x/micah/svg?seed=${seed}&backgroundColor=f1f5f9`} alt={seed} className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </a>
-
-          {/* Action Buttons Row */}
-          <div className="flex justify-around items-start w-full mt-auto px-1 relative z-10">
-            
-            {/* Button 1: Settings */}
-            <Link to="/settings" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Settings">
-              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
-                <div className="absolute inset-0 bg-slate-400/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Settings size={18} className="text-slate-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:rotate-90 transition-transform duration-500" />
-              </div>
-              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Sozlama</span>
-            </Link>
-            
+          {/* Right Column: Signallar & O'rganish */}
+          <div className="flex flex-col justify-around items-center h-full z-10 py-0 shrink-0 gap-0.5 pl-0.5 border-l border-white/5 w-[42px] min-[360px]:w-[48px]">
             {/* Button 2: Signals */}
-            <Link to="/signals" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Signals">
-              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+            <Link to="/signals" className="flex flex-col items-center group transition-all" aria-label="Signals">
+              <div className="w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 rounded-lg bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_3px_8px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 bg-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 80 80" className="text-orange-400 min-[360px]:w-[22px] min-[360px]:h-[22px] group-hover:scale-110 transition-transform">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 80 80" className="text-orange-400 group-hover:scale-110 transition-transform">
                   <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="5">
                     <path stroke="currentColor" d="M40 48v24"/>
                     <circle cx="40" cy="40" r="8" fill="currentColor" fillOpacity="0.2" stroke="currentColor"/>
@@ -356,84 +596,79 @@ export function DashboardPage() {
                   </g>
                 </svg>
               </div>
-              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Signallar</span>
+              <span className="text-[7px] min-[360px]:text-[8px] font-bold text-white/50 group-hover:text-white/80 transition-colors mt-0.5">Signallar</span>
             </Link>
-
-            {/* Button 3: Filter */}
-            <button onClick={toggleFilter} className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Filter Mode">
-              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
-                <div className="absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <div className="flex items-center justify-center w-6 h-6 min-[360px]:w-7 min-[360px]:h-7">
-                  {filterMode === "all" && (
-                    <div className="relative w-full h-full group-hover:scale-110 transition-transform flex items-center justify-center">
-                      <TrendingUp size={16} className="text-emerald-400 absolute top-0 left-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
-                      <TrendingDown size={16} className="text-rose-400 absolute bottom-0 right-0 min-[360px]:w-[18px] min-[360px]:h-[18px]" strokeWidth={2.5} />
-                    </div>
-                  )}
-                  {filterMode === "profit" && <TrendingUp size={22} className="text-emerald-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
-                  {filterMode === "loss" && <TrendingDown size={22} className="text-rose-400 min-[360px]:w-[24px] min-[360px]:h-[24px] group-hover:scale-110 transition-transform" strokeWidth={2.5} />}
-                </div>
-              </div>
-              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">Filtr</span>
-            </button>
-
-            {/* Button 4: AI Send */}
-            <button onClick={() => setShowPrompt(true)} className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="AI Send">
-              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
-                <div className="absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Sparkles size={18} className="text-amber-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform" />
-              </div>
-              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">AI Yordam</span>
-            </button>
 
             {/* Button 5: Shadow Learning AI */}
-            <Link to="/shadow-learning" className="flex flex-col items-center gap-1.5 shrink-0 group transition-all" aria-label="Shadow Learning AI">
-              <div className="w-11 h-11 min-[360px]:w-12 min-[360px]:h-12 min-[390px]:w-[52px] min-[390px]:h-[52px] rounded-2xl min-[360px]:rounded-[18px] bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_6px_16px_rgba(0,0,0,0.4)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
+            <Link to="/shadow-learning" className="flex flex-col items-center group transition-all" aria-label="Shadow Learning AI">
+              <div className="w-7 h-7 min-[360px]:w-8 min-[360px]:h-8 rounded-lg bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_3px_8px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center group-hover:bg-[#1e2230] group-active:scale-95 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 bg-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                <Brain size={18} className="text-emerald-400 min-[360px]:w-[20px] min-[360px]:h-[20px] group-hover:scale-110 transition-transform" />
+                <Brain size={12} className="text-emerald-400 group-hover:scale-110 transition-transform" />
               </div>
-              <span className="text-[9px] min-[360px]:text-[10px] font-medium text-white/50 group-hover:text-white/80 transition-colors">O'rganish</span>
+              <span className="text-[7px] min-[360px]:text-[8px] font-bold text-white/50 group-hover:text-white/80 transition-colors mt-0.5">O'rganish</span>
             </Link>
           </div>
+
         </div>
-
-
+ 
+ 
         <div className="flex-1 overflow-y-auto pb-4 space-y-2 no-scrollbar relative animate-in fade-in slide-in-from-bottom-4 duration-700">
           
           {/* Tab Selector */}
-          <div className="flex bg-[#10192e]/60 border border-white/5 rounded-xl p-0.5 shrink-0 sticky top-0 backdrop-blur-md z-30 overflow-x-auto no-scrollbar">
+          <div className="flex bg-[#10192e]/60 border border-white/5 rounded-xl p-0.5 shrink-0 sticky top-0 backdrop-blur-md z-30 overflow-x-auto no-scrollbar items-center gap-0.5 w-full">
             <button 
               onClick={() => handleTabClick("positions")}
               className={cn(
-                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[70px] py-1.5 text-[10px] min-[350px]:text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "positions" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
               <span>Pozitsiya</span>
-              <span className={cn("text-[9px] px-1 py-0.5 rounded-full font-bold", activeTab === "positions" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
+              <span className={cn("text-[8px] px-1 py-0.5 rounded-full font-bold", activeTab === "positions" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
                 {filteredPositions?.length ?? 0}
               </span>
             </button>
             <button 
               onClick={() => handleTabClick("limits")}
               className={cn(
-                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[70px] py-1.5 text-[10px] min-[350px]:text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "limits" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
               <span>Limitlar</span>
-              <span className={cn("text-[9px] px-1 py-0.5 rounded-full font-bold", activeTab === "limits" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
+              <span className={cn("text-[8px] px-1 py-0.5 rounded-full font-bold", activeTab === "limits" ? "bg-white/20 text-white" : "bg-white/5 text-white/40")}>
                 {pending.data?.length ?? 0}
               </span>
             </button>
             <button 
               onClick={() => handleTabClick("history")}
               className={cn(
-                "flex-1 min-w-[100px] py-1.5 text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
+                "flex-1 min-w-[70px] py-1.5 text-[10px] min-[350px]:text-[11px] min-[375px]:text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95",
                 activeTab === "history" ? "bg-blue-600 text-white shadow-lg shadow-blue-600/10 border border-white/5" : "text-white/60 hover:text-white"
               )}
             >
               <span>Tarix</span>
+            </button>
+            
+            {/* Small Filter Button */}
+            <button 
+              onClick={toggleFilter}
+              className={cn(
+                "px-2 py-1.5 rounded-lg transition-all flex items-center justify-center gap-1 active:scale-95 border mr-0.5",
+                filterMode !== "all" 
+                  ? "bg-purple-600/20 text-purple-400 border-purple-500/30" 
+                  : "text-white/40 hover:text-white/60 border-transparent bg-white/5"
+              )}
+              title="Filtrlash"
+            >
+              {filterMode === "all" && (
+                <div className="relative w-3.5 h-3.5 flex items-center justify-center">
+                  <TrendingUp size={10} className="text-emerald-400 absolute top-0 left-0" strokeWidth={2.5} />
+                  <TrendingDown size={10} className="text-rose-400 absolute bottom-0 right-0" strokeWidth={2.5} />
+                </div>
+              )}
+              {filterMode === "profit" && <TrendingUp size={12} className="text-emerald-400" strokeWidth={2.5} />}
+              {filterMode === "loss" && <TrendingDown size={12} className="text-rose-400" strokeWidth={2.5} />}
             </button>
           </div>
 

@@ -21,6 +21,7 @@ type Body = {
     account_equity?: number;
     account_balance?: number;
     account_currency?: string;
+    available_symbols?: Record<string, string[]>;
   };
   positions?: Array<{
     ticket: number;

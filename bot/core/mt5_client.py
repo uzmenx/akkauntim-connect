@@ -169,6 +169,34 @@ class MT5Client:
                     crypto.append(s.name)
         return crypto
 
+    def get_grouped_symbols(self) -> Dict[str, List[str]]:
+        """MT5 dan barcha ruxsat etilgan juftliklarni kategoriyalar bo'yicha guruhlab oladi."""
+        self._check_connection()
+        symbols = mt5.symbols_get()
+        if symbols is None:
+            self.logger.error(f"Failed to get symbols for grouping, error code: {mt5.last_error()}")
+            return {}
+            
+        grouped = {}
+        for s in symbols:
+            if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL and s.visible:
+                # s.path odatda "Forex\\Majors\\EURUSD" shaklida bo'ladi
+                parts = s.path.split('\\')
+                if not parts:
+                    continue
+                # Asosiy kategoriya sifatida birinchi qismini olamiz (masalan, "Forex")
+                category = parts[0]
+                
+                # Ba'zi brokerlarda path faqat nomdan iborat bo'lishi mumkin
+                if len(parts) == 1:
+                    category = "Boshqalar"
+                    
+                if category not in grouped:
+                    grouped[category] = []
+                grouped[category].append(s.name)
+                
+        return grouped
+
     # === Alias methods for backward compatibility ===
     # OrderManager va boshqa modullar to'g'ridan-to'g'ri MT5 metodlarini chaqiradi
     def symbol_info(self, symbol: str):

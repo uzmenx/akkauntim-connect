@@ -119,6 +119,10 @@ export function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
 
+  const dynamicCategories = statusQuery.data?.available_symbols && Object.keys(statusQuery.data.available_symbols).length > 0 
+    ? statusQuery.data.available_symbols 
+    : ASSET_CATEGORIES;
+
   // Symbol Modal State
   const [isSymbolModalOpen, setIsSymbolModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState("Forex");
@@ -559,7 +563,7 @@ export function SettingsPage() {
 
             {/* Category Tabs */}
             <div className="flex items-center gap-1 overflow-x-auto p-3 scrollbar-hide border-b border-white/5">
-              {Object.keys(ASSET_CATEGORIES).map((cat) => (
+              {Object.keys(dynamicCategories).map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setActiveCategory(cat)}
@@ -578,7 +582,7 @@ export function SettingsPage() {
             <div className="flex justify-between items-center px-4 pt-3 pb-1">
               <button 
                 onClick={() => {
-                  const currentCatSymbols = ASSET_CATEGORIES[activeCategory];
+                  const currentCatSymbols = dynamicCategories[activeCategory] || [];
                   setForm(f => {
                     const current = f.symbols || [];
                     const filtered = current.filter(s => !currentCatSymbols.includes(s));
@@ -591,7 +595,7 @@ export function SettingsPage() {
               </button>
               <button 
                 onClick={() => {
-                  const currentCatSymbols = ASSET_CATEGORIES[activeCategory];
+                  const currentCatSymbols = dynamicCategories[activeCategory] || [];
                   setForm(f => {
                     const current = f.symbols || [];
                     return { ...f, symbols: current.filter(s => !currentCatSymbols.includes(s)) };
@@ -606,7 +610,7 @@ export function SettingsPage() {
             {/* Symbols Grid */}
             <div className="p-4 overflow-y-auto flex-1">
               <div className="grid grid-cols-2 gap-3">
-                {ASSET_CATEGORIES[activeCategory].map((sym) => {
+                {(dynamicCategories[activeCategory] || []).map((sym) => {
                   const isSelected = (form.symbols || []).includes(sym);
                   return (
                     <div 

@@ -7,10 +7,10 @@
       "total_profit": -71.82
     },
     {
-      "mechanism": "tp1_partial",
+      "mechanism": "unknown",
       "trade_count": 1,
       "loss_count": 0,
-      "total_profit": 65.16
+      "total_profit": 13.47
     }
   ],
   "news_coverage_gap": [
@@ -18,9 +18,15 @@
       "gap": "0",
       "trade_count": 2,
       "loss_count": 1,
-      "total_profit": -6.66
+      "total_profit": -58.35
     }
   ],
   "news_strategy_style": [],
-  "updated_at": "2026-07-31T16:33:32.761806"
+  "updated_at": "2026-08-01T13:24:26.902742",
+  "rl_agent_progress": {
+    "episodes_played": 10000,
+    "avg_reward": 1011.66,
+    "win_rate_simulation": 98.2,
+    "growth": 98.2
+  }
 }

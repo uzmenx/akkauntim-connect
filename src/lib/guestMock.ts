@@ -7,6 +7,14 @@ const MOCK_SIGNALS_KEY = "guest_signals";
 const MOCK_PENDING_KEY = "guest_pending_orders";
 const MOCK_SETTINGS_KEY = "guest_bot_settings";
 
+const DEFAULT_ASSET_CATEGORIES: Record<string, string[]> = {
+  Forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURCHF", "EURAUD"],
+  Crypto: ["BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD", "ADAUSD", "DOGEUSD", "BNBUSD", "LTCUSD", "LINKUSD"],
+  Indices: ["US30", "SPX500", "NAS100", "GER40", "UK100", "JPN225"],
+  Metals: ["XAUUSD", "XAGUSD"],
+  Stock: ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "NVDA"],
+};
+
 const defaultStatus = (): BotStatus => ({
   id: "guest-status",
   user_id: "guest",
@@ -19,6 +27,8 @@ const defaultStatus = (): BotStatus => ({
   message: "Panel running in Demo Mode",
   claude_limit: 20.0,
   claude_used: 4.5,
+  available_symbols: DEFAULT_ASSET_CATEGORIES,
+  market_sentiment: 65,
   updated_at: new Date().toISOString(),
 });
 
@@ -185,6 +195,9 @@ const defaultSettings = (): BotSettings => ({
   strategy_weight_smc: 60,
   strategy_weight_pattern: 60,
   strategy_weight_news: 60,
+  strategy_weight_wyckoff: 50,
+  strategy_weight_sr_volume: 50,
+  strategy_weight_auto_pattern: 50,
   updated_at: new Date().toISOString(),
 });
 
