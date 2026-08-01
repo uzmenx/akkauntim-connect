@@ -5,6 +5,10 @@ node_modules
 
 *.db
 *.db-journal
+*.db-shm
+*.db-wal
 *.pkl
 models/
 .venv/
+dist/
+chroma_db/
