@@ -1,6 +1,6 @@
 {
   "trading": {
-    "symbols": ["EURUSD", "GBPUSD", "XAUUSD"],
+    "symbols": ["AUTO"],
     "timeframe_major": "H1",
     "timeframe_minor": "M5",
     "loop_interval_minutes": 5,

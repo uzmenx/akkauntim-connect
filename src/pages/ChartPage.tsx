@@ -44,13 +44,32 @@ export function ChartPage() {
   const [candles, setCandles] = useState<CandleData[]>([]);
   const [zones, setZones] = useState<SmcZone[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>(['EURUSD', 'GBPUSD', 'XAUUSD', 'BTCUSDT']);
 
   useEffect(() => {
     const sym = searchParams.get('symbol');
-    if (sym) {
+    if (sym && sym !== symbol) {
       setSymbol(sym);
     }
-  }, [searchParams]);
+  }, [searchParams.get('symbol')]);
+
+  useEffect(() => {
+    const fetchSymbols = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('bot_status')
+          .select('available_symbols')
+          .limit(1)
+          .single();
+        if (!error && data?.available_symbols && Array.isArray(data.available_symbols) && data.available_symbols.length > 0) {
+          setAvailableSymbols(data.available_symbols);
+        }
+      } catch (e) {
+        console.error("Error fetching symbols", e);
+      }
+    };
+    fetchSymbols();
+  }, []);
 
   // Fetch initial data
   const fetchData = async () => {
@@ -255,12 +274,11 @@ export function ChartPage() {
               onChange={(e) => setSymbol(e.target.value)}
               className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 text-sm font-medium"
             >
-              <option value="EURUSD">EURUSD</option>
-              <option value="GBPUSD">GBPUSD</option>
-              <option value="XAUUSD">XAUUSD</option>
-              <option value="BTCUSDT">BTCUSDT</option>
+              {!availableSymbols.includes(symbol) && <option value={symbol}>{symbol}</option>}
+              {availableSymbols.map(sym => (
+                <option key={sym} value={sym}>{sym}</option>
+              ))}
             </select>
-
             <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
               {['M15', 'H1', 'H4'].map(tf => (
                 <button

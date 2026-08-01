@@ -75,9 +75,17 @@ def check_and_place_straddle(mt5_client, order_manager, symbols, settings):
         if 0.5 <= mins_left <= 3:
             logger.info(f"!!! DIQQAT !!! '{event['title']}' yangiligiga {mins_left} daqiqa qoldi. Straddle v2 tayyorlanmoqda.")
             
-            # Dinamik 3 ta juftlikni tanlash
+            # Dinamik juftlikni tanlash
             country = event.get("country", "USD")
-            dynamic_symbols = CURRENCY_PAIRS_MAP.get(country, ["EURUSD", "GBPUSD", "XAUUSD"])
+            
+            dynamic_symbols = []
+            if symbols:
+                for sym in symbols:
+                    if country.upper() in sym.upper():
+                        dynamic_symbols.append(sym)
+            
+            if not dynamic_symbols:
+                dynamic_symbols = CURRENCY_PAIRS_MAP.get(country, ["EURUSD", "GBPUSD", "XAUUSD"])
             
             for symbol in dynamic_symbols:
                 symbol_info = mt5_client.symbol_info(symbol)

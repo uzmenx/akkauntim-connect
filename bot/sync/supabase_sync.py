@@ -136,14 +136,18 @@ class SupabaseSync:
                 "take_profit": float(o.tp) if o.tp else None,
             })
 
-        # Closed history
-        from_date = self.last_sync_time
+        # Closed history - always query the last 30 days to avoid timezone mismatch or missed trades
+        from_date = datetime.datetime.now() - datetime.timedelta(days=30)
         to_date = datetime.datetime.now() + datetime.timedelta(days=1)
         deals = mt5.history_deals_get(from_date, to_date) or []
         closed_rows = []
         for d in deals:
             if d.entry in (1, 2) and d.symbol:
-                side = "BUY" if d.type == mt5.DEAL_TYPE_BUY else "SELL"
+                # Side and opening price logic
+                side = "SELL" if d.type == mt5.DEAL_TYPE_BUY else "BUY"  # Fallback: opposite of close deal
+                open_price = float(d.price)
+                opened_at = datetime.datetime.fromtimestamp(d.time).isoformat()
+                closed_at = datetime.datetime.fromtimestamp(d.time).isoformat()
                 
                 # Original order ticket ni topish (Pending orderlar uchung)
                 original_ticket = int(d.position_id or d.ticket)
@@ -151,8 +155,11 @@ class SupabaseSync:
                     pos_deals = mt5.history_deals_get(position=d.position_id)
                     if pos_deals:
                         for pd in pos_deals:
-                            if pd.entry == 0:  # DEAL_ENTRY_IN
+                            if pd.entry == 0:  # DEAL_ENTRY_IN (opening deal)
                                 original_ticket = int(pd.order)
+                                side = "BUY" if pd.type == mt5.DEAL_TYPE_BUY else "SELL"
+                                open_price = float(pd.price)
+                                opened_at = datetime.datetime.fromtimestamp(pd.time).isoformat()
                                 break
 
                 agreed_strategies, ai_used = self._get_decision_metadata(original_ticket)
@@ -162,17 +169,16 @@ class SupabaseSync:
                     "symbol": d.symbol,
                     "side": side,
                     "volume": float(d.volume),
-                    "open_price": float(d.price) if hasattr(d, 'price') else 0.0,
+                    "open_price": open_price,
                     "close_price": float(d.price),
                     "profit": float(d.profit),
-                    "opened_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
-                    "closed_at": datetime.datetime.fromtimestamp(d.time).isoformat(),
+                    "opened_at": opened_at,
+                    "closed_at": closed_at,
                     "mt5_comment": str(d.comment) if getattr(d, 'comment', None) else "",
                     "mt5_reason": int(d.reason) if hasattr(d, 'reason') else None,
                     "agreed_strategies": agreed_strategies,
                     "ai_used": ai_used
                 })
-        self.last_sync_time = datetime.datetime.now()
 
         # get available symbols
         available_symbols = {}

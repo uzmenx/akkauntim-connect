@@ -165,9 +165,38 @@ class MT5Client:
         crypto = []
         for s in symbols:
             if s.trade_mode == mt5.SYMBOL_TRADE_MODE_FULL and s.visible:
-                if "crypto" in s.path.lower():
+                nm = s.name.lower()
+                pt = s.path.lower()
+                if "crypto" in pt or "btc" in nm or "eth" in nm or "sol" in nm or "xrp" in nm or "bnb" in nm:
                     crypto.append(s.name)
         return crypto
+
+    def resolve_symbols(self, requested_symbols: List[str]) -> List[str]:
+        """Requested simvollarni MT5 dagi haqiqiy ismlari (case, suffix) bilan taqqoslab qaytaradi."""
+        self._check_connection()
+        symbols = mt5.symbols_get()
+        if symbols is None:
+            return requested_symbols
+            
+        resolved = []
+        req_lower = [s.lower() for s in requested_symbols]
+        
+        for s in symbols:
+            if s.trade_mode != mt5.SYMBOL_TRADE_MODE_FULL or not s.visible:
+                continue
+            s_name = s.name.lower()
+            
+            if s_name in req_lower:
+                resolved.append(s.name)
+                continue
+                
+            for req in req_lower:
+                if s_name.startswith(req) and len(s_name) <= len(req) + 3:
+                    if s.name not in resolved:
+                        resolved.append(s.name)
+                        break
+                        
+        return resolved if resolved else requested_symbols
 
     def get_grouped_symbols(self) -> Dict[str, List[str]]:
         """MT5 dan barcha ruxsat etilgan juftliklarni kategoriyalar bo'yicha guruhlab oladi."""

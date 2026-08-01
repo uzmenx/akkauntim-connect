@@ -200,18 +200,18 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
       className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
     >
       {stats && (
-        <div className="absolute bottom-2 left-3.5 right-3.5 z-10 flex items-center justify-between pointer-events-none">
+        <div className="absolute bottom-2 left-2 right-2 min-[360px]:left-3.5 min-[360px]:right-3.5 z-10 flex items-center justify-between pointer-events-none">
           <div className="flex items-center gap-1 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full backdrop-blur-md">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             <span className="hidden min-[360px]:inline text-[8px] font-bold text-white/50 tracking-wider uppercase">TREND</span>
           </div>
-          <div className="flex items-center gap-1.5 min-[360px]:gap-3 bg-white/5 border border-white/10 px-1.5 min-[360px]:px-2.5 py-0.5 rounded-full backdrop-blur-md pointer-events-auto select-none">
-            <div className="flex items-center gap-1 text-white/80" title="Savdolar soni">
+          <div className="flex items-center gap-1 min-[360px]:gap-2 bg-white/5 border border-white/10 px-1.5 min-[360px]:px-2.5 py-0.5 rounded-full backdrop-blur-md pointer-events-auto select-none">
+            <div className="flex items-center gap-0.5 min-[360px]:gap-1 text-white/80" title="Savdolar soni">
               <Activity size={10} className="text-blue-400" />
               <span className="text-[10px] font-bold leading-none">{stats.todayCount}</span>
             </div>
             <div className="w-[1px] h-2.5 bg-white/10" />
-            <div className="flex items-center gap-1" title="Bugungi P/L">
+            <div className="flex items-center gap-0.5 min-[360px]:gap-1" title="Bugungi P/L">
               {stats.todayPL >= 0 ? (
                 <TrendingUp size={10} className="text-emerald-400" />
               ) : (
@@ -221,8 +221,8 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
                 {stats.todayPL >= 0 ? "+" : ""}{fmtMoney(stats.todayPL)}
               </span>
             </div>
-            <div className="hidden min-[360px]:block w-[1px] h-2.5 bg-white/10" />
-            <div className="hidden min-[360px]:flex items-center gap-1 text-white/80" title="Win Rate">
+            <div className="w-[1px] h-2.5 bg-white/10" />
+            <div className="flex items-center gap-0.5 min-[360px]:gap-1 text-white/80" title="Win Rate">
               <Percent size={9} className="text-purple-400" />
               <span className="text-[10px] font-bold leading-none">{stats.wr != null ? `${stats.wr}%` : "0%"}</span>
             </div>

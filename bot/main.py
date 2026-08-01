@@ -1054,19 +1054,6 @@ class TradingBot:
                     except Exception as e:
                         logger.warning(f"Sozlamalarni yangilashda xatolik: {e}")
 
-                    # === YANGILIKLAR SAVDOSI (NEWS TRADING - 2 USUL) ===
-                    try:
-                        # 1-usul: AI'siz Straddle (Buy Stop/Sell Stop)
-                        check_and_place_straddle(self.mt5, self.orders, [], getattr(self.config, 'news_settings', {}))
-                        cleanup_straddle_orders(self.mt5, self.orders)
-                        # Kechikkan yangiliklar uchun orderlarni yangilab turish
-                        refresh_straddle_for_delayed_news(self.mt5, self.orders)
-                        
-                        # 2-usul: AI bilan Uzoq muddatli (Fundamental)
-                        execute_fundamental_method(self.mt5, self.orders, self.ai)
-                    except Exception as e:
-                        logger.error(f"News Trading siklida xatolik: {e}")
-
                     # Juftliklarni aniqlash (Dam olish kuni vs Ish kuni)
                     import datetime
                     is_weekend = datetime.datetime.utcnow().weekday() >= 5
@@ -1081,14 +1068,45 @@ class TradingBot:
                             all_symbols = self.mt5.get_tradeable_symbols()
                             if not all_symbols:
                                 logger.warning("MT5 dan juftliklar topilmadi. Config dagi juftliklardan foydalanamiz.")
-                                all_symbols = self.config.trading_symbols
+                                all_symbols = self.mt5.resolve_symbols(self.config.trading_symbols)
                         else:
-                            all_symbols = self.config.trading_symbols
+                            all_symbols = self.mt5.resolve_symbols(self.config.trading_symbols)
 
                     if not all_symbols:
                         logger.warning("Tahlil uchun hech qanday juftlik yo'q.")
                         time.sleep(60)
                         continue
+
+                    # === YANGILIKLAR SAVDOSI (NEWS TRADING - 2 USUL) ===
+                    try:
+                        # 1-usul: AI'siz Straddle (Buy Stop/Sell Stop)
+                        check_and_place_straddle(self.mt5, self.orders, all_symbols, getattr(self.config, 'news_settings', {}))
+                        cleanup_straddle_orders(self.mt5, self.orders)
+                        # Kechikkan yangiliklar uchun orderlarni yangilab turish
+                        refresh_straddle_for_delayed_news(self.mt5, self.orders)
+                        
+                        # 2-usul: AI bilan Uzoq muddatli (Fundamental)
+                        execute_fundamental_method(self.mt5, self.orders, self.ai)
+                    except Exception as e:
+                        logger.error(f"News Trading siklida xatolik: {e}")
+
+                    # YANGA QO'SHILGAN QISM: Har qanday ochilgan (yoki kutilayotgan) pozitsiyalarni all_symbols ga qo'shish (masalan Straddle orqali ochilgan)
+                    try:
+                        open_pos = self.mt5.positions_get()
+                        if open_pos:
+                            for pos in open_pos:
+                                if pos.symbol not in all_symbols:
+                                    all_symbols.append(pos.symbol)
+                                    logger.info(f"Ochiq pozitsiya simvoli tsiklga qo'shildi: {pos.symbol}")
+                        
+                        open_orders = self.mt5.orders_get()
+                        if open_orders:
+                            for ord_item in open_orders:
+                                if ord_item.symbol not in all_symbols:
+                                    all_symbols.append(ord_item.symbol)
+                                    logger.info(f"Kutilayotgan order simvoli tsiklga qo'shildi: {ord_item.symbol}")
+                    except Exception as e:
+                        logger.warning(f"Ochiq pozitsiyalarni aniqlashda xato: {e}")
                         
                     logger.info(f"Navbatdagi sikl ({len(all_symbols)} ta juftlik): {all_symbols}")
 
