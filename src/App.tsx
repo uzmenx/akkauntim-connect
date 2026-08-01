@@ -9,7 +9,6 @@ import { SettingsPage } from "@/pages/SettingsPage";
 import { SubscriptionPage } from "@/pages/SubscriptionPage";
 import { BacktestPage } from "@/pages/BacktestPage";
 import { ShadowLearningPage } from "@/pages/ShadowLearningPage";
-import { ChartPage } from "@/pages/ChartPage";
 import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +23,6 @@ const titles: Record<string, string> = {
   "/settings": "Bot settings",
   "/pricing": "Ta'riflar va Obuna",
   "/shadow-learning": "Shadow Learning AI",
-  "/chart": "Narx Grafigi",
 };
 
 export default function App() {
@@ -153,7 +151,6 @@ export default function App() {
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/pricing" element={<SubscriptionPage />} />
           <Route path="/shadow-learning" element={<ShadowLearningPage />} />
-          <Route path="/chart" element={<ChartPage />} />
           <Route path="/auth" element={<Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

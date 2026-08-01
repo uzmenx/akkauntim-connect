@@ -1,16 +1,19 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
 import type { Position } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, CandlestickChart } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
 import { guestMock } from "@/lib/guestMock";
+import { TradingChartModal } from "@/components/TradingChartModal";
 
 export function PositionsPage() {
   const { user } = useAuth();
   const isGuest = user?.id === "guest";
+  const [selectedPosition, setSelectedPosition] = useState<Position | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["positions_full", user?.id],
@@ -37,45 +40,63 @@ export function PositionsPage() {
   }
 
   return (
-    <div className="space-y-3">
-      {data.map((p) => {
-        const isBuy = p.side?.toUpperCase() === "BUY";
-        const profit = Number(p.profit ?? 0);
-        return (
-          <Card key={p.id} className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <span
-                  className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-xs font-black ${
-                    isBuy ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
-                  }`}
-                >
-                  {isBuy ? "BUY" : "SELL"}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold">{p.symbol}</p>
-                  <p className="truncate text-[11px] text-fg-dim">
-                    Ticket #{p.ticket} · {timeAgo(p.opened_at)} oldin
+    <>
+      <div className="space-y-3">
+        {data.map((p) => {
+          const isBuy = p.side?.toUpperCase() === "BUY";
+          const profit = Number(p.profit ?? 0);
+          return (
+            <Card
+              key={p.id}
+              className="p-4 cursor-pointer hover:border-blue-500/50 hover:scale-[1.01] transition-all group relative overflow-hidden"
+              onClick={() => setSelectedPosition(p)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-xs font-black ${
+                      isBuy ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
+                    }`}
+                  >
+                    {isBuy ? "BUY" : "SELL"}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="truncate text-base font-bold group-hover:text-blue-400 transition-colors">{p.symbol}</p>
+                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-blue-400 flex items-center gap-0.5 bg-blue-500/10 px-1.5 py-0.5 rounded-full">
+                        <CandlestickChart size={10} /> Chart
+                      </span>
+                    </div>
+                    <p className="truncate text-[11px] text-fg-dim">
+                      Ticket #{p.ticket} · {timeAgo(p.opened_at)} oldin
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className={`tabular text-lg font-black ${profit >= 0 ? "text-success" : "text-danger"}`}>
+                    {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
                   </p>
+                  <p className="text-[11px] text-fg-dim">{fmtNum(p.volume, 2)} lot</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className={`tabular text-lg font-black ${profit >= 0 ? "text-success" : "text-danger"}`}>
-                  {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
-                </p>
-                <p className="text-[11px] text-fg-dim">{fmtNum(p.volume, 2)} lot</p>
+              <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">
+                <Field label="Open" value={fmtNum(p.open_price, 5)} />
+                <Field label="Now" value={fmtNum(p.current_price, 5)} />
+                <Field label="SL" value={fmtNum(p.stop_loss, 5)} tone="danger" />
+                <Field label="TP" value={fmtNum(p.take_profit, 5)} tone="success" />
               </div>
-            </div>
-            <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">
-              <Field label="Open" value={fmtNum(p.open_price, 5)} />
-              <Field label="Now" value={fmtNum(p.current_price, 5)} />
-              <Field label="SL" value={fmtNum(p.stop_loss, 5)} tone="danger" />
-              <Field label="TP" value={fmtNum(p.take_profit, 5)} tone="success" />
-            </div>
-          </Card>
-        );
-      })}
-    </div>
+            </Card>
+          );
+        })}
+      </div>
+
+      <TradingChartModal
+        isOpen={!!selectedPosition}
+        onClose={() => setSelectedPosition(null)}
+        symbol={selectedPosition?.symbol ?? ""}
+        position={selectedPosition}
+      />
+    </>
   );
 }
 
@@ -88,3 +109,4 @@ function Field({ label, value, tone }: { label: string; value: string; tone?: "s
     </div>
   );
 }
+

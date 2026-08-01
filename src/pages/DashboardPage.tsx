@@ -12,6 +12,7 @@ import { useMemo, useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BalanceTrendChart } from "@/components/BalanceTrendChart";
 import { PaywallModal } from "@/components/PaywallModal";
+import { TradingChartModal } from "@/components/TradingChartModal";
 
 const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
@@ -49,6 +50,9 @@ const MoneyCoinDuoIcon = () => (
 export function DashboardPage() {
   const { user, logout } = useAuth();
   const isGuest = user?.id === "guest";
+
+  const [activeChart, setActiveChart] = useState<{ symbol: string; position?: Position | null } | null>(null);
+
 
 
   const status = useQuery({
@@ -679,7 +683,13 @@ export function DashboardPage() {
                 {positions.isLoading ? (
                   <SkeletonRows />
                 ) : filteredPositions && filteredPositions.length > 0 ? (
-                  filteredPositions.map((p) => <PositionRow key={p.id} p={p} />)
+                  filteredPositions.map((p) => (
+                    <PositionRow
+                      key={p.id}
+                      p={p}
+                      onClick={() => setActiveChart({ symbol: p.symbol, position: p })}
+                    />
+                  ))
                 ) : (
                   <EmptyBox text="Hozircha ochiq pozitsiya yo'q" />
                 )}
@@ -691,7 +701,13 @@ export function DashboardPage() {
                 {pending.isLoading ? (
                   <SkeletonRows count={2} />
                 ) : pending.data && pending.data.length > 0 ? (
-                  pending.data.map((o) => <PendingRow key={o.id} o={o} />)
+                  pending.data.map((o) => (
+                    <PendingRow
+                      key={o.id}
+                      o={o}
+                      onClick={() => setActiveChart({ symbol: o.symbol })}
+                    />
+                  ))
                 ) : (
                   <EmptyBox text="Hozircha kutilayotgan order yo'q" />
                 )}
@@ -707,7 +723,13 @@ export function DashboardPage() {
                 {history.isLoading ? (
                   <SkeletonRows count={2} />
                 ) : history.data && history.data.length > 0 ? (
-                  history.data.slice(0, 15).map((t) => <HistoryRow key={t.id} t={t} />)
+                  history.data.slice(0, 15).map((t) => (
+                    <HistoryRow
+                      key={t.id}
+                      t={t}
+                      onClick={() => setActiveChart({ symbol: t.symbol })}
+                    />
+                  ))
                 ) : (
                   <EmptyBox text="Hozircha yopilgan savdo yo'q" />
                 )}
@@ -796,21 +818,23 @@ export function EmptyLine({ text }: { text: string }) {
   return <p className="py-6 text-center text-xs text-white/40">{text}</p>;
 }
 
-function PositionRow({ p }: { p: Position }) {
+function PositionRow({ p, onClick }: { p: Position; onClick?: () => void }) {
   const isBuy = String(p.side).toUpperCase() === "BUY";
   const profit = Number(p.profit ?? 0);
-  const navigate = useNavigate();
   return (
-    <div 
-      onClick={() => navigate(`/chart?symbol=${p.symbol}`)}
-      className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5 cursor-pointer hover:bg-[#132140] transition-all duration-200 active:scale-[0.99]"
+    <div
+      onClick={onClick}
+      className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5 cursor-pointer hover:border-blue-500/40 hover:bg-[#121c34] transition-all group"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
             {isBuy ? "BUY" : "SELL"}
           </span>
-          <span className="text-xs font-bold text-white truncate">{p.symbol}</span>
+          <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors flex items-center gap-1">
+            {p.symbol}
+            <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
+          </span>
           <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot</span>
         </div>
         <span className={`text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
@@ -844,16 +868,22 @@ function PositionRow({ p }: { p: Position }) {
   );
 }
 
-function PendingRow({ o }: { o: PendingOrder }) {
+function PendingRow({ o, onClick }: { o: PendingOrder; onClick?: () => void }) {
   const isBuy = o.type.toLowerCase().startsWith("buy");
   return (
-    <div className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5">
+    <div
+      onClick={onClick}
+      className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5 cursor-pointer hover:border-blue-500/40 hover:bg-[#121c34] transition-all group"
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase ${isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"}`}>
             {o.type.replace("_", " ")}
           </span>
-          <span className="text-xs font-bold text-white truncate">{o.symbol}</span>
+          <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors flex items-center gap-1">
+            {o.symbol}
+            <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
+          </span>
           <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot</span>
         </div>
         <Clock size={12} className="text-white/40" />
@@ -867,17 +897,23 @@ function PendingRow({ o }: { o: PendingOrder }) {
   );
 }
 
-function HistoryRow({ t }: { t: TradeHistory }) {
+function HistoryRow({ t, onClick }: { t: TradeHistory; onClick?: () => void }) {
   const isBuy = String(t.side).toUpperCase() === "BUY";
   const profit = Number(t.profit ?? 0);
   return (
-    <div className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5">
+    <div
+      onClick={onClick}
+      className="rounded-xl bg-[#10192e] border border-white/5 p-2 flex flex-col gap-1.5 cursor-pointer hover:border-blue-500/40 hover:bg-[#121c34] transition-all group"
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
           <span className={`px-1.5 py-0.5 rounded text-[8.5px] font-black ${isBuy ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400"}`}>
             {isBuy ? "BUY" : "SELL"}
           </span>
-          <span className="text-xs font-bold text-white truncate">{t.symbol}</span>
+          <span className="text-xs font-bold text-white truncate group-hover:text-blue-400 transition-colors flex items-center gap-1">
+            {t.symbol}
+            <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
+          </span>
           <span className="text-[8.5px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
         </div>
         <span className={`text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>

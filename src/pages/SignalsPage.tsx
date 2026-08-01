@@ -1,14 +1,14 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { fmtNum, timeAgo } from "@/lib/utils";
 import type { AISignal, PendingOrder } from "@/lib/types";
-import { Brain, Check, X, Loader2, CircleMinus, Clock, Lock, Sparkles } from "lucide-react";
+import { Brain, Check, X, Loader2, CircleMinus, Clock, Lock, Sparkles, CandlestickChart } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
-import { guestMock } from "@/lib/guestMock";
-import { useState } from "react";
 import { PaywallModal } from "@/components/PaywallModal";
+import { TradingChartModal } from "@/components/TradingChartModal";
 
 export function SignalsPage() {
   const { user } = useAuth();
@@ -16,6 +16,7 @@ export function SignalsPage() {
   const [paywallOpen, setPaywallOpen] = useState(isGuest);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
   const [currentUnlockingId, setCurrentUnlockingId] = useState<string | null>(null);
+  const [selectedChartSymbol, setSelectedChartSymbol] = useState<string | null>(null);
 
   const { data: signals, isLoading: loadingSignals } = useQuery({
     queryKey: ["ai_signals", user?.id],
@@ -75,60 +76,68 @@ export function SignalsPage() {
   };
 
   return (
-    <div className="space-y-6 relative pb-10">
-      {hasPending && (
-        <div>
-          <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">Kutilayotgan Qarorlar (Limit)</h3>
-          <div className="space-y-3">
-            {pending.map((p) => {
-              const isLocked = isGuest && !unlockedIds.includes(p.id);
-              return (
-                <PendingCard 
-                  key={p.id} 
-                  p={p} 
-                  isGuest={isLocked} 
-                  onUnlock={() => handleUnlockClick(p.id)} 
-                />
-              );
-            })}
+    <>
+      <div className="space-y-6 relative pb-10">
+        {hasPending && (
+          <div>
+            <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">Kutilayotgan Qarorlar (Limit)</h3>
+            <div className="space-y-3">
+              {pending.map((p) => {
+                const isLocked = isGuest && !unlockedIds.includes(p.id);
+                return (
+                  <PendingCard 
+                    key={p.id} 
+                    p={p} 
+                    isGuest={isLocked} 
+                    onUnlock={() => handleUnlockClick(p.id)}
+                    onOpenChart={() => setSelectedChartSymbol(p.symbol)}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {hasSignals && (
-        <div>
-          <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">AI Signallar</h3>
-          <div className="space-y-3">
-            {signals.map((s) => {
-              const isLocked = isGuest && !unlockedIds.includes(s.id);
-              return (
-                <SignalCard 
-                  key={s.id} 
-                  s={s} 
-                  isGuest={isLocked} 
-                  onUnlock={() => handleUnlockClick(s.id)} 
-                />
-              );
-            })}
+        {hasSignals && (
+          <div>
+            <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">AI Signallar</h3>
+            <div className="space-y-3">
+              {signals.map((s) => {
+                const isLocked = isGuest && !unlockedIds.includes(s.id);
+                return (
+                  <SignalCard 
+                    key={s.id} 
+                    s={s} 
+                    isGuest={isLocked} 
+                    onUnlock={() => handleUnlockClick(s.id)}
+                    onOpenChart={() => setSelectedChartSymbol(s.symbol)}
+                  />
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <PaywallModal isOpen={paywallOpen} onClose={handlePaywallClose} />
-    </div>
+        <PaywallModal isOpen={paywallOpen} onClose={handlePaywallClose} />
+      </div>
+
+      <TradingChartModal
+        isOpen={!!selectedChartSymbol}
+        onClose={() => setSelectedChartSymbol(null)}
+        symbol={selectedChartSymbol ?? ""}
+      />
+    </>
   );
 }
 
-function PendingCard({ p, isGuest, onUnlock }: { p: PendingOrder; isGuest: boolean; onUnlock: () => void }) {
+function PendingCard({ p, isGuest, onUnlock, onOpenChart }: { p: PendingOrder; isGuest: boolean; onUnlock: () => void; onOpenChart?: () => void }) {
   const isBuy = p.type.toLowerCase().includes("buy");
   const badge = isBuy ? "bg-success/20 text-success" : "bg-danger/20 text-danger";
   
   return (
     <div 
-      onClick={isGuest ? onUnlock : undefined}
-      className={`relative overflow-hidden bg-white/[0.02] border border-white/10 rounded-3xl p-4 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-all duration-300 ${
-        isGuest ? "cursor-pointer hover:border-[#00a8ff]/30 active:scale-[0.99]" : "hover:border-white/25 hover:-translate-y-0.5"
-      }`}
+      onClick={isGuest ? onUnlock : onOpenChart}
+      className={`relative overflow-hidden bg-white/[0.02] border border-white/10 rounded-3xl p-4 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-all duration-300 cursor-pointer hover:border-blue-500/40 hover:-translate-y-0.5 group`}
     >
       <div className="absolute top-[-30px] right-[-30px] w-28 h-28 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
       
@@ -139,7 +148,10 @@ function PendingCard({ p, isGuest, onUnlock }: { p: PendingOrder; isGuest: boole
           </span>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <p className="truncate text-base font-bold text-white">{p.symbol}</p>
+              <p className="truncate text-base font-bold text-white group-hover:text-blue-400 transition-colors flex items-center gap-1">
+                {p.symbol}
+                <CandlestickChart size={12} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
+              </p>
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wider uppercase ${badge}`}>
                 {p.type.replace("_", " ")}
               </span>
@@ -185,7 +197,7 @@ function PendingCard({ p, isGuest, onUnlock }: { p: PendingOrder; isGuest: boole
   );
 }
 
-function SignalCard({ s, isGuest, onUnlock }: { s: AISignal; isGuest: boolean; onUnlock: () => void }) {
+function SignalCard({ s, isGuest, onUnlock, onOpenChart }: { s: AISignal; isGuest: boolean; onUnlock: () => void; onOpenChart?: () => void }) {
   const sig = s.signal?.toUpperCase();
   const tone =
     sig === "BUY" ? "success" : sig === "SELL" ? "danger" : "muted";
@@ -199,10 +211,8 @@ function SignalCard({ s, isGuest, onUnlock }: { s: AISignal; isGuest: boolean; o
   
   return (
     <div 
-      onClick={isGuest ? onUnlock : undefined}
-      className={`relative overflow-hidden bg-white/[0.02] border border-white/10 rounded-3xl p-4 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-all duration-300 ${
-        isGuest ? "cursor-pointer hover:border-[#00a8ff]/30 active:scale-[0.99]" : "hover:border-white/25 hover:-translate-y-0.5"
-      }`}
+      onClick={isGuest ? onUnlock : onOpenChart}
+      className={`relative overflow-hidden bg-white/[0.02] border border-white/10 rounded-3xl p-4 shadow-[0_24px_48px_-12px_rgba(0,0,0,0.5),inset_0_1px_1px_rgba(255,255,255,0.15)] backdrop-blur-2xl transition-all duration-300 cursor-pointer hover:border-blue-500/40 hover:-translate-y-0.5 group`}
     >
       <div className="absolute top-[-30px] right-[-30px] w-28 h-28 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
       
