@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_memory: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          failed_applications: number | null
+          id: string
+          importance: number | null
+          lesson_text: string
+          source: string | null
+          success_applications: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          failed_applications?: number | null
+          id?: string
+          importance?: number | null
+          lesson_text: string
+          source?: string | null
+          success_applications?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          failed_applications?: number | null
+          id?: string
+          importance?: number | null
+          lesson_text?: string
+          source?: string | null
+          success_applications?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       ai_signals: {
         Row: {
           confidence: number
@@ -65,6 +101,39 @@ export type Database = {
           take_profit_pips?: number | null
           tp_price?: number | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      backtest_jobs: {
+        Row: {
+          created_at: string
+          id: string
+          mode: string
+          status: string
+          strategy: string | null
+          symbol: string
+          timeframe: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mode: string
+          status?: string
+          strategy?: string | null
+          symbol: string
+          timeframe: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mode?: string
+          status?: string
+          strategy?: string | null
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -172,6 +241,7 @@ export type Database = {
           account_balance: number | null
           account_currency: string | null
           account_equity: number | null
+          available_symbols: Json | null
           broker: string | null
           claude_limit: number
           claude_used: number
@@ -187,6 +257,7 @@ export type Database = {
           account_balance?: number | null
           account_currency?: string | null
           account_equity?: number | null
+          available_symbols?: Json | null
           broker?: string | null
           claude_limit?: number
           claude_used?: number
@@ -202,6 +273,7 @@ export type Database = {
           account_balance?: number | null
           account_currency?: string | null
           account_equity?: number | null
+          available_symbols?: Json | null
           broker?: string | null
           claude_limit?: number
           claude_used?: number
@@ -212,6 +284,69 @@ export type Database = {
           message?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      candles: {
+        Row: {
+          close: number
+          high: number
+          id: string
+          low: number
+          open: number
+          symbol: string
+          time: string
+          timeframe: string
+          user_id: string
+          volume: number | null
+        }
+        Insert: {
+          close: number
+          high: number
+          id?: string
+          low: number
+          open: number
+          symbol: string
+          time: string
+          timeframe: string
+          user_id: string
+          volume?: number | null
+        }
+        Update: {
+          close?: number
+          high?: number
+          id?: string
+          low?: number
+          open?: number
+          symbol?: string
+          time?: string
+          timeframe?: string
+          user_id?: string
+          volume?: number | null
+        }
+        Relationships: []
+      }
+      pending_books: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_url: string
+          id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_url: string
+          id?: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_url?: string
+          id?: string
+          status?: string | null
         }
         Relationships: []
       }
@@ -305,8 +440,151 @@ export type Database = {
         }
         Relationships: []
       }
+      smc_zones: {
+        Row: {
+          bottom: number
+          direction: string
+          formed_at: string
+          id: string
+          status: string
+          symbol: string
+          timeframe: string
+          top: number
+          updated_at: string
+          user_id: string
+          zone_type: string
+        }
+        Insert: {
+          bottom: number
+          direction: string
+          formed_at: string
+          id?: string
+          status?: string
+          symbol: string
+          timeframe: string
+          top: number
+          updated_at?: string
+          user_id: string
+          zone_type: string
+        }
+        Update: {
+          bottom?: number
+          direction?: string
+          formed_at?: string
+          id?: string
+          status?: string
+          symbol?: string
+          timeframe?: string
+          top?: number
+          updated_at?: string
+          user_id?: string
+          zone_type?: string
+        }
+        Relationships: []
+      }
+      strategy_insights: {
+        Row: {
+          created_at: string | null
+          fail_count: number | null
+          id: string
+          insight_text: string
+          market_condition: string | null
+          setup_type: string | null
+          success_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          fail_count?: number | null
+          id?: string
+          insight_text: string
+          market_condition?: string | null
+          setup_type?: string | null
+          success_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          fail_count?: number | null
+          id?: string
+          insight_text?: string
+          market_condition?: string | null
+          setup_type?: string | null
+          success_count?: number | null
+        }
+        Relationships: []
+      }
+      strategy_performance: {
+        Row: {
+          avg_rr: number | null
+          id: string
+          losses: number | null
+          recommended_weight: number | null
+          strategy_name: string
+          total_profit: number | null
+          updated_at: string | null
+          wins: number | null
+        }
+        Insert: {
+          avg_rr?: number | null
+          id?: string
+          losses?: number | null
+          recommended_weight?: number | null
+          strategy_name: string
+          total_profit?: number | null
+          updated_at?: string | null
+          wins?: number | null
+        }
+        Update: {
+          avg_rr?: number | null
+          id?: string
+          losses?: number | null
+          recommended_weight?: number | null
+          strategy_name?: string
+          total_profit?: number | null
+          updated_at?: string | null
+          wins?: number | null
+        }
+        Relationships: []
+      }
+      test_results: {
+        Row: {
+          created_at: string
+          id: string
+          reasoning: string | null
+          symbol: string
+          timeframe: string
+          total_profit: number
+          total_trades: number
+          type: string
+          win_rate: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          reasoning?: string | null
+          symbol: string
+          timeframe: string
+          total_profit?: number
+          total_trades?: number
+          type: string
+          win_rate?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          reasoning?: string | null
+          symbol?: string
+          timeframe?: string
+          total_profit?: number
+          total_trades?: number
+          type?: string
+          win_rate?: number
+        }
+        Relationships: []
+      }
       trade_history: {
         Row: {
+          agreed_strategies: string[] | null
+          ai_used: boolean | null
           close_price: number
           closed_at: string
           created_at: string
@@ -323,6 +601,8 @@ export type Database = {
           volume: number
         }
         Insert: {
+          agreed_strategies?: string[] | null
+          ai_used?: boolean | null
           close_price: number
           closed_at?: string
           created_at?: string
@@ -339,6 +619,8 @@ export type Database = {
           volume: number
         }
         Update: {
+          agreed_strategies?: string[] | null
+          ai_used?: boolean | null
           close_price?: number
           closed_at?: string
           created_at?: string
