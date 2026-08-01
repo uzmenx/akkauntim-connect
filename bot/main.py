@@ -147,59 +147,7 @@ class TradingBot:
             logger.error(f"SMC Engine xatolik: {e}")
             return None
 
-    def _sync_chart(self, symbol: str, timeframe: str, df: pd.DataFrame, smc_data: Dict[str, Any]):
-        """Yangi chart (Candles + SMC) ma'lumotlarini jo'natish"""
-        try:
-            import datetime
-            candles_list = []
-            if df is not None and not df.empty:
-                for idx, row in df.tail(300).iterrows():
-                    candles_list.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "time": row['time'].isoformat() if hasattr(row['time'], 'isoformat') else str(row['time']),
-                        "open": float(row['open']),
-                        "high": float(row['high']),
-                        "low": float(row['low']),
-                        "close": float(row['close']),
-                        "volume": float(row.get('tick_volume', 0.0))
-                    })
-            
-            zones_list = []
-            if smc_data and isinstance(smc_data, dict):
-                ob_dict = smc_data.get('order_blocks', {})
-                fvg_dict = smc_data.get('fvg', {})
-                
-                blocks = ob_dict.get('demand', []) + ob_dict.get('supply', []) if isinstance(ob_dict, dict) else []
-                fvgs = fvg_dict.get('demand', []) + fvg_dict.get('supply', []) if isinstance(fvg_dict, dict) else []
-                
-                for ob in blocks:
-                    zones_list.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "zone_type": "order_block",
-                        "direction": ob.get("ob_type", "demand"),
-                        "top": float(ob.get("top", 0)),
-                        "bottom": float(ob.get("bottom", 0)),
-                        "status": ob.get("status", "fresh"),
-                        "formed_at": str(ob.get("timestamp", datetime.datetime.now().isoformat()))
-                    })
-                for fvg in fvgs:
-                    zones_list.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "zone_type": "fvg",
-                        "direction": fvg.get("type", "demand"),
-                        "top": float(fvg.get("top", 0)),
-                        "bottom": float(fvg.get("bottom", 0)),
-                        "status": fvg.get("status", "fresh"),
-                        "formed_at": str(fvg.get("timestamp", datetime.datetime.now().isoformat()))
-                    })
 
-            if hasattr(self, 'sync') and hasattr(self.sync, 'sync_chart_data'):
-                self.sync.sync_chart_data(symbol, timeframe, candles_list, zones_list)
-        except Exception as e:
-            logger.error(f"Chart sync failed for {symbol}: {e}")
 
     def _get_harmonic_patterns(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """Harmonic pattern aniqlash."""
@@ -422,8 +370,7 @@ class TradingBot:
         # 4. Qaror qabul qilish (EXECUTE/REJECT) uchun kerakli ma'lumotlarni ajratib olamiz
         smc_result = portfolio_result["details"].get("SMC", {})
         
-        # Frontend Chart uchun ma'lumotlarni sinxronizatsiya qilamiz
-        self._sync_chart(symbol, self.config.timeframe_major, df_major, smc_result)
+
         
         pattern_result = portfolio_result["details"].get("Pattern", {})
         news_result = portfolio_result["details"].get("News", {})
