@@ -607,7 +607,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     if (showAutoPattern && autoPatternData && autoPatternData.length > 0) {
       autoPatternData.forEach(a => {
         if (a.lines && Array.isArray(a.lines)) {
-           a.lines.forEach(l => {
+           a.lines.forEach((l: any) => {
               aggregatedLines.push({
                 ...l,
                 color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`
