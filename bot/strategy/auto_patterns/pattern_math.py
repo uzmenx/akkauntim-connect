@@ -116,12 +116,34 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
         
         if current_price > h2['price'] + (atr * 0.5 if atr else 0):
             signal = "BUY"
-            confidence = 80
-            reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Breakout Up)"
+            # Pattern direction va breakout signalini muvofiqlashtirish:
+            # Agar pattern_dir == "Bullish" bo'lsa (masalan Descending Channel, Falling Wedge) -> aligned breakout (confidence = 85)
+            # Agar pattern_dir == "Bearish" bo'lsa (masalan Ascending Channel, Rising Wedge) -> counter-bias breakout (susaytirildi, confidence = 55)
+            # Agar pattern_dir == "Neutral" bo'lsa -> standard breakout (confidence = 75)
+            if pattern_dir == "Bullish":
+                confidence = 85
+                reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Bullish aligned Breakout Up)"
+            elif pattern_dir == "Bearish":
+                confidence = 55  # Counter-bias breakout signal: susaytirildi
+                reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Counter-bias Breakout Up - ehtiyotkorlik bilan)"
+            else:
+                confidence = 75
+                reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Breakout Up)"
         elif current_price < l2['price'] - (atr * 0.5 if atr else 0):
             signal = "SELL"
-            confidence = 80
-            reasoning = f"{pattern_name} pastga yorib o'tildi (Breakout Down)"
+            # Pattern direction va breakout signalini muvofiqlashtirish:
+            # Agar pattern_dir == "Bearish" bo'lsa (masalan Ascending Channel, Rising Wedge) -> aligned breakout (confidence = 85)
+            # Agar pattern_dir == "Bullish" bo'lsa (masalan Descending Channel, Falling Wedge) -> counter-bias breakout (susaytirildi, confidence = 55)
+            # Agar pattern_dir == "Neutral" bo'lsa -> standard breakout (confidence = 75)
+            if pattern_dir == "Bearish":
+                confidence = 85
+                reasoning = f"{pattern_name} pastga yorib o'tildi (Bearish aligned Breakout Down)"
+            elif pattern_dir == "Bullish":
+                confidence = 55  # Counter-bias breakout signal: susaytirildi
+                reasoning = f"{pattern_name} pastga yorib o'tildi (Counter-bias Breakout Down - ehtiyotkorlik bilan)"
+            else:
+                confidence = 75
+                reasoning = f"{pattern_name} pastga yorib o'tildi (Breakout Down)"
         else:
             # Hali breakout bo'lmagan, lekin figurani o'zi yo'nalish beradi
             if pattern_dir == "Bullish":
@@ -142,5 +164,11 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
         "signal": signal,
         "confidence": confidence,
         "reasoning": reasoning,
-        "slopes": {"res": round(m_res, 3), "sup": round(m_sup, 3)}
+        "slopes": {"res": round(m_res, 3), "sup": round(m_sup, 3)},
+        "pattern_points": {
+            "h1": h1,
+            "h2": h2,
+            "l1": l1,
+            "l2": l2
+        }
     }

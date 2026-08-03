@@ -2,7 +2,11 @@ import os
 import json
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    def load_dotenv(*args, **kwargs):
+        pass
 
 @dataclass
 class BotConfig:

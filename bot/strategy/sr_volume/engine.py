@@ -88,7 +88,16 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
     
     support_zone = None
     resistance_zone = None
+    sup_bar_idx = None
+    sup_time = None
+    res_bar_idx = None
+    res_time = None
     
+    last_breakout_res = None
+    last_breakout_sup = None
+    last_res_holds = None
+    last_sup_holds = None
+
     for i in range(lookbackPeriod * 2, n):
         vol = df_calc['Vol'].iloc[i]
         vol_hi = df_calc['vol_hi'].iloc[i]
@@ -102,17 +111,24 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
         if not np.isnan(pv_low) and vol > vol_hi:
             supportLevel = pv_low
             supportLevel_1 = supportLevel - withd
+            sup_bar_idx = max(0, i - lookbackPeriod)
+            sup_time = str(df_calc.index[sup_bar_idx])
             
         # New Resistance
         if not np.isnan(pv_high) and vol < vol_lo:
             resistanceLevel = pv_high
             resistanceLevel_1 = resistanceLevel + withd
+            res_bar_idx = max(0, i - lookbackPeriod)
+            res_time = str(df_calc.index[res_bar_idx])
             
         current_low = df_calc['low'].iloc[i]
         current_high = df_calc['high'].iloc[i]
         prev_low = df_calc['low'].iloc[i-1]
         prev_high = df_calc['high'].iloc[i-1]
         
+        bar_loc = i
+        bar_time = str(df_calc.index[i])
+
         # Breakout / Holds logic using crossover / crossunder
         if not np.isnan(resistanceLevel_1):
             brekout_res = (prev_low <= resistanceLevel_1) and (current_low > resistanceLevel_1)
@@ -134,6 +150,15 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
         else:
             brekout_sup = False
             
+        if brekout_res:
+            last_breakout_res = {"type": "breakout_res", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_high)}
+        if brekout_sup:
+            last_breakout_sup = {"type": "breakout_sup", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_low)}
+        if res_holds:
+            last_res_holds = {"type": "res_holds", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_high)}
+        if sup_holds:
+            last_sup_holds = {"type": "sup_holds", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_low)}
+
         if i == n - 1:
             brekout_res_sig = brekout_res
             res_holds_sig = res_holds
@@ -143,35 +168,49 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
             if not np.isnan(supportLevel):
                 support_zone = {
                     "top": float(supportLevel),
-                    "bottom": float(supportLevel_1)
+                    "bottom": float(supportLevel_1),
+                    "bar_index": sup_bar_idx,
+                    "time": sup_time
                 }
             if not np.isnan(resistanceLevel):
                 resistance_zone = {
                     "top": float(resistanceLevel_1),
-                    "bottom": float(resistanceLevel)
+                    "bottom": float(resistanceLevel),
+                    "bar_index": res_bar_idx,
+                    "time": res_time
                 }
 
     signal = "NEUTRAL"
     confidence = 0
     reasoning = []
     
+    event_details = {"type": "None", "event_bar_index": None, "bar_index": None, "event_time": None, "time": None, "price": None}
+
     if brekout_res_sig:
         signal = "BUY"
         confidence = 75
         reasoning.append("Resistance broken upwards (Breakout)")
+        if last_breakout_res:
+            event_details = last_breakout_res
     elif sup_holds_sig:
         signal = "BUY"
         confidence = 65
         reasoning.append("Support tested and held (Rejection)")
+        if last_sup_holds:
+            event_details = last_sup_holds
         
     if brekout_sup_sig:
         signal = "SELL"
         confidence = 75
         reasoning.append("Support broken downwards (Breakout)")
+        if last_breakout_sup:
+            event_details = last_breakout_sup
     elif res_holds_sig:
         signal = "SELL"
         confidence = 65
         reasoning.append("Resistance tested and held (Rejection)")
+        if last_res_holds:
+            event_details = last_res_holds
         
     return {
         "signal": signal,
@@ -182,7 +221,10 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
         "brekout_res": bool(brekout_res_sig),
         "res_holds": bool(res_holds_sig),
         "sup_holds": bool(sup_holds_sig),
-        "brekout_sup": bool(brekout_sup_sig)
+        "brekout_sup": bool(brekout_sup_sig),
+        "event_bar_index": event_details.get("event_bar_index"),
+        "event_time": event_details.get("event_time"),
+        "event_details": event_details
     }
 
 def _empty_result() -> Dict[str, Any]:
@@ -195,5 +237,8 @@ def _empty_result() -> Dict[str, Any]:
         "brekout_res": False,
         "res_holds": False,
         "sup_holds": False,
-        "brekout_sup": False
+        "brekout_sup": False,
+        "event_bar_index": None,
+        "event_time": None,
+        "event_details": {"type": "None", "event_bar_index": None, "bar_index": None, "event_time": None, "time": None, "price": None}
     }

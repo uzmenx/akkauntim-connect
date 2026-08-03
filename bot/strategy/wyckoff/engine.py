@@ -40,16 +40,20 @@ def analyze_wyckoff(df: pd.DataFrame, lookback: int = 100) -> Dict[str, Any]:
     phase = _determine_phase(df_recent, tr_data)
     
     # 3. Spring yoki Upthrust ni izlash (soxta yorib o'tishlar)
-    spring_upthrust = _detect_spring_upthrust(df_recent, tr_data)
+    spring_upthrust, event_details = _detect_spring_upthrust(df_recent, tr_data)
     
     # 4. SOS (Sign of Strength) / SOW (Sign of Weakness) momentumini aniqlash
-    momentum_sign = _detect_sos_sow(df_recent)
+    momentum_sign, momentum_details = _detect_sos_sow(df_recent)
     
     return {
         "phase": phase,
         "trading_range": tr_data,
         "spring_upthrust": spring_upthrust,
+        "event_details": event_details,
+        "event_bar_index": event_details.get("event_bar_index"),
+        "event_time": event_details.get("event_time"),
         "momentum_sign": momentum_sign,
+        "momentum_details": momentum_details,
         "current_price": current_price
     }
 
@@ -58,7 +62,11 @@ def _empty_wyckoff_result() -> Dict[str, Any]:
         "phase": "Unknown",
         "trading_range": {"is_ranging": False},
         "spring_upthrust": "None",
+        "event_details": {"type": "None", "bar_index": None, "event_bar_index": None, "time": None, "event_time": None, "price": None},
+        "event_bar_index": None,
+        "event_time": None,
         "momentum_sign": "None",
+        "momentum_details": {"type": "None", "bar_index": None, "event_bar_index": None, "time": None, "event_time": None, "price": None},
         "current_price": 0.0
     }
 
@@ -81,17 +89,17 @@ def _detect_trading_range(df: pd.DataFrame) -> Dict[str, Any]:
     atr_approx = np.mean(highs[-14:] - lows[-14:])
     range_size = max_h - min_l
     
-    # Agar narx oxirgi 50 sham davomida ATR * 10 dan kichik koridorda qolib ketgan bo'lsa, bu TR.
-    # Lekin juda tor ham bo'lmasligi kerak (ATR * 1.5 dan katta)
+    # Kengaytirilgan ATR koridori: 0.8 * ATR dan 15.0 * ATR gacha.
+    # Bu tor fletlarni va yuqori volatilli bozorlardagi keng trading range'larni qamrab oladi.
     is_ranging = False
-    if atr_approx * 1.5 < range_size < atr_approx * 10:
+    if atr_approx * 0.8 < range_size < atr_approx * 15.0:
         # Endi narx shu oraliqda necha marta tepaga/pastga urilganini tekshiramiz (ADR qismi)
         # O'rta chiziq atrofida kesishmalar soni
         mid_price = (max_h + min_l) / 2
         # np.diff bool arrayda ishlatilganda o'zgarishlarni topadi
         bool_array = (closes[-50:] > mid_price).astype(int)
         crosses = np.sum(np.abs(np.diff(bool_array)))
-        if crosses >= 3: # Kamida 3 marta o'rtani kesib o'tgan bo'lsa
+        if crosses >= 2: # Kamida 2 marta o'rtani kesib o'tgan bo'lsa
             is_ranging = True
             
     return {
@@ -106,7 +114,7 @@ def _determine_phase(df: pd.DataFrame, tr_data: Dict[str, Any]) -> str:
     """
     Narx qaysi bosqichda ekanini topadi.
     Markup / Markdown trendga asoslanadi.
-    Accumulation / Distribution esa TR va undan oldingi trendga qaraydi.
+    Accumulation / Distribution esa TR va undan oldingi trend/kirish traektoriyasiga qaraydi.
     """
     closes = df['close'].values
     ema50 = df['close'].ewm(span=50).mean().iloc[-1]
@@ -114,15 +122,17 @@ def _determine_phase(df: pd.DataFrame, tr_data: Dict[str, Any]) -> str:
     current = closes[-1]
     
     if tr_data["is_ranging"]:
-        # Agar narx EMA lardan pastdan kelib TR ga kirgan bo'lsa = Accumulation
-        # Agar narx EMA lardan tepadan kelib TR ga kirgan bo'lsa = Distribution
         start_price = closes[0]
-        if start_price > tr_data["top"]: # Tushib kelib fletga kirdi
+        # Narx trading range'ga yuqoridan/o'rtadan balanddan kelib kirdi = Accumulation
+        # Narx trading range'ga pastdan/o'rtadan pastdan kelib kirdi = Distribution
+        if start_price > tr_data["top"]:
             return "Accumulation"
-        elif start_price < tr_data["bottom"]: # O'sib kelib fletga kirdi
+        elif start_price < tr_data["bottom"]:
             return "Distribution"
+        elif start_price >= tr_data["mid"]:
+            return "Accumulation"
         else:
-            return "Consolidation"
+            return "Distribution"
     else:
         # Flet emas, yo'nalishli trend
         if current > ema20 > ema50:
@@ -132,81 +142,100 @@ def _determine_phase(df: pd.DataFrame, tr_data: Dict[str, Any]) -> str:
         
     return "Unknown"
 
-def _detect_spring_upthrust(df: pd.DataFrame, tr_data: Dict[str, Any]) -> str:
+def _detect_spring_upthrust(df: pd.DataFrame, tr_data: Dict[str, Any]) -> tuple:
     """
     Spring = Support ni yorib pastga ketdi, lekin tezda Range ichiga qaytdi (Liquidity Sweep).
     Upthrust = Resistance ni yorib tepaga chiqdi, lekin tezda Range ichiga qaytdi.
     """
+    empty_details = {"type": "None", "bar_index": None, "event_bar_index": None, "time": None, "event_time": None, "price": None, "level_broken": None}
     if not tr_data["is_ranging"]:
-        return "None"
+        return "None", empty_details
         
     top = tr_data["top"]
     bottom = tr_data["bottom"]
     
-    # Oxirgi 10-15 sham ichida hodisa bo'lganini qaraymiz
     recent = df.iloc[-15:]
     
-    spring_detected = False
-    upthrust_detected = False
+    spring_info = None
+    upthrust_info = None
     
-    for i, row in recent.iterrows():
-        # Pastga soxta yorilish
+    for idx, row in recent.iterrows():
+        bar_loc = int(df.index.get_loc(idx)) if idx in df.index else None
+        bar_time = str(idx)
+        
+        # Pastga soxta yorilish (Spring)
         if row['low'] < bottom and row['close'] > bottom:
-            spring_detected = True
+            spring_info = {
+                "type": "Spring",
+                "bar_index": bar_loc,
+                "event_bar_index": bar_loc,
+                "time": bar_time,
+                "event_time": bar_time,
+                "price": float(row['low']),
+                "level_broken": float(bottom)
+            }
         
-        # Tepaga soxta yorilish
+        # Tepaga soxta yorilish (Upthrust)
         if row['high'] > top and row['close'] < top:
-            upthrust_detected = True
+            upthrust_info = {
+                "type": "Upthrust",
+                "bar_index": bar_loc,
+                "event_bar_index": bar_loc,
+                "time": bar_time,
+                "event_time": bar_time,
+                "price": float(row['high']),
+                "level_broken": float(top)
+            }
             
-    # Agar oxirgi sham range ni ichida yoki tepasida/pastida bo'lsa
-    current_close = df['close'].iloc[-1]
+    current_close = float(df['close'].iloc[-1])
     
-    if spring_detected and current_close > bottom:
-        return "Spring"
+    if spring_info and current_close > bottom:
+        return "Spring", spring_info
         
-    if upthrust_detected and current_close < top:
-        return "Upthrust"
+    if upthrust_info and current_close < top:
+        return "Upthrust", upthrust_info
         
-    return "None"
+    return "None", empty_details
 
-def _detect_sos_sow(df: pd.DataFrame) -> str:
+def _detect_sos_sow(df: pd.DataFrame) -> tuple:
     """
     Sign of Strength (SOS): Juda katta bullish sham (qolgan o'rtacha shamlardan ancha katta),
                             ko'pincha volume ham baland bo'ladi.
     Sign of Weakness (SOW): Katta bearish sham.
     """
+    empty_details = {"type": "None", "bar_index": None, "event_bar_index": None, "time": None, "event_time": None, "price": None}
     recent_5 = df.iloc[-5:]
     
-    atr = np.mean(df['high'].iloc[-14:] - df['low'].iloc[-14:])
+    atr = float(np.mean(df['high'].iloc[-14:] - df['low'].iloc[-14:]))
     
-    has_sos = False
-    has_sow = False
+    sos_info = None
+    sow_info = None
     
-    for _, row in recent_5.iterrows():
+    for idx, row in recent_5.iterrows():
+        bar_loc = int(df.index.get_loc(idx)) if idx in df.index else None
+        bar_time = str(idx)
         candle_body = row['close'] - row['open']
-        candle_size = row['high'] - row['low']
         
         # O'sish kuchli (SOS) - Tana ATR dan ham katta
         if candle_body > atr * 1.2:
-            # Volume ham tekshirilishi mumkin (agar tick_volume bo'lsa)
             if 'tick_volume' in row and row['tick_volume'] > df['tick_volume'].mean() * 1.2:
-                has_sos = True
+                sos_info = {"type": "SOS", "bar_index": bar_loc, "event_bar_index": bar_loc, "time": bar_time, "event_time": bar_time, "price": float(row['close'])}
             elif 'tick_volume' not in row:
-                has_sos = True
+                sos_info = {"type": "SOS", "bar_index": bar_loc, "event_bar_index": bar_loc, "time": bar_time, "event_time": bar_time, "price": float(row['close'])}
                 
         # Tushish kuchli (SOW)
         if candle_body < -atr * 1.2:
             if 'tick_volume' in row and row['tick_volume'] > df['tick_volume'].mean() * 1.2:
-                has_sow = True
+                sow_info = {"type": "SOW", "bar_index": bar_loc, "event_bar_index": bar_loc, "time": bar_time, "event_time": bar_time, "price": float(row['close'])}
             elif 'tick_volume' not in row:
-                has_sow = True
+                sow_info = {"type": "SOW", "bar_index": bar_loc, "event_bar_index": bar_loc, "time": bar_time, "event_time": bar_time, "price": float(row['close'])}
                 
-    if has_sos and not has_sow:
-        return "SOS"
-    if has_sow and not has_sos:
-        return "SOW"
+    if sos_info and not sow_info:
+        return "SOS", sos_info
+    if sow_info and not sos_info:
+        return "SOW", sow_info
         
-    return "None"
+    return "None", empty_details
 
 def to_voting_signal(result: dict) -> dict:
     """

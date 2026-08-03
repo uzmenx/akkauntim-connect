@@ -258,6 +258,48 @@ PATTERN_FUNCTIONS = {
     "Expanding Triangle": is_exptria
 }
 
+IDEAL_PATTERN_RATIOS = {
+    "Bat": {"xab": 0.442, "abc": 0.618, "bcd": 2.0, "xad": 0.886},
+    "Anti Bat": {"xab": 0.618, "abc": 1.618, "bcd": 2.0, "xad": 0.886},
+    "Alt Bat": {"xab": 0.382, "abc": 0.618, "bcd": 2.618, "xad": 1.13},
+    "Butterfly": {"xab": 0.786, "abc": 0.618, "bcd": 1.618, "xad": 1.272},
+    "Anti Butterfly": {"xab": 0.5, "abc": 1.618, "bcd": 1.13, "xad": 0.618},
+    "ABCD": {"abc": 0.618, "bcd": 1.618},
+    "Gartley": {"xab": 0.618, "abc": 0.618, "bcd": 1.272, "xad": 0.786},
+    "Anti Gartley": {"xab": 0.618, "abc": 1.618, "bcd": 2.0, "xad": 1.272},
+    "Crab": {"xab": 0.618, "abc": 0.618, "bcd": 3.14, "xad": 1.618},
+    "Anti Crab": {"xab": 0.382, "abc": 1.618, "bcd": 2.0, "xad": 0.618},
+    "Shark": {"xab": 0.618, "abc": 1.272, "bcd": 1.618, "xad": 0.886},
+    "Anti Shark": {"xab": 0.618, "abc": 0.786, "bcd": 1.618, "xad": 0.886},
+    "5-O": {"xab": 1.272, "abc": 1.618, "bcd": 0.5, "xad": 0.118},
+    "Wolf Wave": {"xab": 1.414, "abc": 1.0, "bcd": 1.414, "xad": 1.0},
+    "Head and Shoulders": {"xab": 2.5, "abc": 1.0, "bcd": 0.5, "xad": 1.0},
+    "Contracting Triangle": {"xab": 0.5, "abc": 0.5, "bcd": 0.5, "xad": 0.5},
+    "Expanding Triangle": {"xab": 1.414, "abc": 1.272, "bcd": 1.618, "xad": 2.118}
+}
+
+def calculate_pattern_confidence(pattern_name: str, ratios: dict) -> float:
+    """
+    Calculates dynamic pattern confidence (50.0 - 98.0%) based on ratio proximity to ideal Fibonacci targets.
+    """
+    if not ratios or pattern_name not in IDEAL_PATTERN_RATIOS:
+        return 75.0
+    
+    ideals = IDEAL_PATTERN_RATIOS[pattern_name]
+    errors = []
+    for key, ideal_val in ideals.items():
+        if key in ratios and ideal_val > 0:
+            actual_val = ratios[key]
+            err = abs(actual_val - ideal_val) / ideal_val
+            errors.append(err)
+    
+    if not errors:
+        return 75.0
+    
+    avg_error = float(np.mean(errors))
+    score = max(50.0, min(98.0, 100.0 * (1.0 - avg_error)))
+    return float(round(score, 1))
+
 def calc_fib(c, d, rate):
     fib_range = abs(d - c)
     if d > c:
@@ -369,6 +411,7 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
             d = zz_points.iloc[i]
             
             bar_index = df.index.get_loc(zz_points.index[i])
+            bar_time = str(zz_points.index[i])
             
             ratios = get_ratios(x, a, b, c, d)
             if ratios is None:
@@ -383,7 +426,8 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
                             "name": p_name,
                             "direction": "Bullish",
                             "bar_index": bar_index,
-                            "d_price": d
+                            "time": bar_time,
+                            "d_price": float(d)
                         })
                     # Check Bearish (mode = -1)
                     if p_func(ratios, -1, c, d):
@@ -391,7 +435,8 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
                             "name": p_name,
                             "direction": "Bearish",
                             "bar_index": bar_index,
-                            "d_price": d
+                            "time": bar_time,
+                            "d_price": float(d)
                         })
         
         # Current active pattern (from the very last 5 points)
@@ -401,9 +446,31 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
         c = zz_points.iloc[-2]
         d = zz_points.iloc[-1]
         
-        d_index = df.index.get_loc(zz_points.index[-1])
+        idx_x = zz_points.index[-5]
+        idx_a = zz_points.index[-4]
+        idx_b = zz_points.index[-3]
+        idx_c = zz_points.index[-2]
+        idx_d = zz_points.index[-1]
+
+        d_index = df.index.get_loc(idx_d)
         bars_since_d = len(df) - 1 - d_index
         
+        xabcd_coords = {
+            "x": {"price": float(x), "time": str(idx_x), "bar_index": int(df.index.get_loc(idx_x))},
+            "a": {"price": float(a), "time": str(idx_a), "bar_index": int(df.index.get_loc(idx_a))},
+            "b": {"price": float(b), "time": str(idx_b), "bar_index": int(df.index.get_loc(idx_b))},
+            "c": {"price": float(c), "time": str(idx_c), "bar_index": int(df.index.get_loc(idx_c))},
+            "d": {"price": float(d), "time": str(idx_d), "bar_index": int(df.index.get_loc(idx_d))}
+        }
+        xabcd_times = {
+            "x": str(idx_x), "a": str(idx_a), "b": str(idx_b), "c": str(idx_c), "d": str(idx_d)
+        }
+        xabcd_bar_indices = {
+            "x": int(df.index.get_loc(idx_x)), "a": int(df.index.get_loc(idx_a)),
+            "b": int(df.index.get_loc(idx_b)), "c": int(df.index.get_loc(idx_c)),
+            "d": int(df.index.get_loc(idx_d))
+        }
+
         ratios = get_ratios(x, a, b, c, d)
         if ratios:
             # Find the active pattern
@@ -414,7 +481,10 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
                         active_pattern_info = {
                             "name": p_name,
                             "direction": "Bullish",
-                            "xabcd_points": {"x": x, "a": a, "b": b, "c": c, "d": d},
+                            "xabcd_points": {"x": float(x), "a": float(a), "b": float(b), "c": float(c), "d": float(d)},
+                            "xabcd_coords": xabcd_coords,
+                            "xabcd_times": xabcd_times,
+                            "xabcd_bar_indices": xabcd_bar_indices,
                             "ratios": ratios,
                             "bars_since_d": bars_since_d
                         }
@@ -423,7 +493,10 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
                         active_pattern_info = {
                             "name": p_name,
                             "direction": "Bearish",
-                            "xabcd_points": {"x": x, "a": a, "b": b, "c": c, "d": d},
+                            "xabcd_points": {"x": float(x), "a": float(a), "b": float(b), "c": float(c), "d": float(d)},
+                            "xabcd_coords": xabcd_coords,
+                            "xabcd_times": xabcd_times,
+                            "xabcd_bar_indices": xabcd_bar_indices,
                             "ratios": ratios,
                             "bars_since_d": bars_since_d
                         }
@@ -455,11 +528,21 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
         ec = zz_points.iloc[-1]
         emerging_patterns = predict_emerging_patterns(ex, ea, eb, ec, enabled_patterns)
     
+    if active_pattern_info and signal in ["BUY", "SELL"]:
+        confidence = calculate_pattern_confidence(
+            active_pattern_info["name"],
+            active_pattern_info.get("ratios", {})
+        )
+        active_pattern_info["confidence"] = confidence
+    else:
+        confidence = 0.0
+
     return {
         "current_price": float(current_price) if current_price is not None else None,
         "active_pattern": active_pattern_info,
         "emerging_patterns": emerging_patterns,
         "signal": signal,
+        "confidence": confidence,
         "fib_levels": fib_levels,
         "all_detected_patterns": all_detected_patterns[-30:] # Last 30 detected patterns
     }

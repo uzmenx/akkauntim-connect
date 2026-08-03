@@ -29,10 +29,37 @@ def find_pivots(df: pd.DataFrame, order: int = 8) -> List[Dict[str, Any]]:
         is_high = (highs[i] == np.max(window_h))
         is_low = (lows[i] == np.min(window_l))
         
+        time_val = str(df.index[i]) if hasattr(df.index, '__getitem__') else None
+        if 'time' in df.columns:
+            time_val = str(df['time'].iloc[i])
+        elif 'datetime' in df.columns:
+            time_val = str(df['datetime'].iloc[i])
+
+        ts_val = None
+        if time_val:
+            try:
+                ts_val = int(pd.to_datetime(time_val).timestamp())
+            except Exception:
+                ts_val = None
+
         if is_high and not is_low:
-            pivots.append({'index': i, 'price': float(highs[i]), 'type': 'High'})
+            pivots.append({
+                'index': i,
+                'bar_index': i,
+                'price': float(highs[i]),
+                'type': 'High',
+                'time': time_val,
+                'timestamp': ts_val
+            })
         elif is_low and not is_high:
-            pivots.append({'index': i, 'price': float(lows[i]), 'type': 'Low'})
+            pivots.append({
+                'index': i,
+                'bar_index': i,
+                'price': float(lows[i]),
+                'type': 'Low',
+                'time': time_val,
+                'timestamp': ts_val
+            })
             
     # Filtr: ketma-ket ikkita High yoki Low kelib qolsa, kuchlirog'ini saqlab qolamiz.
     if not pivots:

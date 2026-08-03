@@ -479,6 +479,29 @@ class TradingBot:
         sr_volume_result = portfolio_result["details"].get("SR_Volume", {})
         auto_patterns_result = portfolio_result["details"].get("Auto_Pattern", {})
         
+        with self.profiler.track("2.2.1_save_strategy_memory"):
+            try:
+                from bot.strategy.smc.zones import ZoneManager
+                from bot.strategy.harmonic.manager import HarmonicPatternManager
+                from bot.strategy.wyckoff.manager import WyckoffEventManager
+                from bot.strategy.sr_volume.manager import SRVolumeZoneManager
+                from bot.strategy.auto_patterns.manager import AutoPatternManager
+                
+                zm = ZoneManager()
+                hm = HarmonicPatternManager()
+                wm = WyckoffEventManager()
+                srm = SRVolumeZoneManager()
+                apm = AutoPatternManager()
+                
+                tf_major = self.config.timeframe_major
+                zm.save_zones(symbol, tf_major, smc_result)
+                hm.save_patterns(symbol, tf_major, pattern_result)
+                wm.save_events(symbol, tf_major, wyckoff_result)
+                srm.save_zones(symbol, tf_major, sr_volume_result)
+                apm.save_pattern(symbol, tf_major, auto_patterns_result)
+            except Exception as e:
+                logger.error(f"[{symbol}] Strategiya xotirasini saqlashda xatolik: {e}")
+        
         # Minor timeframe ma'lumotlarini qo'shish
         with self.profiler.track("2.3_fetch_minor_and_smc"):
             tf_minor = self.config.timeframe_minor

@@ -226,6 +226,11 @@ class PatternStrategy(Strategy):
 
     def analyze(self, df: pd.DataFrame, context: Dict[str, Any] = None) -> Dict[str, Any]:
         result = self.bot._get_harmonic_patterns(df)
+        if result:
+            sig = result.get("signal", "NEUTRAL")
+            conf = result.get("confidence", 75 if sig in ["BUY", "SELL"] else 0)
+            result["signal"] = sig
+            result["confidence"] = conf
         return result or {"signal": "HOLD", "confidence": 0}
 
 class NewsStrategy(Strategy):
@@ -234,8 +239,19 @@ class NewsStrategy(Strategy):
         self.bot = main_bot
 
     def analyze(self, df: pd.DataFrame, context: Dict[str, Any] = None) -> Dict[str, Any]:
-        symbol = context.get("symbol")
-        result = self.bot._get_news_context(symbol)
+        symbol = context.get("symbol") if context else None
+        result = self.bot._get_news_context(symbol) if symbol else {}
+        if result:
+            rec = result.get("recommendation", "neutral")
+            if rec == "prepare_long":
+                result["signal"] = "BUY"
+                result["confidence"] = 80
+            elif rec == "prepare_short":
+                result["signal"] = "SELL"
+                result["confidence"] = 80
+            else:
+                result["signal"] = "HOLD"
+                result["confidence"] = 0
         return result or {"signal": "HOLD", "confidence": 0}
 
 class WyckoffStrategy(Strategy):

@@ -50,7 +50,9 @@ def analyze_auto_patterns(df: pd.DataFrame, current_price: Optional[float] = Non
             "reasoning": result["reasoning"],
             "pattern_name": result["pattern"],
             "pivots_found": len(pivots),
-            "slopes": result["slopes"]
+            "slopes": result.get("slopes", {}),
+            "pattern_points": result.get("pattern_points", {}),
+            "pivots": pivots[-10:]
         }
         
     except Exception as e:
@@ -64,5 +66,7 @@ def _empty_result(reason: str) -> Dict[str, Any]:
         "reasoning": reason,
         "pattern_name": "None",
         "pivots_found": 0,
-        "slopes": {}
+        "slopes": {},
+        "pattern_points": {},
+        "pivots": []
     }

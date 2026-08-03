@@ -207,3 +207,43 @@ class ZoneManager:
             "type": type_counts,
             "total": sum(status_counts.values())
         }
+
+    def get_active_zones(self, symbol: str, timeframe: str) -> List[Dict[str, Any]]:
+        """
+        Supabase sync va UI uchun mos keladigan aktiv (fresh) zonalarni qaytaradi.
+        `zone_type`, `direction`, `top`, `bottom`, `status`, `formed_at` maydonlari
+        Supabase smc_zones jadvali va Frontend UI bilan 100% moslashtirilgan.
+        """
+        active_zones = []
+        try:
+            with sqlite3.connect(self.db_path, timeout=30.0) as conn:
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    SELECT * FROM zones 
+                    WHERE symbol = ? AND timeframe = ? AND status = 'fresh'
+                    ORDER BY creation_time DESC
+                ''', (symbol, timeframe))
+                
+                rows = cursor.fetchall()
+                
+            for row in rows:
+                z = dict(row)
+                z_type = "order_block" if z["zone_type"] == "ob" else z["zone_type"]
+                active_zones.append({
+                    "symbol": z["symbol"],
+                    "timeframe": z["timeframe"],
+                    "zone_type": z_type,
+                    "direction": z["direction"],
+                    "top": float(z["top_price"]),
+                    "bottom": float(z["bottom_price"]),
+                    "status": z["status"],
+                    "formed_at": str(z["creation_time"])
+                })
+        except sqlite3.Error as e:
+            print(f"DB Get Active Zones Error: {e}")
+            
+        return active_zones
+

@@ -2,20 +2,26 @@ import sys
 import os
 import sqlite3
 import datetime
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
+import unittest
+
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-from bot.learning.predictor import ShadowDataset, MarketPredictorLSTM, TORCH_AVAILABLE
+class TestSeqLengthBiLSTM(unittest.TestCase):
+    def test_sequence_lengths(self):
+        if not TORCH_AVAILABLE:
+            self.skipTest("PyTorch is not installed")
 
-def test_sequence_lengths():
-    if not TORCH_AVAILABLE:
-        print("PyTorch is not installed")
-        return
+        from bot.learning.predictor import ShadowDataset, MarketPredictorLSTM
 
     db_path = "test_seq_search.db"
     if os.path.exists(db_path):
@@ -140,4 +146,4 @@ def test_sequence_lengths():
     print(best)
     
 if __name__ == "__main__":
-    test_sequence_lengths()
+    unittest.main()
