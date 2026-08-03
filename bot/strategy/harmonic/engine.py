@@ -546,3 +546,24 @@ def analyze_harmonic_patterns(df: pd.DataFrame, config: dict = None) -> dict:
         "fib_levels": fib_levels,
         "all_detected_patterns": all_detected_patterns[-30:] # Last 30 detected patterns
     }
+
+
+def to_voting_signal(result: dict) -> dict:
+    """
+    Harmonic pattern tahlili natijalaridan ovoz berish signali shakllantiradi.
+    """
+    if not result:
+        return {"signal": "HOLD", "confidence": 0}
+        
+    sig = result.get("signal", "HOLD")
+    if sig == "NEUTRAL":
+        sig = "HOLD"
+        
+    conf = result.get("confidence", 0.0)
+    try:
+        conf = int(round(float(conf)))
+    except:
+        conf = 0
+        
+    return {"signal": sig, "confidence": conf}
+

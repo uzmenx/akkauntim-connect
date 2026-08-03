@@ -111,19 +111,29 @@ class VotingStrategy(BacktestStrategy):
     def on_bar(self, current_df: pd.DataFrame, current_row: pd.Series, atr: float, pip_divisor: float, mode: str) -> None:
         current_price = float(current_row['close'])
 
-        smc_data = self._safe_call("SMC", analyze_market_structure, current_df)
-        harmonic_data = self._safe_call("Harmonic", analyze_harmonic_patterns, current_df)
-        wyckoff_data = self._safe_call("Wyckoff", analyze_wyckoff, current_df)
-        sr_data = self._safe_call("SR_Volume", analyze_sr_volume, current_df)
+        smc_raw = self._safe_call("SMC", analyze_market_structure, current_df)
+        harmonic_raw = self._safe_call("Harmonic", analyze_harmonic_patterns, current_df)
+        wyckoff_raw = self._safe_call("Wyckoff", analyze_wyckoff, current_df)
+        sr_raw = self._safe_call("SR_Volume", analyze_sr_volume, current_df)
         auto_patterns_data = self._safe_call("Auto_Pattern", analyze_auto_patterns, current_df, current_price, atr)
         kill_zones_data = self._safe_call("Kill_Zones", analyze_kill_zones, current_df)
+
+        from bot.strategy.smc.engine import to_voting_signal as smc_voting
+        from bot.strategy.harmonic.engine import to_voting_signal as harmonic_voting
+        from bot.strategy.wyckoff.engine import to_voting_signal as wyckoff_voting
+        from bot.strategy.sr_volume.engine import to_voting_signal as sr_voting
+
+        smc_data = smc_voting(smc_raw) if smc_raw else {"signal": "HOLD", "confidence": 0}
+        harmonic_data = harmonic_voting(harmonic_raw) if harmonic_raw else {"signal": "HOLD", "confidence": 0}
+        wyckoff_data = wyckoff_voting(wyckoff_raw) if wyckoff_raw else {"signal": "HOLD", "confidence": 0}
+        sr_volume_data = sr_voting(sr_raw) if sr_raw else {"signal": "HOLD", "confidence": 0}
 
         voting_result = aggregate_signals(
             smc_data=smc_data,
             pattern_data=harmonic_data,
             news_data={}, # News details fetched inside live trading
             wyckoff_data=wyckoff_data,
-            sr_volume_data=sr_data,
+            sr_volume_data=sr_volume_data,
             auto_pattern_data=auto_patterns_data,
             kill_zones_data=kill_zones_data,
             config=self.config,
@@ -588,19 +598,29 @@ class Backtester:
         # ----------------------------------------------------
         # 1. Voting Engine Prediction
         # ----------------------------------------------------
-        smc_data = self.active_strategy._safe_call("SMC", analyze_market_structure, current_df)
-        harmonic_data = self.active_strategy._safe_call("Harmonic", analyze_harmonic_patterns, current_df)
-        wyckoff_data = self.active_strategy._safe_call("Wyckoff", analyze_wyckoff, current_df)
-        sr_data = self.active_strategy._safe_call("SR_Volume", analyze_sr_volume, current_df)
+        smc_raw = self.active_strategy._safe_call("SMC", analyze_market_structure, current_df)
+        harmonic_raw = self.active_strategy._safe_call("Harmonic", analyze_harmonic_patterns, current_df)
+        wyckoff_raw = self.active_strategy._safe_call("Wyckoff", analyze_wyckoff, current_df)
+        sr_raw = self.active_strategy._safe_call("SR_Volume", analyze_sr_volume, current_df)
         auto_patterns_data = self.active_strategy._safe_call("Auto_Pattern", analyze_auto_patterns, current_df, current_price, atr)
         kill_zones_data = self.active_strategy._safe_call("Kill_Zones", analyze_kill_zones, current_df)
+
+        from bot.strategy.smc.engine import to_voting_signal as smc_voting
+        from bot.strategy.harmonic.engine import to_voting_signal as harmonic_voting
+        from bot.strategy.wyckoff.engine import to_voting_signal as wyckoff_voting
+        from bot.strategy.sr_volume.engine import to_voting_signal as sr_voting
+
+        smc_data = smc_voting(smc_raw) if smc_raw else {"signal": "HOLD", "confidence": 0}
+        harmonic_data = harmonic_voting(harmonic_raw) if harmonic_raw else {"signal": "HOLD", "confidence": 0}
+        wyckoff_data = wyckoff_voting(wyckoff_raw) if wyckoff_raw else {"signal": "HOLD", "confidence": 0}
+        sr_volume_data = sr_voting(sr_raw) if sr_raw else {"signal": "HOLD", "confidence": 0}
 
         voting_result = aggregate_signals(
             smc_data=smc_data,
             pattern_data=harmonic_data,
             news_data={},
             wyckoff_data=wyckoff_data,
-            sr_volume_data=sr_data,
+            sr_volume_data=sr_volume_data,
             auto_pattern_data=auto_patterns_data,
             kill_zones_data=kill_zones_data,
             config=self.config,

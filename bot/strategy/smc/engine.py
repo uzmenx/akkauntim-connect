@@ -1134,39 +1134,246 @@ def _empty_result() -> dict:
 def to_voting_signal(result: dict) -> dict:
     """
     SMC natijalaridan ovoz berish moduli uchun BUY/SELL/HOLD signali chiqaradi.
+    Tizim statik (75, 60, 0) qiymatlardan farqli ravishda, bozorning barcha murakkab SMC topilmalari
+    (Trend parallelizmi, BoS/ChoCh kuchliligi, Order Block proximity, FVG magnetizmi va Liquidity Sweep)ni
+    hisobga olib o'ta aniq INSTITUTIONAL DYNAMIC CONFIDENCE hisoblaydi.
     """
     if not result or "trend" not in result:
-        return {"signal": "HOLD", "confidence": 0}
+        return {"signal": "HOLD", "confidence": 0, "reasoning": "No valid trend data"}
         
+    current_price = result.get("current_price", 0.0)
+    if current_price <= 0:
+        return {"signal": "HOLD", "confidence": 0, "reasoning": "Invalid price"}
+        
+    # ----------------------------------------------------------------
+    # 1. Trend va BoS / ChoCh yo'nalishlarini aniqlash
+    # ----------------------------------------------------------------
     internal_trend = result["trend"].get("internal", "")
+    external_trend = result["trend"].get("external", "")
+    
     last_bos = result.get("last_bos")
     bos_dir = last_bos.get("type", "").lower() if last_bos else ""
     
+    last_choch = result.get("last_choch")
+    choch_dir = last_choch.get("type", "").lower() if last_choch else ""
+    
+    # ----------------------------------------------------------------
+    # 2. Bullish vs Bearish ballarni (Confluence points) alohida hisoblaymiz
+    # Max ball = 100 har bir tomonga.
+    # ----------------------------------------------------------------
+    bullish_score = 0.0
+    bearish_score = 0.0
+    
+    # --- A. Trend Confluence (Maks: 25 ball) ---
+    # Internal trend (15 ball)
+    if "Up" in internal_trend:
+        bullish_score += 15.0
+    elif "Down" in internal_trend:
+        bearish_score += 15.0
+        
+    # External Trend (Multi-Timeframe alignment - 10 ball)
+    if "Up" in external_trend:
+        if "Up" in internal_trend:
+            bullish_score += 10.0 # Trend aligned
+        else:
+            bullish_score += 5.0
+    elif "Down" in external_trend:
+        if "Down" in internal_trend:
+            bearish_score += 10.0 # Trend aligned
+        else:
+            bearish_score += 5.0
+            
+    # --- B. Market Structure Shift: BoS & ChoCh (Maks: 25 ball) ---
+    # Break of Structure (BoS) - Trend davomiyligi tasdig'i (15 ball)
+    if bos_dir == "bullish":
+        bullish_score += 12.0
+        if last_bos and last_bos.get("bar_index") is not None:
+            bullish_score += 3.0 # Freshness bonus
+    elif bos_dir == "bearish":
+        bearish_score += 12.0
+        if last_bos and last_bos.get("bar_index") is not None:
+            bearish_score += 3.0 # Freshness bonus
+            
+    # Change of Character (ChoCh) - Trend o'zgarishi, o'ta kuchli signal! (10 ball)
+    if choch_dir == "bullish":
+        bullish_score += 10.0
+    elif choch_dir == "bearish":
+        bearish_score += 10.0
+
+    # --- C. Order Block (OB) Proximity & Strength (Maks: 25 ball) ---
     demand_obs = result.get("order_blocks", {}).get("demand", [])
     supply_obs = result.get("order_blocks", {}).get("supply", [])
     
-    near_demand_ob = False
+    # Eng yaqin fresh demand OB ni qidiramiz
+    closest_demand_ob = None
+    min_demand_dist = float("inf")
     for ob in demand_obs:
-        if ob.get("status") == "fresh" and abs(ob.get("distance_pct", 100)) < 0.5:
-            near_demand_ob = True
-            break
-            
-    near_supply_ob = False
+        if ob.get("status") == "fresh":
+            dist = abs(ob.get("distance_pct", 100.0))
+            if dist < min_demand_dist:
+                min_demand_dist = dist
+                closest_demand_ob = ob
+                
+    # Eng yaqin fresh supply OB ni qidiramiz
+    closest_supply_ob = None
+    min_supply_dist = float("inf")
     for ob in supply_obs:
-        if ob.get("status") == "fresh" and abs(ob.get("distance_pct", 100)) < 0.5:
-            near_supply_ob = True
-            break
+        if ob.get("status") == "fresh":
+            dist = abs(ob.get("distance_pct", 100.0))
+            if dist < min_supply_dist:
+                min_supply_dist = dist
+                closest_supply_ob = ob
+                
+    # Proximity hisoblari (0.5% narx masofasi - yuqori ehtimollik zonasi, maks 20 ball)
+    if closest_demand_ob is not None:
+        if min_demand_dist <= 0.2:
+            bullish_score += 20.0 # Zo'r kirish nuqtasi, OB ichida/juda yaqin
+        elif min_demand_dist <= 0.5:
+            bullish_score += 15.0
+        elif min_demand_dist <= 1.0:
+            bullish_score += 8.0
             
-    is_bullish = ("Up" in internal_trend) or (bos_dir == "bullish")
-    is_bearish = ("Down" in internal_trend) or (bos_dir == "bearish")
+        # OB darajasi (Major OB ko'proq ishonch beradi - 5 ball)
+        if min_demand_dist <= 1.0 and closest_demand_ob.get("level") == "Major":
+            bullish_score += 5.0
+            
+    if closest_supply_ob is not None:
+        if min_supply_dist <= 0.2:
+            bearish_score += 20.0
+        elif min_supply_dist <= 0.5:
+            bearish_score += 15.0
+        elif min_supply_dist <= 1.0:
+            bearish_score += 8.0
+            
+        if min_supply_dist <= 1.0 and closest_supply_ob.get("level") == "Major":
+            bearish_score += 5.0
+
+    # --- D. Fair Value Gap (FVG) Confluence (Maks: 15 ball) ---
+    demand_fvgs = result.get("fvg", {}).get("demand", [])
+    supply_fvgs = result.get("fvg", {}).get("supply", [])
     
-    if is_bullish and near_demand_ob:
-        return {"signal": "BUY", "confidence": 75}
-    elif is_bearish and near_supply_ob:
-        return {"signal": "SELL", "confidence": 75}
-    elif is_bullish and not is_bearish:
-        return {"signal": "BUY", "confidence": 60}
-    elif is_bearish and not is_bullish:
-        return {"signal": "SELL", "confidence": 60}
+    # FVG borligi va ularga yaqinlik (FVG magnet vazifasini bajaradi yoki re-entry support)
+    closest_demand_fvg = None
+    min_demand_fvg_dist = float("inf")
+    for fvg in demand_fvgs:
+        if fvg.get("status") == "fresh":
+            bottom = fvg.get("bottom", 0.0)
+            top = fvg.get("top", 0.0)
+            if bottom <= current_price <= top:
+                min_demand_fvg_dist = 0.0
+                closest_demand_fvg = fvg
+                break
+            else:
+                dist = min(abs(current_price - bottom), abs(current_price - top)) / current_price * 100.0
+                if dist < min_demand_fvg_dist:
+                    min_demand_fvg_dist = dist
+                    closest_demand_fvg = fvg
+                    
+    closest_supply_fvg = None
+    min_supply_fvg_dist = float("inf")
+    for fvg in supply_fvgs:
+        if fvg.get("status") == "fresh":
+            bottom = fvg.get("bottom", 0.0)
+            top = fvg.get("top", 0.0)
+            if bottom <= current_price <= top:
+                min_supply_fvg_dist = 0.0
+                closest_supply_fvg = fvg
+                break
+            else:
+                dist = min(abs(current_price - bottom), abs(current_price - top)) / current_price * 100.0
+                if dist < min_supply_fvg_dist:
+                    min_supply_fvg_dist = dist
+                    closest_supply_fvg = fvg
+
+    if closest_demand_fvg is not None:
+        if min_demand_fvg_dist == 0.0:
+            bullish_score += 12.0 # Narx gap ichida
+        elif min_demand_fvg_dist <= 0.3:
+            bullish_score += 8.0
+        elif min_demand_fvg_dist <= 0.8:
+            bullish_score += 4.0
+            
+        if min_demand_fvg_dist <= 0.8 and closest_demand_fvg.get("gap_size", 0.0) / current_price * 100.0 > 0.1:
+            bullish_score += 3.0
+
+    if closest_supply_fvg is not None:
+        if min_supply_fvg_dist == 0.0:
+            bearish_score += 12.0
+        elif min_supply_fvg_dist <= 0.3:
+            bearish_score += 8.0
+        elif min_supply_fvg_dist <= 0.8:
+            bearish_score += 4.0
+            
+        if min_supply_fvg_dist <= 0.8 and closest_supply_fvg.get("gap_size", 0.0) / current_price * 100.0 > 0.1:
+            bearish_score += 3.0
+
+    # --- E. Liquidity Pools & Sweeps (Maks: 10 ball) ---
+    liquidity = result.get("liquidity", {})
+    static_low = liquidity.get("static_low")
+    static_high = liquidity.get("static_high")
+    dynamic_low = liquidity.get("dynamic_low")
+    dynamic_high = liquidity.get("dynamic_high")
+    
+    if static_low is not None:
+        dist_pct = abs(current_price - static_low) / static_low * 100.0
+        if dist_pct <= 0.3:
+            bullish_score += 6.0
+        elif dist_pct <= 0.8:
+            bullish_score += 3.0
+            
+    if dynamic_low is not None:
+        dist_pct = abs(current_price - dynamic_low) / dynamic_low * 100.0
+        if dist_pct <= 0.3:
+            bullish_score += 4.0
+            
+    if static_high is not None:
+        dist_pct = abs(current_price - static_high) / static_high * 100.0
+        if dist_pct <= 0.3:
+            bearish_score += 6.0
+        elif dist_pct <= 0.8:
+            bearish_score += 3.0
+            
+    if dynamic_high is not None:
+        dist_pct = abs(current_price - dynamic_high) / dynamic_high * 100.0
+        if dist_pct <= 0.3:
+            bearish_score += 4.0
+
+    # ----------------------------------------------------------------
+    # 3. Yakuniy signal va uning dinamik ishonchligini (Confidence) aniqlash
+    # ----------------------------------------------------------------
+    # Capping high scores to 95 to allow some systemic doubt (no trade is 100% certain in institutional trading)
+    bullish_score = min(bullish_score, 95.0)
+    bearish_score = min(bearish_score, 95.0)
+    
+    # Ostonalar (Thresholds)
+    score_threshold = 45.0
+    
+    # Conflict index check
+    if abs(bullish_score - bearish_score) < 15.0 and max(bullish_score, bearish_score) > 55.0:
+        return {
+            "signal": "HOLD",
+            "confidence": int(round(max(bullish_score, bearish_score))),
+            "reasoning": f"SMC conflict: Bullish({bullish_score:.1f}) vs Bearish({bearish_score:.1f}). Inside consolidation."
+        }
         
-    return {"signal": "HOLD", "confidence": 0}
+    if bullish_score > bearish_score and bullish_score >= score_threshold:
+        return {
+            "signal": "BUY",
+            "confidence": int(round(bullish_score)),
+            "reasoning": f"SMC Bullish: Score={bullish_score:.1f} (Trend={ 'Up' if 'Up' in internal_trend else 'Neutral' }, OB={ 'Tap' if min_demand_dist <= 0.5 else 'None' }, FVG={ 'Tap' if min_demand_fvg_dist <= 0.3 else 'None' })"
+        }
+    elif bearish_score > bullish_score and bearish_score >= score_threshold:
+        return {
+            "signal": "SELL",
+            "confidence": int(round(bearish_score)),
+            "reasoning": f"SMC Bearish: Score={bearish_score:.1f} (Trend={ 'Down' if 'Down' in internal_trend else 'Neutral' }, OB={ 'Tap' if min_supply_dist <= 0.5 else 'None' }, FVG={ 'Tap' if min_supply_fvg_dist <= 0.3 else 'None' })"
+        }
+        
+    return {
+        "signal": "HOLD",
+        "confidence": int(round(max(bullish_score, bearish_score))),
+        "reasoning": f"SMC HOLD: Trend and Order Block indicators insufficient. Bullish={bullish_score:.1f}, Bearish={bearish_score:.1f}."
+    }
+
+# Alias for testing and backwards compatibility
+analyze_smc = analyze_market_structure

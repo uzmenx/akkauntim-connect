@@ -45,6 +45,9 @@ def analyze_wyckoff(df: pd.DataFrame, lookback: int = 100) -> Dict[str, Any]:
     # 4. SOS (Sign of Strength) / SOW (Sign of Weakness) momentumini aniqlash
     momentum_sign, momentum_details = _detect_sos_sow(df_recent)
     
+    # 5. Dynamic Confluence Calculations
+    confluences = _calculate_confluences(df_recent, phase, spring_upthrust, event_details, momentum_sign, momentum_details, current_price)
+    
     return {
         "phase": phase,
         "trading_range": tr_data,
@@ -54,7 +57,8 @@ def analyze_wyckoff(df: pd.DataFrame, lookback: int = 100) -> Dict[str, Any]:
         "event_time": event_details.get("event_time"),
         "momentum_sign": momentum_sign,
         "momentum_details": momentum_details,
-        "current_price": current_price
+        "current_price": current_price,
+        "confluences": confluences
     }
 
 def _empty_wyckoff_result() -> Dict[str, Any]:
@@ -67,39 +71,79 @@ def _empty_wyckoff_result() -> Dict[str, Any]:
         "event_time": None,
         "momentum_sign": "None",
         "momentum_details": {"type": "None", "bar_index": None, "event_bar_index": None, "time": None, "event_time": None, "price": None},
-        "current_price": 0.0
+        "current_price": 0.0,
+        "confluences": {
+            "volume_ratio": 1.0,
+            "trend_score": 0.0,
+            "sweep_ratio": 0.0,
+            "phase_aligned": False,
+            "momentum_aligned": False
+        }
     }
 
 def _detect_trading_range(df: pd.DataFrame) -> Dict[str, Any]:
     """
     Narx ma'lum bir koridorda (Trading Range) qolib ketganligini aniqlaydi.
+    Institutional darajadagi dinamik va adaptiv tahlil orqali tor fletlardan tortib,
+    keng tarqalgan konsolidatsiyalargacha aniq ajratib beradi.
     """
     highs = df['high'].values
     lows = df['low'].values
     closes = df['close'].values
     
-    # TR chegaralarini topishda oxirgi 15 ta shamni (Spring/Upthrust ehtimoli bor joyni) hisobga olmaymiz
-    recent_highs = highs[-65:-15]
-    recent_lows = lows[-65:-15]
-    
+    n = len(df)
+    if n < 65:
+        recent_highs = highs
+        recent_lows = lows
+        recent_closes = closes
+    else:
+        # TR chegaralarini topishda oxirgi 15 ta shamni (Spring/Upthrust ehtimoli bor joyni) hisobga olmaymiz
+        recent_highs = highs[-65:-15]
+        recent_lows = lows[-65:-15]
+        recent_closes = closes[-65:-15]
+        
     max_h = np.max(recent_highs)
     min_l = np.min(recent_lows)
-    
-    # TR kengligi (ATR bilan solishtiramiz)
-    atr_approx = np.mean(highs[-14:] - lows[-14:])
     range_size = max_h - min_l
     
-    # Kengaytirilgan ATR koridori: 0.8 * ATR dan 15.0 * ATR gacha.
-    # Bu tor fletlarni va yuqori volatilli bozorlardagi keng trading range'larni qamrab oladi.
+    # ATR oraliq kengligi (14 periodli)
+    atr_approx = np.mean(highs[-14:] - lows[-14:])
+    if atr_approx < 1e-8:
+        atr_approx = 1e-8
+        
+    # Kvant tahliliga ko'ra, koridor kengligi ATR ning 0.3 baravaridan
+    # tortib 20.0 baravarigacha bo'lishi mumkin.
+    min_multiplier = 0.3
+    max_multiplier = 20.0
+    
     is_ranging = False
-    if atr_approx * 0.8 < range_size < atr_approx * 15.0:
-        # Endi narx shu oraliqda necha marta tepaga/pastga urilganini tekshiramiz (ADR qismi)
-        # O'rta chiziq atrofida kesishmalar soni
-        mid_price = (max_h + min_l) / 2
-        # np.diff bool arrayda ishlatilganda o'zgarishlarni topadi
-        bool_array = (closes[-50:] > mid_price).astype(int)
-        crosses = np.sum(np.abs(np.diff(bool_array)))
-        if crosses >= 2: # Kamida 2 marta o'rtani kesib o'tgan bo'lsa
+    
+    if atr_approx * min_multiplier <= range_size <= atr_approx * max_multiplier:
+        mid_price = (max_h + min_l) / 2.0
+        
+        # O'rta chiziq (mid_price) atrofidagi kesishmalar soni
+        bool_array = (recent_closes > mid_price).astype(int)
+        crosses = int(np.sum(np.abs(np.diff(bool_array))))
+        
+        # Trend kuchini aniqlash: Linear regression slope
+        try:
+            x = np.arange(len(recent_closes))
+            slope, _ = np.polyfit(x, recent_closes, 1)
+            normalized_slope = abs(slope * len(recent_closes) / atr_approx)
+        except Exception:
+            normalized_slope = 0.0
+            
+        # Narx o'zgaruvchanligi (Standard Deviation of closes) koridorga nisbatan
+        close_std = np.std(recent_closes)
+        std_to_range_ratio = close_std / range_size if range_size > 0 else 0
+        
+        # Shartlar:
+        # - crosses >= 2 (kamida 2 marta o'rta chiziq kesib o'tilgan bo'lishi kerak)
+        # - normalized_slope < 4.0 (kuchli yo'nalishli trend bo'lmasligi kerak)
+        # - std_to_range_ratio < 0.45 (fletlik testi)
+        if crosses >= 2 and normalized_slope < 4.0 and std_to_range_ratio < 0.45:
+            is_ranging = True
+        elif crosses >= 4 and normalized_slope < 6.0:
             is_ranging = True
             
     return {
@@ -237,9 +281,99 @@ def _detect_sos_sow(df: pd.DataFrame) -> tuple:
         
     return "None", empty_details
 
+def _calculate_confluences(
+    df_recent: pd.DataFrame,
+    phase: str,
+    spring_upthrust: str,
+    event_details: dict,
+    momentum_sign: str,
+    momentum_details: dict,
+    current_price: float
+) -> Dict[str, Any]:
+    """
+    Wyckoff hodisalari va fazalariga doir bozor konfluensiyalarini hisoblaydi.
+    """
+    confluences = {
+        "volume_ratio": 1.0,
+        "trend_score": 0.0,
+        "sweep_ratio": 0.0,
+        "phase_aligned": False,
+        "momentum_aligned": False
+    }
+
+    # 1. Volume Ratio (Hajm Confluence)
+    vol_col = 'tick_volume' if 'tick_volume' in df_recent.columns else 'volume' if 'volume' in df_recent.columns else None
+    if vol_col:
+        try:
+            recent_vols = df_recent[vol_col].values
+            avg_vol = float(np.mean(recent_vols[-20:])) if len(recent_vols) >= 20 else float(np.mean(recent_vols))
+            if avg_vol < 1e-8:
+                avg_vol = 1e-8
+                
+            event_time = event_details.get("time") if spring_upthrust != "None" else momentum_details.get("time")
+            if event_time is not None and event_time in df_recent.index:
+                trigger_vol = float(df_recent.loc[event_time, vol_col])
+            else:
+                trigger_vol = float(df_recent[vol_col].iloc[-1])
+                
+            confluences["volume_ratio"] = float(trigger_vol / avg_vol)
+        except Exception:
+            confluences["volume_ratio"] = 1.0
+
+    # 2. Trend Score (-1.0 dan +1.0 gacha)
+    try:
+        ema20_series = df_recent['close'].ewm(span=20).mean()
+        ema50_series = df_recent['close'].ewm(span=50).mean()
+        ema20 = float(ema20_series.iloc[-1])
+        ema50 = float(ema50_series.iloc[-1])
+
+        if current_price > ema20 > ema50:
+            confluences["trend_score"] = 1.0
+        elif current_price > ema50 and ema20 > ema50:
+            confluences["trend_score"] = 0.5
+        elif current_price < ema20 < ema50:
+            confluences["trend_score"] = -1.0
+        elif current_price < ema50 and ema20 < ema50:
+            confluences["trend_score"] = -0.5
+        else:
+            confluences["trend_score"] = 0.0
+    except Exception:
+        confluences["trend_score"] = 0.0
+
+    # 3. Sweep Ratio (Faqat Spring/Upthrust uchun)
+    if spring_upthrust in ["Spring", "Upthrust"] and event_details.get("price") is not None and event_details.get("level_broken") is not None:
+        try:
+            atr = float(np.mean(df_recent['high'].iloc[-14:] - df_recent['low'].iloc[-14:]))
+            if atr < 1e-8:
+                atr = 1e-8
+            sweep_depth = abs(event_details["price"] - event_details["level_broken"])
+            confluences["sweep_ratio"] = float(sweep_depth / atr)
+        except Exception:
+            confluences["sweep_ratio"] = 0.0
+
+    # 4. Phase Alignment (Faza mosligi)
+    if spring_upthrust == "Spring" and phase == "Accumulation":
+        confluences["phase_aligned"] = True
+    elif spring_upthrust == "Upthrust" and phase == "Distribution":
+        confluences["phase_aligned"] = True
+
+    # 5. Momentum Alignment (Momentum mosligi)
+    if spring_upthrust == "Spring" and momentum_sign == "SOS":
+        confluences["momentum_aligned"] = True
+    elif spring_upthrust == "Upthrust" and momentum_sign == "SOW":
+        confluences["momentum_aligned"] = True
+    elif phase == "Markup" and momentum_sign == "SOS":
+        confluences["momentum_aligned"] = True
+    elif phase == "Markdown" and momentum_sign == "SOW":
+        confluences["momentum_aligned"] = True
+
+    return confluences
+
 def to_voting_signal(result: dict) -> dict:
     """
     Wyckoff natijalaridan ovoz berish moduli uchun BUY/SELL/HOLD signali chiqaradi.
+    Dinamik ravishda bozor konfluensiyalarini (Volume, Trend, Sweep chuqurligi, 
+    Faza va Momentum mosligi) hisobga olib confidence hisoblaydi.
     """
     if not result:
         return {"signal": "HOLD", "confidence": 0}
@@ -247,15 +381,73 @@ def to_voting_signal(result: dict) -> dict:
     spring_upthrust = result.get("spring_upthrust", "None")
     phase = result.get("phase", "Unknown")
     momentum_sign = result.get("momentum_sign", "None")
+    confluences = result.get("confluences", {})
+    
+    # 1. Baza signal va dastlabki confidence
+    signal = "HOLD"
+    base_confidence = 0
     
     if spring_upthrust == "Spring":
-        return {"signal": "BUY", "confidence": 70}
+        signal = "BUY"
+        base_confidence = 65
     elif spring_upthrust == "Upthrust":
-        return {"signal": "SELL", "confidence": 70}
-        
-    if phase == "Markup" and momentum_sign == "SOS":
-        return {"signal": "BUY", "confidence": 55}
+        signal = "SELL"
+        base_confidence = 65
+    elif phase == "Markup" and momentum_sign == "SOS":
+        signal = "BUY"
+        base_confidence = 50
     elif phase == "Markdown" and momentum_sign == "SOW":
-        return {"signal": "SELL", "confidence": 55}
+        signal = "SELL"
+        base_confidence = 50
         
-    return {"signal": "HOLD", "confidence": 0}
+    if signal == "HOLD":
+        return {"signal": "HOLD", "confidence": 0}
+        
+    # 2. Konfluensiya bo'yicha hisob-kitoblar (Dinamik)
+    confidence = base_confidence
+    
+    # A. Volume Confluence (+12 bonusgacha yoki -10 jarimagacha)
+    vol_ratio = confluences.get("volume_ratio", 1.0)
+    if vol_ratio > 1.2:
+        # Katta hajm o'sishi signal ishonchliligini oshiradi
+        vol_bonus = min(12, int((vol_ratio - 1.0) * 10))
+        confidence += vol_bonus
+    elif vol_ratio < 0.8:
+        # Kichik hajm feykout (soxta yorilish) ehtimolini oshiradi, confidence kamayadi
+        vol_penalty = min(10, int((1.0 - vol_ratio) * 10))
+        confidence -= vol_penalty
+        
+    # B. Phase Alignment Confluence (+12 bonusgacha)
+    if confluences.get("phase_aligned", False):
+        confidence += 12
+        
+    # C. Momentum Alignment Confluence (+10 bonusgacha)
+    if confluences.get("momentum_aligned", False):
+        confidence += 10
+        
+    # D. Trend Alignment Confluence (+10 bonusgacha yoki -8 jarimagacha)
+    trend_score = confluences.get("trend_score", 0.0)
+    if signal == "BUY" and trend_score > 0:
+        confidence += int(trend_score * 10)
+    elif signal == "SELL" and trend_score < 0:
+        confidence += int(abs(trend_score) * 10)
+    elif signal == "BUY" and trend_score < 0:
+        confidence -= int(abs(trend_score) * 8)
+    elif signal == "SELL" and trend_score > 0:
+        confidence -= int(trend_score * 8)
+        
+    # E. Sweep Quality Confluence (+8 bonus yoki -10 jarimagacha, faqat Spring/Upthrust)
+    if spring_upthrust in ["Spring", "Upthrust"]:
+        sweep_ratio = confluences.get("sweep_ratio", 0.0)
+        if 0.2 <= sweep_ratio <= 1.2:
+            confidence += 8
+        elif sweep_ratio > 1.8:
+            # Haddan tashqari katta yorilish real yorib o'tish bo'lishi mumkin, soxta emas
+            confidence -= 10
+        elif sweep_ratio < 0.1:
+            confidence -= 5
+            
+    # 3. Institutional darajadagi xavfsiz diapazon: [15, 95]
+    confidence = max(15, min(95, confidence))
+    
+    return {"signal": signal, "confidence": int(confidence)}

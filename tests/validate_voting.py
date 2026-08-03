@@ -25,7 +25,7 @@ res1 = aggregate_signals(
 )
 print(res1)
 assert res1['signal'] == "BUY"
-assert res1['risk_pct'] == 0.03
+assert res1['risk_pct'] == 0.015
 
 print("\n=== Test 2: SMC + News (Pattern ishlashni rad etdi) ===")
 res2 = aggregate_signals(
@@ -40,7 +40,7 @@ res2 = aggregate_signals(
 )
 print(res2)
 assert res2['signal'] == "SELL"
-assert res2['risk_pct'] == 0.02
+assert res2['risk_pct'] == 0.015
 
 print("\n=== Test 3: SMC + Pattern (News kutishda) ===")
 res3 = aggregate_signals(
@@ -55,7 +55,7 @@ res3 = aggregate_signals(
 )
 print(res3)
 assert res3['signal'] == "BUY"
-assert res3['risk_pct'] == 0.02
+assert res3['risk_pct'] == 0.015
 
 print("\n=== Test 4: Ziddiyat (SMC Buy, News Sell) ===")
 res4 = aggregate_signals(

@@ -1017,9 +1017,9 @@ def calculate_confluence(
 
     # -------- 2I: SR VOLUME ALIGNMENT --------
     sr_score = 0
-    sr_signal = sr_volume_data.get("signal", "NEUTRAL")
+    sr_signal = sr_volume_data.get("signal", "HOLD")
     
-    if sr_signal != "NEUTRAL":
+    if sr_signal not in ["NEUTRAL", "HOLD"]:
         if direction == "Bullish" and sr_signal == "BUY":
             sr_score += get_weight("sr_volume_weight")
             reasoning_parts.append(f"SR Volume: Bullish signal ({sr_volume_data.get('reasoning', '')}) → +{get_weight('sr_volume_weight')} ball")

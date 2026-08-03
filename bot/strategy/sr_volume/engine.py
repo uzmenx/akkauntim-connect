@@ -76,145 +76,238 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
     df_calc['ATR200'] = df_calc['TR'].rolling(window=200, min_periods=1).mean()
     df_calc['withd'] = df_calc['ATR200'] * box_withd
     
-    supportLevel = np.nan
-    supportLevel_1 = np.nan
-    resistanceLevel = np.nan
-    resistanceLevel_1 = np.nan
+    # 5. Vectorized Support & Resistance Level Tracking (Bug D Fix)
+    pivot_lows = df_calc['pivot_low'].values
+    pivot_highs = df_calc['pivot_high'].values
+    vols = df_calc['Vol'].values
+    vol_hi_arr = df_calc['vol_hi'].values
+    vol_lo_arr = df_calc['vol_lo'].values
+    withd_arr = df_calc['withd'].values
     
-    brekout_res_sig = False
-    res_holds_sig = False
-    sup_holds_sig = False
-    brekout_sup_sig = False
+    sup_cond = (~np.isnan(pivot_lows)) & (vols > vol_hi_arr)
+    res_cond = (~np.isnan(pivot_highs)) & (vols < vol_lo_arr)
     
-    support_zone = None
-    resistance_zone = None
-    sup_bar_idx = None
-    sup_time = None
-    res_bar_idx = None
-    res_time = None
+    sup_vals = np.where(sup_cond, pivot_lows, np.nan)
+    sup_vals_1 = np.where(sup_cond, pivot_lows - withd_arr, np.nan)
+    sup_indices = np.where(sup_cond, np.arange(n), np.nan)
     
+    res_vals = np.where(res_cond, pivot_highs, np.nan)
+    res_vals_1 = np.where(res_cond, pivot_highs + withd_arr, np.nan)
+    res_indices = np.where(res_cond, np.arange(n), np.nan)
+    
+    # Forward-fill to propagate active S/R levels efficiently using pandas
+    s_val = pd.Series(sup_vals).ffill().values
+    s_val_1 = pd.Series(sup_vals_1).ffill().values
+    s_idx = pd.Series(sup_indices).ffill().values
+    
+    r_val = pd.Series(res_vals).ffill().values
+    r_val_1 = pd.Series(res_vals_1).ffill().values
+    r_idx = pd.Series(res_indices).ffill().values
+    
+    # Mask values before lookbackPeriod * 2 as nan
+    s_val[:lookbackPeriod * 2] = np.nan
+    s_val_1[:lookbackPeriod * 2] = np.nan
+    s_idx[:lookbackPeriod * 2] = np.nan
+    r_val[:lookbackPeriod * 2] = np.nan
+    r_val_1[:lookbackPeriod * 2] = np.nan
+    r_idx[:lookbackPeriod * 2] = np.nan
+    
+    # 6. Vectorized Breakout & Hold detection
+    current_lows = df_calc['low'].values
+    current_highs = df_calc['high'].values
+    prev_lows = np.roll(current_lows, 1)
+    prev_highs = np.roll(current_highs, 1)
+    
+    # brekout_res: prev_low <= resistanceLevel_1 and current_low > resistanceLevel_1
+    brekout_res_arr = (prev_lows <= r_val_1) & (current_lows > r_val_1)
+    # res_holds: prev_high >= resistanceLevel and current_high < resistanceLevel
+    res_holds_arr = (prev_highs >= r_val) & (current_highs < r_val)
+    # sup_holds: prev_low <= supportLevel and current_low > supportLevel
+    sup_holds_arr = (prev_lows <= s_val) & (current_lows > s_val)
+    # brekout_sup: prev_high >= supportLevel_1 and current_high < supportLevel_1
+    brekout_sup_arr = (prev_highs >= s_val_1) & (current_highs < s_val_1)
+    
+    # Mask out before boundary
+    brekout_res_arr[:lookbackPeriod * 2] = False
+    res_holds_arr[:lookbackPeriod * 2] = False
+    sup_holds_arr[:lookbackPeriod * 2] = False
+    brekout_sup_arr[:lookbackPeriod * 2] = False
+    
+    # Extract states for the final bar (n - 1)
+    brekout_res_sig = bool(brekout_res_arr[-1])
+    res_holds_sig = bool(res_holds_arr[-1])
+    sup_holds_sig = bool(sup_holds_arr[-1])
+    brekout_sup_sig = bool(brekout_sup_arr[-1])
+    
+    supportLevel = s_val[-1]
+    supportLevel_1 = s_val_1[-1]
+    sup_bar_idx = s_idx[-1]
+    
+    if not np.isnan(sup_bar_idx):
+        sup_event_idx = max(0, int(sup_bar_idx) - lookbackPeriod)
+        sup_time = str(df_calc.index[sup_event_idx])
+        support_zone = {
+            "top": float(supportLevel),
+            "bottom": float(supportLevel_1),
+            "bar_index": sup_event_idx,
+            "time": sup_time
+        }
+    else:
+        support_zone = None
+        
+    resistanceLevel = r_val[-1]
+    resistanceLevel_1 = r_val_1[-1]
+    res_bar_idx = r_idx[-1]
+    
+    if not np.isnan(res_bar_idx):
+        res_event_idx = max(0, int(res_bar_idx) - lookbackPeriod)
+        res_time = str(df_calc.index[res_event_idx])
+        resistance_zone = {
+            "top": float(resistanceLevel_1),
+            "bottom": float(resistanceLevel),
+            "bar_index": res_event_idx,
+            "time": res_time
+        }
+    else:
+        resistance_zone = None
+        
+    # Reconstruct last events
     last_breakout_res = None
     last_breakout_sup = None
     last_res_holds = None
     last_sup_holds = None
-
-    for i in range(lookbackPeriod * 2, n):
-        vol = df_calc['Vol'].iloc[i]
-        vol_hi = df_calc['vol_hi'].iloc[i]
-        vol_lo = df_calc['vol_lo'].iloc[i]
+    
+    br_indices = np.where(brekout_res_arr)[0]
+    if len(br_indices) > 0:
+        last_idx = int(br_indices[-1])
+        last_breakout_res = {"type": "breakout_res", "event_bar_index": last_idx, "bar_index": last_idx, "event_time": str(df_calc.index[last_idx]), "time": str(df_calc.index[last_idx]), "price": float(current_highs[last_idx])}
         
-        pv_low = df_calc['pivot_low'].iloc[i]
-        pv_high = df_calc['pivot_high'].iloc[i]
-        withd = df_calc['withd'].iloc[i]
+    bs_indices = np.where(brekout_sup_arr)[0]
+    if len(bs_indices) > 0:
+        last_idx = int(bs_indices[-1])
+        last_breakout_sup = {"type": "breakout_sup", "event_bar_index": last_idx, "bar_index": last_idx, "event_time": str(df_calc.index[last_idx]), "time": str(df_calc.index[last_idx]), "price": float(current_lows[last_idx])}
         
-        # New Support
-        if not np.isnan(pv_low) and vol > vol_hi:
-            supportLevel = pv_low
-            supportLevel_1 = supportLevel - withd
-            sup_bar_idx = max(0, i - lookbackPeriod)
-            sup_time = str(df_calc.index[sup_bar_idx])
-            
-        # New Resistance
-        if not np.isnan(pv_high) and vol < vol_lo:
-            resistanceLevel = pv_high
-            resistanceLevel_1 = resistanceLevel + withd
-            res_bar_idx = max(0, i - lookbackPeriod)
-            res_time = str(df_calc.index[res_bar_idx])
-            
-        current_low = df_calc['low'].iloc[i]
-        current_high = df_calc['high'].iloc[i]
-        prev_low = df_calc['low'].iloc[i-1]
-        prev_high = df_calc['high'].iloc[i-1]
+    rh_indices = np.where(res_holds_arr)[0]
+    if len(rh_indices) > 0:
+        last_idx = int(rh_indices[-1])
+        last_res_holds = {"type": "res_holds", "event_bar_index": last_idx, "bar_index": last_idx, "event_time": str(df_calc.index[last_idx]), "time": str(df_calc.index[last_idx]), "price": float(current_highs[last_idx])}
         
-        bar_loc = i
-        bar_time = str(df_calc.index[i])
+    sh_indices = np.where(sup_holds_arr)[0]
+    if len(sh_indices) > 0:
+        last_idx = int(sh_indices[-1])
+        last_sup_holds = {"type": "sup_holds", "event_bar_index": last_idx, "bar_index": last_idx, "event_time": str(df_calc.index[last_idx]), "time": str(df_calc.index[last_idx]), "price": float(current_lows[last_idx])}
 
-        # Breakout / Holds logic using crossover / crossunder
-        if not np.isnan(resistanceLevel_1):
-            brekout_res = (prev_low <= resistanceLevel_1) and (current_low > resistanceLevel_1)
-        else:
-            brekout_res = False
-            
-        if not np.isnan(resistanceLevel):
-            res_holds = (prev_high >= resistanceLevel) and (current_high < resistanceLevel)
-        else:
-            res_holds = False
-            
-        if not np.isnan(supportLevel):
-            sup_holds = (prev_low <= supportLevel) and (current_low > supportLevel)
-        else:
-            sup_holds = False
-            
-        if not np.isnan(supportLevel_1):
-            brekout_sup = (prev_high >= supportLevel_1) and (current_high < supportLevel_1)
-        else:
-            brekout_sup = False
-            
-        if brekout_res:
-            last_breakout_res = {"type": "breakout_res", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_high)}
-        if brekout_sup:
-            last_breakout_sup = {"type": "breakout_sup", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_low)}
-        if res_holds:
-            last_res_holds = {"type": "res_holds", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_high)}
-        if sup_holds:
-            last_sup_holds = {"type": "sup_holds", "event_bar_index": bar_loc, "bar_index": bar_loc, "event_time": bar_time, "time": bar_time, "price": float(current_low)}
-
-        if i == n - 1:
-            brekout_res_sig = brekout_res
-            res_holds_sig = res_holds
-            sup_holds_sig = sup_holds
-            brekout_sup_sig = brekout_sup
-            
-            if not np.isnan(supportLevel):
-                support_zone = {
-                    "top": float(supportLevel),
-                    "bottom": float(supportLevel_1),
-                    "bar_index": sup_bar_idx,
-                    "time": sup_time
-                }
-            if not np.isnan(resistanceLevel):
-                resistance_zone = {
-                    "top": float(resistanceLevel_1),
-                    "bottom": float(resistanceLevel),
-                    "bar_index": res_bar_idx,
-                    "time": res_time
-                }
-
-    signal = "NEUTRAL"
-    confidence = 0
+    signal = "HOLD"
+    base_confidence = 0
     reasoning = []
     
     event_details = {"type": "None", "event_bar_index": None, "bar_index": None, "event_time": None, "time": None, "price": None}
 
     if brekout_res_sig:
         signal = "BUY"
-        confidence = 75
+        base_confidence = 75
         reasoning.append("Resistance broken upwards (Breakout)")
         if last_breakout_res:
             event_details = last_breakout_res
     elif sup_holds_sig:
         signal = "BUY"
-        confidence = 65
+        base_confidence = 65
         reasoning.append("Support tested and held (Rejection)")
         if last_sup_holds:
             event_details = last_sup_holds
         
     if brekout_sup_sig:
         signal = "SELL"
-        confidence = 75
+        base_confidence = 75
         reasoning.append("Support broken downwards (Breakout)")
         if last_breakout_sup:
             event_details = last_breakout_sup
     elif res_holds_sig:
         signal = "SELL"
-        confidence = 65
+        base_confidence = 65
         reasoning.append("Resistance tested and held (Rejection)")
         if last_res_holds:
             event_details = last_res_holds
+            
+    # Dynamic Confidence Calculation (Bug C Fix)
+    if signal == "HOLD":
+        confidence = 0
+    else:
+        confidence = base_confidence
+        
+        # A. Volume Ratio Confirmation
+        try:
+            current_vol = float(volumes[-1])
+            avg_vol = float(np.mean(volumes[-20:])) if len(volumes) >= 20 else float(np.mean(volumes))
+            if avg_vol > 1e-8:
+                vol_ratio = current_vol / avg_vol
+                if vol_ratio > 1.3:
+                    vol_bonus = min(12, int((vol_ratio - 1.0) * 10))
+                    confidence += vol_bonus
+                elif vol_ratio < 0.7:
+                    vol_penalty = min(10, int((1.0 - vol_ratio) * 10))
+                    confidence -= vol_penalty
+        except Exception:
+            pass
+            
+        # B. Trend Alignment (EMA20 & EMA50)
+        try:
+            closes_series = df_calc['close']
+            ema20 = float(closes_series.ewm(span=20).mean().iloc[-1])
+            ema50 = float(closes_series.ewm(span=50).mean().iloc[-1])
+            current_price = float(closes_series.iloc[-1])
+            
+            if signal == "BUY":
+                if current_price > ema20 > ema50:
+                    confidence += 10
+                elif current_price < ema20 < ema50:
+                    confidence -= 8
+            elif signal == "SELL":
+                if current_price < ema20 < ema50:
+                    confidence += 10
+                elif current_price > ema20 > ema50:
+                    confidence -= 8
+        except Exception:
+            pass
+            
+        # C. Rejection Candle Shadow Strength (Hold signals only)
+        if "tested and held" in "".join(reasoning):
+            try:
+                op = float(opens[-1])
+                cl = float(closes[-1])
+                hi = float(current_highs[-1])
+                lo = float(current_lows[-1])
+                body_size = abs(cl - op)
+                
+                if signal == "BUY":
+                    lower_wick = min(op, cl) - lo
+                    if lower_wick > body_size * 1.5:
+                        confidence += 8
+                elif signal == "SELL":
+                    upper_wick = hi - max(op, cl)
+                    if upper_wick > body_size * 1.5:
+                        confidence += 8
+            except Exception:
+                pass
+                
+        # D. S/R Level Age Alignment
+        try:
+            target_idx = res_bar_idx if signal == "SELL" else sup_bar_idx
+            if not np.isnan(target_idx):
+                age_bars = (n - 1) - int(target_idx)
+                if 5 <= age_bars <= 50:
+                    confidence += 5
+                elif age_bars > 150:
+                    confidence += 8
+        except Exception:
+            pass
+            
+        # Bound confidence
+        confidence = max(20, min(95, confidence))
         
     return {
         "signal": signal,
-        "confidence": confidence,
+        "confidence": int(confidence),
         "reasoning": " | ".join(reasoning) if reasoning else "No active breakout or hold",
         "support_zone": support_zone,
         "resistance_zone": resistance_zone,
@@ -229,7 +322,7 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
 
 def _empty_result() -> Dict[str, Any]:
     return {
-        "signal": "NEUTRAL",
+        "signal": "HOLD",
         "confidence": 0,
         "reasoning": "Not enough data",
         "support_zone": None,
@@ -241,4 +334,15 @@ def _empty_result() -> Dict[str, Any]:
         "event_bar_index": None,
         "event_time": None,
         "event_details": {"type": "None", "event_bar_index": None, "bar_index": None, "event_time": None, "time": None, "price": None}
+    }
+
+def to_voting_signal(result: dict) -> dict:
+    """
+    SR Volume natijalaridan ovoz berish moduli uchun BUY/SELL/HOLD signali chiqaradi.
+    """
+    if not result:
+        return {"signal": "HOLD", "confidence": 0}
+    return {
+        "signal": result.get("signal", "HOLD"),
+        "confidence": result.get("confidence", 0)
     }

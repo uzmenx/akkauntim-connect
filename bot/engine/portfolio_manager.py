@@ -227,11 +227,18 @@ class PatternStrategy(Strategy):
     def analyze(self, df: pd.DataFrame, context: Dict[str, Any] = None) -> Dict[str, Any]:
         result = self.bot._get_harmonic_patterns(df)
         if result:
-            sig = result.get("signal", "NEUTRAL")
-            conf = result.get("confidence", 75 if sig in ["BUY", "SELL"] else 0)
-            result["signal"] = sig
-            result["confidence"] = conf
-        return result or {"signal": "HOLD", "confidence": 0}
+            try:
+                from bot.strategy.harmonic.engine import to_voting_signal as harmonic_voting
+                sig_data = harmonic_voting(result)
+                result["signal"] = sig_data.get("signal", "HOLD")
+                result["confidence"] = sig_data.get("confidence", 0)
+            except Exception as e:
+                logger.error(f"Harmonic to_voting_signal xatosi: {e}")
+                result["signal"] = "HOLD"
+                result["confidence"] = 0
+        else:
+            result = {"signal": "HOLD", "confidence": 0}
+        return result
 
 class NewsStrategy(Strategy):
     def __init__(self, main_bot):
@@ -281,7 +288,17 @@ class SRVolumeStrategy(Strategy):
 
     def analyze(self, df: pd.DataFrame, context: Dict[str, Any] = None) -> Dict[str, Any]:
         result = self.bot._get_sr_volume_analysis(df)
-        return result or {"signal": "HOLD", "confidence": 0}
+        if result:
+            try:
+                from bot.strategy.sr_volume.engine import to_voting_signal as sr_voting
+                sig_data = sr_voting(result)
+                result["signal"] = sig_data.get("signal", "HOLD")
+                result["confidence"] = sig_data.get("confidence", 0)
+            except Exception as e:
+                logger.error(f"SR_Volume to_voting_signal xatosi: {e}")
+        else:
+            result = {"signal": "HOLD", "confidence": 0}
+        return result
 
 class AutoPatternStrategy(Strategy):
     def __init__(self, main_bot):

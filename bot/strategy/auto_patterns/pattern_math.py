@@ -12,8 +12,17 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
     Pivotlar ro'yxatidan eng oxirgi figurani aniqlaydi.
     Kamida 4 ta pivot kerak (2 ta High, 2 ta Low).
     """
+    empty_res = {
+        "pattern": "None",
+        "signal": "HOLD",
+        "confidence": 0,
+        "reasoning": "Sufficient pivots not found",
+        "slopes": {"res": 0.0, "sup": 0.0},
+        "pattern_points": {}
+    }
+
     if len(pivots) < 4:
-        return {"pattern": "None", "direction": "Neutral", "quality": 0}
+        return empty_res
 
     # Oxirgi 5 ta yoki 4 ta pivotni olamiz
     recent = pivots[-5:]
@@ -22,7 +31,7 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
     lows = [p for p in recent if p['type'] == 'Low']
     
     if len(highs) < 2 or len(lows) < 2:
-        return {"pattern": "None", "direction": "Neutral", "quality": 0}
+        return empty_res
         
     # Oxirgi 2 ta High
     h1, h2 = highs[-2], highs[-1]
@@ -31,8 +40,8 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
     
     # Resistance qiyaligi (Slope) = (y2 - y1) / (x2 - x1)
     # Normallashtirish: % o'zgarish 1 ta sham uchun * 1000
-    if h2['index'] == h1['index']: return {"pattern": "None", "direction": "Neutral", "quality": 0}
-    if l2['index'] == l1['index']: return {"pattern": "None", "direction": "Neutral", "quality": 0}
+    if h2['index'] == h1['index'] or l2['index'] == l1['index']:
+        return empty_res
 
     m_res = ((h2['price'] - h1['price']) / h1['price']) / (h2['index'] - h1['index']) * 1000
     m_sup = ((l2['price'] - l1['price']) / l1['price']) / (l2['index'] - l1['index']) * 1000
@@ -103,49 +112,37 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
     # Joriy narx h2 dan baland bo'lsa -> Breakout UP
     # Joriy narx l2 dan past bo'lsa -> Breakout DOWN
     
-    signal = "NEUTRAL"
+    signal = "HOLD"
     confidence = 0
     reasoning = ""
     
     if pattern_name != "Unknown" and pattern_name != "None":
-        # Chiziqlarning hozirgi bardagi proyeksiyasi
-        last_index = max(h2['index'], l2['index'])
-        # Aytaylik hozirgi index oxirgi pivotdan 5-10 bar uzoqlikda
-        # Biz aniq bar indexini bilmaymiz, chunki current_price berilgan.
-        # Breakout oddiygina oxirgi pivotlar orqali tekshiriladi
+        delta = (atr * 0.5) if atr else 0.0
+        is_breakout_up = current_price > h2['price'] + delta
+        is_breakout_down = current_price < l2['price'] - delta
         
-        if current_price > h2['price'] + (atr * 0.5 if atr else 0):
-            signal = "BUY"
-            # Pattern direction va breakout signalini muvofiqlashtirish:
-            # Agar pattern_dir == "Bullish" bo'lsa (masalan Descending Channel, Falling Wedge) -> aligned breakout (confidence = 85)
-            # Agar pattern_dir == "Bearish" bo'lsa (masalan Ascending Channel, Rising Wedge) -> counter-bias breakout (susaytirildi, confidence = 55)
-            # Agar pattern_dir == "Neutral" bo'lsa -> standard breakout (confidence = 75)
-            if pattern_dir == "Bullish":
-                confidence = 85
-                reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Bullish aligned Breakout Up)"
-            elif pattern_dir == "Bearish":
-                confidence = 55  # Counter-bias breakout signal: susaytirildi
-                reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Counter-bias Breakout Up - ehtiyotkorlik bilan)"
-            else:
-                confidence = 75
+        if is_breakout_up:
+            if pattern_dir == "Bullish" or pattern_dir == "Neutral":
+                signal = "BUY"
+                confidence = 80
                 reasoning = f"{pattern_name} yuqoriga yorib o'tildi (Breakout Up)"
-        elif current_price < l2['price'] - (atr * 0.5 if atr else 0):
-            signal = "SELL"
-            # Pattern direction va breakout signalini muvofiqlashtirish:
-            # Agar pattern_dir == "Bearish" bo'lsa (masalan Ascending Channel, Rising Wedge) -> aligned breakout (confidence = 85)
-            # Agar pattern_dir == "Bullish" bo'lsa (masalan Descending Channel, Falling Wedge) -> counter-bias breakout (susaytirildi, confidence = 55)
-            # Agar pattern_dir == "Neutral" bo'lsa -> standard breakout (confidence = 75)
-            if pattern_dir == "Bearish":
-                confidence = 85
-                reasoning = f"{pattern_name} pastga yorib o'tildi (Bearish aligned Breakout Down)"
-            elif pattern_dir == "Bullish":
-                confidence = 55  # Counter-bias breakout signal: susaytirildi
-                reasoning = f"{pattern_name} pastga yorib o'tildi (Counter-bias Breakout Down - ehtiyotkorlik bilan)"
-            else:
-                confidence = 75
+            else: # pattern_dir == "Bearish"
+                # Ziddiyatli holat: pattern Bearish edi, lekin tepaga yorildi.
+                signal = "HOLD"
+                confidence = 0
+                reasoning = f"{pattern_name} yuqoriga yorildi, lekin kutilgan Bearish bias bilan zid (No Trade)"
+        elif is_breakout_down:
+            if pattern_dir == "Bearish" or pattern_dir == "Neutral":
+                signal = "SELL"
+                confidence = 80
                 reasoning = f"{pattern_name} pastga yorib o'tildi (Breakout Down)"
+            else: # pattern_dir == "Bullish"
+                # Ziddiyatli holat: pattern Bullish edi, lekin pastga yorildi.
+                signal = "HOLD"
+                confidence = 0
+                reasoning = f"{pattern_name} pastga yorildi, lekin kutilgan Bullish bias bilan zid (No Trade)"
         else:
-            # Hali breakout bo'lmagan, lekin figurani o'zi yo'nalish beradi
+            # Hali breakout bo'lmagan, lekin figurani o'zi yo'nalish beradi (shakllanayotgan bias yoki yo'nalishsiz)
             if pattern_dir == "Bullish":
                 signal = "BUY"
                 confidence = 60
@@ -154,10 +151,10 @@ def identify_pattern(pivots: List[Dict[str, Any]], current_price: float, atr: fl
                 signal = "SELL"
                 confidence = 60
                 reasoning = f"{pattern_name} shakllanmoqda (Bearish bias)"
-            else:
+            else: # Neutral
                 signal = "HOLD"
                 confidence = 40
-                reasoning = f"{pattern_name} - yo'nalish kutilyapti"
+                reasoning = f"{pattern_name} - shakllanmoqda (Yo'nalishsiz)"
                 
     return {
         "pattern": pattern_name,
