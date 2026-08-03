@@ -1,0 +1,33 @@
+# AI Trading Bot — Python Dependencies
+# Install: pip install -r bot_requirements.txt
+
+# MetaTrader 5
+MetaTrader5>=5.0.45
+
+# AI
+anthropic>=0.39.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# HTTP
+requests>=2.31.0
+
+# Date parsing (news_detector)
+python-dateutil>=2.8.2
+
+# Vector DB
+chromadb>=0.4.0
+
+# PDF Parsing
+pypdf>=3.0.0
+
+# Deep Learning / AI Models
+torch>=2.0.0
+scikit-learn>=1.2.0
+gymnasium>=0.29.0
+stable-baselines3>=2.2.1

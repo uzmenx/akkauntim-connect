@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Open Sea</title>
+    <style>
+        @import url('https://cdn.jsdelivr.net/npm/@fontsource/geist-sans@5.0.1/400.css');
+        @import url('https://cdn.jsdelivr.net/npm/@fontsource/geist-sans@5.0.1/500.css');
+        @import url('https://cdn.jsdelivr.net/npm/@fontsource/geist-mono@5.0.1/400.css');
+
+        :root {
+            --accent: #8fe9e4;
+            --bg: #05070a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            background-color: var(--bg);
+            color: white;
+            font-family: 'Geist Sans', sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+
+        #vignette {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at 50% 40%, transparent 40%, rgba(5,7,10,0.6) 90%, rgba(5,7,10,0.9) 100%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        #loader, #error {
+            position: fixed;
+            inset: 0;
+            background-color: var(--bg);
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.9s ease;
+        }
+        
+        .eyebrow {
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: rgba(255,255,255,0.7);
+            text-transform: uppercase;
+        }
+
+        #loader h1, #error h1 {
+            font-size: 21px;
+            font-weight: 500;
+            letter-spacing: 0.15em;
+            margin: 12px 0 24px;
+        }
+        
+        #error h1 { color: #ff6b6b; }
+
+        .track {
+            width: 168px;
+            height: 2px;
+            background: rgba(255,255,255,0.1);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .streak {
+            position: absolute;
+            top: 0; left: -100%;
+            width: 50%; height: 100%;
+            background: var(--accent);
+            animation: load 1.5s infinite ease-in-out;
+        }
+
+        @keyframes load {
+            0% { left: -50%; }
+            100% { left: 100%; }
+        }
+
+        .status {
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            color: rgba(255,255,255,0.5);
+        }
+
+        #ui {
+            position: fixed;
+            top: 24px; left: 24px;
+            padding: 6px;
+            border-radius: 26px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            z-index: 10;
+            opacity: 0;
+            transform: translateY(14px);
+            transition: opacity 1s ease, transform 1s ease;
+            pointer-events: auto;
+        }
+        
+        #ui.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .panel-core {
+            width: 300px;
+            padding: 22px;
+            border-radius: 20px;
+            background: rgba(8, 11, 16, 0.55);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
+            backdrop-filter: blur(24px) saturate(140%);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+        
+        .title {
+            font-size: 21px;
+            font-weight: 500;
+            margin: 8px 0 4px;
+            letter-spacing: 0.05em;
+        }
+        
+        .subtitle {
+            font-family: 'Geist Mono', monospace;
+            font-size: 9px;
+            color: rgba(255,255,255,0.5);
+            margin-bottom: 24px;
+        }
+
+        .control-group {
+            margin-bottom: 16px;
+        }
+        
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+        
+        .val { color: var(--accent); }
+
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        
+        input[type=range]:focus { outline: none; }
+        
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 1.5px;
+        }
+        
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 12px;
+            width: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            margin-top: -4.5px;
+            box-shadow: 0 0 10px rgba(143, 233, 228, 0.5);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.25); }
+
+        input[type=range]::-moz-range-track {
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 1.5px;
+        }
+        
+        input[type=range]::-moz-range-thumb {
+            height: 12px;
+            width: 12px;
+            border: none;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 10px rgba(143, 233, 228, 0.5);
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        
+        input[type=range]::-moz-range-thumb:hover { transform: scale(1.25); }
+
+        .bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 24px;
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+        }
+
+        #btn-drift {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: rgba(255,255,255,0.5);
+            padding: 6px 14px;
+            border-radius: 14px;
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        #btn-drift.active {
+            background: rgba(143, 233, 228, 0.15);
+            border-color: var(--accent);
+            color: #d8fbf9;
+        }
+        
+        #btn-drift:active { transform: scale(0.95); }
+
+        #hint {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Geist Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 0.2em;
+            color: rgba(255,255,255,0.3);
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            #ui {
+                top: 14px; left: 14px; right: 14px;
+                padding: 4px;
+            }
+            .panel-core { width: 100%; }
+            #hint { display: none; }
+        }
+    </style>
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.webgpu.js",
+            "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.webgpu.js",
+            "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.tsl.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.178.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <div id="loader">
+        <div class="eyebrow">WebGPU &middot; Three.js &middot; TSL</div>
+        <h1>OPEN SEA</h1>
+        <div class="track"><div class="streak"></div></div>
+        <div class="status">INITIALIZING RENDERER&hellip;</div>
+    </div>
+    
+    <div id="error" style="display: none;">
+        <div class="eyebrow">WebGPU &middot; Three.js &middot; TSL</div>
+        <h1 id="error-title">WEBGPU UNAVAILABLE</h1>
+        <div class="status" id="error-msg" style="text-align: center; max-width: 80%; line-height: 1.5;">
+            Please use Chrome or Edge with WebGPU support.
+        </div>
+    </div>
+
+    <div id="vignette"></div>
+
+    <div id="ui" style="display: none;">
+        <div class="panel-core">
+            <div class="eyebrow">REALTIME OCEAN</div>
+            <div class="title">OPEN SEA</div>
+            <div class="subtitle" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Gerstner swell &middot; FBM micro-surface &middot; spectral sky</div>
+            
+            <div class="control-group">
+                <div class="control-header">
+                    <span>SEA STATE</span>
+                    <span id="val-sea" class="val">45</span>
+                </div>
+                <input type="range" id="inp-sea" min="0" max="100" value="45" aria-label="Sea State">
+            </div>
+
+            <div class="control-group">
+                <div class="control-header">
+                    <span>TIME OF DAY</span>
+                    <span id="val-time" class="val">AFTERNOON</span>
+                </div>
+                <input type="range" id="inp-time" min="0" max="100" value="55" aria-label="Time of Day">
+            </div>
+
+            <div class="bottom-row">
+                <button id="btn-drift" class="active">DRIFT</button>
+                <div id="val-fps">60 FPS</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="hint" style="display: none;">DRAG TO ORBIT &mdash; SCROLL TO ZOOM</div>
+
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

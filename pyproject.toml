@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "yuksalish-bot"
+version = "1.0.0"
+description = "Akkauntim Connect — AI Forex Trading Bot"
+requires-python = ">=3.10"
+dependencies = [
+    "MetaTrader5>=5.0.45",
+    "anthropic>=0.39.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+    "python-dateutil>=2.8.2",
+]
+
+[project.scripts]
+yuksalish = "bot.main:run_cli"
+yuksal = "bot.main:run_cli"
+
+[tool.setuptools]
+packages = ["bot", "bot.core", "bot.engine", "bot.execution", "bot.strategy",
+            "bot.strategy.auto_patterns", "bot.strategy.harmonic",
+            "bot.strategy.kill_zones", "bot.strategy.news", "bot.strategy.smc",
+            "bot.strategy.sr_volume", "bot.strategy.wyckoff", "bot.sync"]
+include-package-data = true

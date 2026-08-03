@@ -1,0 +1,36 @@
+# Python bytecode & cache
+__pycache__/
+*.pyc
+
+# Node & dependencies
+node_modules/
+.venv/
+
+# Environment secrets
+.env
+
+# Databases & journals
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Model weights, datasets & binaries
+*.pth
+*.zip
+*.joblib
+*.pkl
+models/
+chroma_db/
+bot/learning/test_chroma_db/
+yuksalish_bot.egg-info/
+
+# Build outputs
+dist/
+
+# Runtime generated files
+public/*.json
+news_cache.json
+bot/news_cache.json

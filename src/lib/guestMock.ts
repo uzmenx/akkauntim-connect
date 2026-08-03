@@ -1,0 +1,385 @@
+import type { BotSettings, BotStatus, Position, AISignal, TradeHistory, PendingOrder } from "./types";
+
+const MOCK_STATUS_KEY = "guest_bot_status";
+const MOCK_POSITIONS_KEY = "guest_positions_v2";
+const MOCK_HISTORY_KEY = "guest_history";
+const MOCK_SIGNALS_KEY = "guest_signals";
+const MOCK_PENDING_KEY = "guest_pending_orders";
+const MOCK_SETTINGS_KEY = "guest_bot_settings";
+
+const DEFAULT_ASSET_CATEGORIES: Record<string, string[]> = {
+  Forex: ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY", "EURCHF", "EURAUD"],
+  Crypto: ["BTCUSD", "ETHUSD", "XRPUSD", "SOLUSD", "ADAUSD", "DOGEUSD", "BNBUSD", "LTCUSD", "LINKUSD"],
+  Indices: ["US30", "SPX500", "NAS100", "GER40", "UK100", "JPN225"],
+  Metals: ["XAUUSD", "XAGUSD"],
+  Stock: ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "NVDA"],
+};
+
+const defaultStatus = (): BotStatus => ({
+  id: "guest-status",
+  user_id: "guest",
+  is_running: true,
+  last_heartbeat: new Date().toISOString(),
+  account_balance: 52002.50,
+  account_equity: 52850.20,
+  account_currency: "USD",
+  broker: "MetaQuotes Software Corp.",
+  message: "Panel running in Demo Mode",
+  claude_limit: 20.0,
+  claude_used: 4.5,
+  available_symbols: DEFAULT_ASSET_CATEGORIES,
+  market_sentiment: 65,
+  updated_at: new Date().toISOString(),
+});
+
+const defaultPositions = (): Position[] => {
+  const symbols = ["EURUSD", "XAUUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURJPY", "GBPJPY"];
+  return Array.from({ length: 20 }).map((_, i) => {
+    const isBuy = i % 2 === 0;
+    const symbol = symbols[i % symbols.length];
+    const openPrice = symbol.includes("JPY") ? 150.0 + i : (symbol.includes("XAU") ? 2300.0 + i : 1.0500 + i * 0.01);
+    const hasAi = Math.random() > 0.5;
+    const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+    const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+    const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
+    return {
+      id: `mock-pos-${i + 1}`,
+      ticket: 10000000 + i,
+      symbol,
+      side: isBuy ? "BUY" : "SELL",
+      volume: Number((Math.random() * 2 + 0.1).toFixed(2)),
+      open_price: openPrice,
+      current_price: openPrice + (isBuy ? 0.0050 : -0.0050),
+      stop_loss: openPrice - 0.0200,
+      take_profit: openPrice + 0.0400,
+      profit: Number(((isBuy ? 1 : -1) * (Math.random() * 200 - 50)).toFixed(2)),
+      opened_at: new Date(Date.now() - ((i + 1) * 3600000)).toISOString(),
+      agreed_strategies: agreedStrategies,
+      ai_used: hasAi,
+    };
+  });
+};
+
+const defaultHistory = (): TradeHistory[] => {
+  const symbols = ["GBPUSD", "XAUUSD", "EURUSD", "USDJPY", "AUDUSD", "USDCAD"];
+  const list: TradeHistory[] = [];
+  let currentBalance = 15000; // Simulating growth starting from $15,000
+  
+  for (let i = 1; i <= 25; i++) {
+    const isWin = i % 5 !== 0; // 80% Win Rate (20 wins, 5 losses)
+    const symbol = symbols[i % symbols.length];
+    const isBuy = i % 2 === 0;
+    
+    // Compounding growth: profits scale up as simulated history progresses
+    const rate = isWin ? (0.04 + (i * 0.003)) : -(0.015 + (i * 0.001));
+    const profit = Number((currentBalance * rate).toFixed(2));
+    currentBalance = Number((currentBalance + profit).toFixed(2));
+    
+    const hasAi = Math.random() > 0.4;
+    const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+    const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+    const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
+    list.unshift({
+      id: `mock-hist-${i}`,
+      ticket: 11110000 + i,
+      symbol,
+      side: isBuy ? "BUY" : "SELL",
+      volume: Number((0.5 + (i * 0.15)).toFixed(2)),
+      open_price: symbol.includes("JPY") ? 150.0 : (symbol.includes("XAU") ? 2300.0 : 1.0500),
+      close_price: symbol.includes("JPY") ? 151.2 : (symbol.includes("XAU") ? 2318.0 : 1.0620),
+      profit,
+      opened_at: new Date(Date.now() - 3600000 * (26 - i) * 3 - 3600000).toISOString(),
+      closed_at: new Date(Date.now() - 3600000 * (26 - i) * 3).toISOString(),
+      agreed_strategies: agreedStrategies,
+      ai_used: hasAi,
+    });
+  }
+  return list;
+};
+
+const defaultSignals = (): AISignal[] => [
+  {
+    id: "mock-sig-1",
+    symbol: "EURUSD",
+    signal: "BUY",
+    confidence: 85,
+    reasoning: "🤖 AI Tahlil: SMC bo'yicha kuchli 'Bullish Order Block' H4 taymfreymda aniqlandi. M15 taymfreymda narx 'Change of Character' (CHoCH) qilib yuqoriga harakatni tasdiqladi. \n\n📊 Garmonik: H1 da 'Bullish Bat' pattern xarid zonasida shakllandi. \n\n📰 Fundamental: Yevro hududidagi inflyatsiya ko'rsatkichlari kutilganidan yaxshi chiqdi, bu esa EUR ni quvvatlab kelgusi 4 soatda ko'tarilish ehtimolini 85% ga oshiradi.",
+    entry_price: 1.08500,
+    sl_price: 1.08200,
+    tp_price: 1.09100,
+    rr_ratio: 2.0,
+    stop_loss_pips: 30,
+    take_profit_pips: 60,
+    executed: true,
+    rejection_reason: null,
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: "mock-sig-2",
+    symbol: "XAUUSD",
+    signal: "SELL",
+    confidence: 72,
+    reasoning: "🤖 AI Tahlil: Narx kuchli kundalik qarshilik zonasiga (Resistance) yetib keldi. M5 va M15 tuzilmalarida narx yuqori nuqtalarni yangilay olmay, 'Bearish Divergence' (Bozor kuchsizlanishi) hosil qildi.\n\n📊 Katta xajmdagi 'Liquidity Grab' (Likvidlik yig'ish) jarayoni yakunlandi. Bozor yirik ishtirokchilari endi pastga qarab bosim o'tkazishi kutilmoqda. SL va TP oraliq rasio 1:3 qilib belgilandi.",
+    entry_price: 2350.50,
+    sl_price: 2355.50,
+    tp_price: 2335.50,
+    rr_ratio: 3.0,
+    stop_loss_pips: 50,
+    take_profit_pips: 150,
+    executed: true,
+    rejection_reason: null,
+    created_at: new Date(Date.now() - 10800000).toISOString(),
+  },
+  {
+    id: "mock-sig-3",
+    symbol: "GBPUSD",
+    signal: "BUY",
+    confidence: 92,
+    reasoning: "🤖 AI Tahlil: Ajoyib kirish nuqtasi! Narx pastki diapazonda to'plangan barcha likvidlikni tozalab ('Sweep'), kuchli impuls bilan yuqoriga qaytdi. \n\n✅ 3 ta tasdiq: 1. SMC 'Demand Zone' ga tegib qaytish; 2. RSI da o'ta sotilganlik holatidan chiqish; 3. Buyuk Britaniya moliya siyosati hisoboti kutilayotgani tufayli xaridorlar faolligi keskin oshmoqda.",
+    entry_price: 1.25000,
+    sl_price: 1.24750,
+    tp_price: 1.25750,
+    rr_ratio: 3.0,
+    stop_loss_pips: 25,
+    take_profit_pips: 75,
+    executed: false,
+    rejection_reason: "Risk limit exceeded (Drawdown protection active)",
+    created_at: new Date(Date.now() - 25000000).toISOString(),
+  }
+];
+
+const defaultPending = (): PendingOrder[] => [
+  {
+    id: "mock-pend-1",
+    ticket: 88881111,
+    symbol: "EURUSD",
+    type: "buy_limit",
+    volume: 0.1,
+    price: 1.0800,
+    stop_loss: 1.0750,
+    take_profit: 1.0900,
+    created_at: new Date(Date.now() - 3600000).toISOString(),
+  },
+  {
+    id: "mock-pend-2",
+    ticket: 88882222,
+    symbol: "XAUUSD",
+    type: "sell_limit",
+    volume: 0.05,
+    price: 2350.00,
+    stop_loss: 2360.00,
+    take_profit: 2320.00,
+    created_at: new Date(Date.now() - 10800000).toISOString(),
+  }
+];
+
+const defaultSettings = (): BotSettings => ({
+  id: "guest-settings",
+  user_id: "guest",
+  symbols: ["EURUSD", "GBPUSD", "XAUUSD"],
+  risk_per_trade: 0.02,
+  max_daily_loss: 0.10,
+  min_confidence: 50,
+  max_lot_size: 5.0,
+  timeframe_major: "H1",
+  timeframe_minor: "M5",
+  ai_model: "auto",
+  ai_enabled: true,
+  news_breakout_grid_enabled: false,
+  prompt_identity: "Sen professional Forex treyderi va fundamental tahlilchisisan.",
+  prompt_strategy: "SMC, Garmonik patternlar va Iqtisodiy yangiliklarni birlashtirib eng yaxshi nuqtadan savdoga kirish qarorini qabul qilgin.",
+  prompt_output: 'JAVOBNI FAQAT quyidagi JSON formatida qaytar, boshqa hech qanday izoh yoki tushuntirish yozma. Format: {"signal": "BUY" | "SELL" | "HOLD", "confidence": 0-100, "reasoning": "...", "stop_loss_pips": 20, "take_profit_pips": 40}',
+  risk_level_single_confirmation: 0.01,
+  risk_level_multiple_confirmation: 0.02,
+  strategy_weight_smc: 60,
+  strategy_weight_pattern: 60,
+  strategy_weight_news: 60,
+  strategy_weight_wyckoff: 50,
+  strategy_weight_sr_volume: 50,
+  strategy_weight_auto_pattern: 50,
+  updated_at: new Date().toISOString(),
+});
+
+export const guestMock = {
+  getBotStatus: (): BotStatus => {
+    const item = localStorage.getItem(MOCK_STATUS_KEY);
+    let val;
+    if (!item) {
+      val = defaultStatus();
+    } else {
+      val = JSON.parse(item);
+    }
+    // Simulate minor live equity fluctuations between trade closures
+    const tick = (Math.random() - 0.5) * 15.5; 
+    val.account_equity = Number((val.account_equity + tick).toFixed(2));
+    localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(val));
+    return val;
+  },
+  saveBotStatus: (status: Partial<BotStatus>) => {
+    const curr = guestMock.getBotStatus();
+    const updated = { ...curr, ...status, updated_at: new Date().toISOString() };
+    localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(updated));
+    return updated;
+  },
+
+  getPositions: (): Position[] => {
+    const item = localStorage.getItem(MOCK_POSITIONS_KEY);
+    let val: Position[];
+    if (!item) {
+      val = defaultPositions();
+    } else {
+      val = JSON.parse(item);
+    }
+
+    // Simulate real-time position price ticks
+    val = val.map((p: Position) => {
+      const isJPY = p.symbol.includes("JPY");
+      const tickSize = isJPY ? 0.01 : 0.0001;
+      const move = (Math.random() - 0.5) * tickSize * 10;
+      p.current_price = Number(((p.current_price ?? p.open_price ?? 0) + move).toFixed(5));
+      const profitChange = (Math.random() - 0.5) * 10;
+      p.profit = Number(((p.profit ?? 0) + profitChange).toFixed(2));
+      return p;
+    });
+
+    // 15% chance to close a position and execute a compound interest trade
+    if (Math.random() < 0.15 && val.length > 0) {
+      const indexToClose = val.findIndex(p => (p.profit ?? 0) > 0) !== -1 
+        ? val.findIndex(p => (p.profit ?? 0) > 0) 
+        : 0;
+      
+      const closedPos = val[indexToClose];
+      
+      // Get current bot status to update balance
+      const statusItem = localStorage.getItem(MOCK_STATUS_KEY);
+      if (statusItem) {
+        const botStatus = JSON.parse(statusItem);
+        
+        // Compound profit: 2% to 6% of current balance (making it larger as balance grows)
+        const compoundFactor = 0.02 + Math.random() * 0.04;
+        const profit = Number((botStatus.account_balance * compoundFactor).toFixed(2));
+        
+        botStatus.account_balance = Number((botStatus.account_balance + profit).toFixed(2));
+        botStatus.account_equity = Number((botStatus.account_balance + 850).toFixed(2)); 
+        localStorage.setItem(MOCK_STATUS_KEY, JSON.stringify(botStatus));
+
+        // Add to history
+        const histItem = localStorage.getItem(MOCK_HISTORY_KEY);
+        const historyList = histItem ? JSON.parse(histItem) : [];
+        const hasAi = Math.random() > 0.4;
+        const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+        const shuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+        const agreedStrategies = shuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
+        const newHist: TradeHistory = {
+          id: `mock-hist-${Date.now()}`,
+          ticket: closedPos.ticket,
+          symbol: closedPos.symbol,
+          side: closedPos.side,
+          volume: closedPos.volume,
+          open_price: closedPos.open_price,
+          close_price: closedPos.current_price ?? closedPos.open_price,
+          profit: profit, 
+          opened_at: closedPos.opened_at,
+          closed_at: new Date().toISOString(),
+          agreed_strategies: closedPos.agreed_strategies || agreedStrategies,
+          ai_used: closedPos.ai_used !== undefined ? closedPos.ai_used : hasAi,
+        };
+        historyList.unshift(newHist);
+        localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(historyList.slice(0, 50)));
+      }
+
+      // Remove closed position
+      val.splice(indexToClose, 1);
+      
+      // Spawn new position to keep it active
+      const symbols = ["EURUSD", "XAUUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"];
+      const newSym = symbols[Math.floor(Math.random() * symbols.length)];
+      const openPrice = newSym.includes("JPY") ? 150.0 : (newSym.includes("XAU") ? 2300.0 : 1.0500);
+      
+      const newHasAi = Math.random() > 0.5;
+      const allStrategies = ["SMC", "Harmonic", "Wyckoff", "SR Volume", "Auto Pattern", "Kill Zones", "News"];
+      const newShuffled = [...allStrategies].sort(() => 0.5 - Math.random());
+      const newAgreedStrategies = newShuffled.slice(0, Math.floor(Math.random() * 3) + 1);
+
+      val.push({
+        id: `mock-pos-${Date.now()}`,
+        ticket: 10000000 + Math.floor(Math.random() * 900000),
+        symbol: newSym,
+        side: Math.random() > 0.5 ? "BUY" : "SELL",
+        volume: Number((Math.random() * 1.5 + 0.1).toFixed(2)),
+        open_price: openPrice,
+        current_price: openPrice,
+        stop_loss: openPrice - 0.02,
+        take_profit: openPrice + 0.04,
+        profit: Number(((Math.random() - 0.4) * 20).toFixed(2)),
+        opened_at: new Date().toISOString(),
+        agreed_strategies: newAgreedStrategies,
+        ai_used: newHasAi,
+      });
+    }
+
+    localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(val));
+    return val;
+  },
+  savePositions: (positions: Position[]) => {
+    localStorage.setItem(MOCK_POSITIONS_KEY, JSON.stringify(positions));
+  },
+
+  getHistory: (): TradeHistory[] => {
+    const item = localStorage.getItem(MOCK_HISTORY_KEY);
+    if (!item || JSON.parse(item).length < 25) {
+      const val = defaultHistory();
+      localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(val));
+      return val;
+    }
+    return JSON.parse(item);
+  },
+  saveHistory: (history: TradeHistory[]) => {
+    localStorage.setItem(MOCK_HISTORY_KEY, JSON.stringify(history));
+  },
+
+  getSignals: (): AISignal[] => {
+    const item = localStorage.getItem(MOCK_SIGNALS_KEY);
+    if (!item) {
+      const val = defaultSignals();
+      localStorage.setItem(MOCK_SIGNALS_KEY, JSON.stringify(val));
+      return val;
+    }
+    return JSON.parse(item);
+  },
+  saveSignals: (signals: AISignal[]) => {
+    localStorage.setItem(MOCK_SIGNALS_KEY, JSON.stringify(signals));
+  },
+
+  getPendingOrders: (): PendingOrder[] => {
+    const item = localStorage.getItem(MOCK_PENDING_KEY);
+    if (!item) {
+      const val = defaultPending();
+      localStorage.setItem(MOCK_PENDING_KEY, JSON.stringify(val));
+      return val;
+    }
+    return JSON.parse(item);
+  },
+  savePendingOrders: (orders: PendingOrder[]) => {
+    localStorage.setItem(MOCK_PENDING_KEY, JSON.stringify(orders));
+  },
+
+  getSettings: (): BotSettings => {
+    const item = localStorage.getItem(MOCK_SETTINGS_KEY);
+    if (!item) {
+      const val = defaultSettings();
+      localStorage.setItem(MOCK_SETTINGS_KEY, JSON.stringify(val));
+      return val;
+    }
+    return JSON.parse(item);
+  },
+  saveSettings: (settings: Partial<BotSettings>) => {
+    const curr = guestMock.getSettings();
+    const updated = { ...curr, ...settings, updated_at: new Date().toISOString() };
+    localStorage.setItem(MOCK_SETTINGS_KEY, JSON.stringify(updated));
+    return updated;
+  },
+};

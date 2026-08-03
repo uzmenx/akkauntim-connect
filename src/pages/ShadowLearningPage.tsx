@@ -1,0 +1,1145 @@
+import { useState, useRef, useEffect, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Brain, UploadCloud, BookOpen, Activity, Target, ShieldAlert, Loader2, Sparkles, CheckCircle2, Lightbulb, BarChart3, Zap } from "lucide-react";
+import { cn, timeAgo } from "@/lib/utils";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Icon } from "@iconify/react";
+import { AnalyticsView } from "@/components/AnalyticsView";
+
+type StrategyInsight = {
+  id: string;
+  insight_text: string;
+  market_condition: string;
+  setup_type: string;
+  success_count: number;
+  fail_count: number;
+  created_at: string;
+};
+
+type PendingBook = {
+  id: string;
+  file_name: string;
+  status: string;
+  created_at: string;
+};
+
+type AILesson = {
+  id: string;
+  lesson_text: string;
+  category: string;
+  importance: number;
+  source: string;
+  success_applications: number;
+  failed_applications: number;
+  created_at: string;
+};
+
+type StrategyPerf = {
+  id: string;
+  strategy_name: string;
+  wins: number;
+  losses: number;
+  total_profit: number;
+  avg_rr: number;
+  recommended_weight: number;
+  updated_at: string;
+};
+
+type BlackBoxStats = {
+  mechanism?: string;
+  gap?: string;
+  style?: string;
+  trade_count: number;
+  loss_count: number;
+  total_profit: number;
+};
+
+type BlackBoxData = {
+  close_mechanism: BlackBoxStats[];
+  news_coverage_gap: BlackBoxStats[];
+  news_strategy_style?: BlackBoxStats[];
+  rl_agent_progress?: {
+    episodes_played: number;
+    win_rate_simulation: number;
+    avg_reward: number;
+    growth: number;
+  };
+  updated_at: string;
+};
+
+type PortfolioState = {
+  sentiment_score: number;
+  strategies: { name: string; weight: number }[];
+};
+
+type ShadowStats = {
+  total_shadow_trades: number;
+  dataset_size: number;
+  overall_win_rate: number;
+  knowledge_points: number;
+};
+
+export function ShadowLearningPage() {
+  const [activeTab, setActiveTab] = useState<'overview' | 'memory' | 'blackbox'>('overview');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient();
+
+  const insights = useQuery({
+    queryKey: ["strategy_insights"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("strategy_insights")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("Error fetching insights:", error);
+        return [];
+      }
+      return data as StrategyInsight[];
+    },
+    refetchInterval: 10000,
+  });
+
+  const books = useQuery({
+    queryKey: ["pending_books"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("pending_books")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      if (error) return [];
+      return data as PendingBook[];
+    },
+    refetchInterval: 10000,
+  });
+
+  const isLearning = books.data?.some(book => !book.status.startsWith('done')) || false;
+
+  // AI Memory (saboqlar)
+  const lessons = useQuery({
+    queryKey: ["ai_memory"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ai_memory")
+        .select("*")
+        .order("importance", { ascending: false })
+        .limit(10);
+      if (error) return [];
+      return data as AILesson[];
+    },
+    refetchInterval: 15000,
+  });
+
+  // Strategiya samaradorligi
+  const stratPerf = useQuery({
+    queryKey: ["strategy_performance"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("strategy_performance")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(7);
+      if (error) return [];
+      return data as StrategyPerf[];
+    },
+    refetchInterval: 15000,
+  });
+
+  // Trade History (o'rganish egri chizig'i uchun)
+  const tradeHistory = useQuery({
+    queryKey: ["trade_history_learning"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trade_history")
+        .select("ticket, symbol, profit, closed_at")
+        .order("closed_at", { ascending: true });
+      if (error) return [];
+      return data || [];
+    },
+    refetchInterval: 30000,
+  });
+
+  // Black Box Data (Local JSON)
+  const blackbox = useQuery({
+    queryKey: ["blackbox_data"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/blackbox.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as BlackBoxData;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 15000,
+  });
+
+  // Python Model Network State
+  const netState = useQuery({
+    queryKey: ["network_state"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/network_state.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return await res.json();
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 3000,
+  });
+
+  // Portfolio State (Dynamic Weights & Sentiment)
+  const portfolioState = useQuery({
+    queryKey: ["portfolio_state"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/portfolio_state.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as PortfolioState;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 3000,
+  });
+
+  // Shadow Stats (Data Pipeline)
+  const shadowStats = useQuery({
+    queryKey: ["shadow_stats"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/shadow_stats.json?" + new Date().getTime());
+        if (!res.ok) return null;
+        return (await res.json()) as ShadowStats;
+      } catch {
+        return null;
+      }
+    },
+    refetchInterval: 5000,
+  });
+
+  // Learning metrics hisoblash
+  const learningData = useMemo(() => {
+    const trades = tradeHistory.data;
+    if (!trades || trades.length < 2) return null;
+
+    const batchSize = Math.max(5, Math.floor(trades.length / 12));
+    const batches: { tradeNum: number; winRate: number }[] = [];
+    
+    for (let i = 0; i < trades.length; i += batchSize) {
+      const batch = trades.slice(i, i + batchSize);
+      const wins = batch.filter((t: any) => t.profit > 0).length;
+      batches.push({
+        tradeNum: i + batch.length,
+        winRate: Math.round((wins / batch.length) * 100),
+      });
+    }
+
+    const firstWR = batches[0]?.winRate || 0;
+    const lastWR = batches[batches.length - 1]?.winRate || 0;
+    const improvement = lastWR - firstWR;
+    const totalWins = trades.filter((t: any) => t.profit > 0).length;
+    const overallWR = Math.round((totalWins / trades.length) * 100);
+
+    return { batches, totalTrades: trades.length, firstWR, lastWR, improvement, overallWR };
+  }, [tradeHistory.data]);
+
+  // Neural Network nodes/edges hisoblash
+  const networkData = useMemo(() => {
+    const insightCount = insights.data?.length || 0;
+    const lessonCount = lessons.data?.length || 0;
+    const knowledge = insightCount + lessonCount;
+    
+    const nodes: { x: number; y: number; layer: number; active: number }[] = [];
+    const edges: { from: number; to: number; strength: number }[] = [];
+    
+    // Haqiqiy Python modelidan ma'lumot
+    const realNet = netState.data;
+    if (realNet && realNet.status === 'active') {
+       let lstm = realNet.lstm_nodes || [];
+       let hidden = realNet.hidden_nodes || [];
+       const out = realNet.output_probabilities || [];
+       
+       // Haqiqiy real-time o'sish dinamikasi (Dataset va Bilimlar soniga qarab tugunlar ko'payadi)
+       // Har 10 ta yangi ma'lumot bitta yangi tugunni "uyg'otadi"
+       const dataSize = shadowStats.data?.dataset_size || 0;
+       const dynamicLstmCount = Math.min(lstm.length, Math.max(3, 3 + Math.floor(dataSize / 10) + Math.floor(knowledge / 2)));
+       const dynamicHiddenCount = Math.min(hidden.length, Math.max(3, 2 + Math.floor(dataSize / 15) + Math.floor(knowledge / 3)));
+       
+       lstm = lstm.slice(0, dynamicLstmCount);
+       hidden = hidden.slice(0, dynamicHiddenCount);
+       
+       const layers = [Math.min(6, 3 + Math.floor(dataSize / 20)), lstm.length, hidden.length, 3];
+       const acts = [
+           Array(layers[0]).fill(0.6), 
+           lstm, 
+           hidden, 
+           out
+       ];
+       
+       const svgW = 320;
+       const svgH = 240;
+       const layerSpacing = svgW / (layers.length + 1);
+
+       layers.forEach((count, li) => {
+           const x = layerSpacing * (li + 1);
+           const spacing = svgH / (count + 1);
+           const layerActs = acts[li];
+           for (let ni = 0; ni < count; ni++) {
+               // Limit the maximum activation value so the nodes don't grow huge
+               const val = (layerActs[ni] !== undefined) ? Math.min(1.5, Math.abs(layerActs[ni])) : 0.2;
+               nodes.push({ x, y: spacing * (ni + 1), layer: li, active: val });
+           }
+       });
+
+       let nodeIdx = 0;
+       for (let li = 0; li < layers.length - 1; li++) {
+           const nextStart = nodeIdx + layers[li];
+           for (let a = nodeIdx; a < nextStart; a++) {
+               for (let b = nextStart; b < nextStart + layers[li + 1]; b++) {
+                   const aAct = nodes[a].active;
+                   const bAct = nodes[b].active;
+                   // Faqat faol ulanishlarni ko'rsatamiz va bog'liqliklar ham datasetga qarab zichlashadi
+                   const connectionThreshold = Math.max(0.05, 0.2 - (knowledge * 0.005));
+                   if (aAct > connectionThreshold || bAct > connectionThreshold) {
+                       const strength = Math.min(1, (aAct + bAct));
+                       edges.push({ from: a, to: b, strength: strength });
+                   }
+               }
+           }
+           nodeIdx = nextStart;
+       }
+       return { nodes, edges, layers, knowledge, isReal: true, pred: out };
+    }
+
+    // Default dummy logic (agar python model ulanmagan yoki o'qitilmagan bo'lsa)
+    const layers = [
+      Math.min(6, 3 + Math.floor(knowledge / 10)),    // Input
+      Math.min(10, 3 + Math.floor(knowledge / 5)),     // Hidden 1
+      Math.min(8, 2 + Math.floor(knowledge / 7)),      // Hidden 2
+      3                                                 // Output
+    ];
+
+    const svgW = 320;
+    const svgH = 240;
+    const layerSpacing = svgW / (layers.length + 1);
+
+    layers.forEach((count, li) => {
+      const x = layerSpacing * (li + 1);
+      const spacing = svgH / (count + 1);
+      for (let ni = 0; ni < count; ni++) {
+        nodes.push({ x, y: spacing * (ni + 1), layer: li, active: 0.5 });
+      }
+    });
+
+    let nodeIdx = 0;
+    for (let li = 0; li < layers.length - 1; li++) {
+      const nextStart = nodeIdx + layers[li];
+      for (let a = nodeIdx; a < nextStart; a++) {
+        for (let b = nextStart; b < nextStart + layers[li + 1]; b++) {
+          const seed = (a * 31 + b * 17 + li * 7) % 100;
+          const showProb = Math.min(1, 0.3 + knowledge * 0.03);
+          if (seed / 100 < showProb) {
+            edges.push({ from: a, to: b, strength: Math.min(1, 0.2 + knowledge * 0.04) });
+          }
+        }
+      }
+      nodeIdx = nextStart;
+    }
+
+    return { nodes, edges, layers, knowledge, isReal: false };
+  }, [insights.data, lessons.data, netState.data]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    setUploadProgress(10);
+    
+    try {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Upload to Storage
+      const { error: uploadError } = await supabase.storage
+        .from("shadow_knowledge")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadError) throw uploadError;
+      setUploadProgress(70);
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from("shadow_knowledge")
+        .getPublicUrl(filePath);
+
+      // Insert into pending_books
+      const { error: dbError } = await supabase.from("pending_books").insert({
+        file_name: file.name,
+        file_url: publicUrl,
+        status: "pending"
+      });
+
+      if (dbError) throw dbError;
+      setUploadProgress(100);
+      
+      qc.invalidateQueries({ queryKey: ["pending_books"] });
+
+    } catch (error: any) {
+      console.error("Upload error:", error.message);
+      alert("Yuklashda xatolik yuz berdi: " + error.message);
+    } finally {
+      setTimeout(() => {
+        setUploading(false);
+        setUploadProgress(0);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }, 1000);
+    }
+  };
+
+  return (
+    <div className="flex flex-col min-h-full w-full font-sans bg-[#0a0f1c] pb-20 relative">
+      {/* Dynamic Background */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-600/10 rounded-full blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px]" />
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20" />
+      </div>
+
+      <div className="w-full h-full mx-auto px-2 pt-2 relative z-10 flex flex-col gap-2">
+        <input 
+          type="file" 
+          accept=".pdf,.txt,.docx" 
+          className="hidden" 
+          ref={fileInputRef}
+          onChange={handleUpload}
+          disabled={uploading}
+        />
+        
+        {/* Header Area - Minimalist Ribbon */}
+        <div className="w-full bg-[#10192e]/45 backdrop-blur-xl border border-white/5 rounded-2xl p-1.5 flex items-center justify-between gap-1.5 min-[360px]:gap-3">
+          {/* Center: Tabs (No container background/border for cleaner design) */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'overview' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+            >
+              Asosiy
+            </button>
+            <button 
+              onClick={() => setActiveTab('memory')}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider", activeTab === 'memory' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+            >
+              Xotira
+            </button>
+            <button 
+              onClick={() => setActiveTab('blackbox')}
+              className={cn("px-2.5 py-1.5 rounded-md text-[9px] min-[360px]:text-[10px] font-bold transition-all whitespace-nowrap uppercase tracking-wider flex items-center gap-1", activeTab === 'blackbox' ? "bg-white/10 text-white" : "text-white/40 hover:text-white/70")}
+            >
+              Qora Quti
+            </button>
+          </div>
+
+          {/* Right: Upload Button (Larger & Glowing) */}
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="w-10 h-10 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-300 hover:to-teal-300 text-[#070b13] flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_22px_rgba(16,185,129,0.6)] active:scale-95 transition-all duration-300 shrink-0 border border-emerald-200/30 group"
+            title="Fayl yuklash"
+          >
+            {uploading ? (
+              <Loader2 size={14} className="animate-spin text-[#070b13]" />
+            ) : (
+              <div className="flex items-center gap-0.5 scale-105">
+                <Icon icon="pixel:machine-learning" className="w-[14px] h-[14px]" />
+                <Icon icon="mage:file-upload-fill" className="w-[14px] h-[14px]" />
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* === AI O'RGANISH JARAYONI VIZUALIZATSIYASI === */}
+        {activeTab === 'overview' && (
+        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-[24px] p-4 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-40 h-40 bg-violet-500/10 blur-[60px] rounded-full pointer-events-none" />
+          <div className="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
+          
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-white/50 flex items-center gap-1.5">
+              <Brain size={14} className="text-violet-400/50" />
+              AI O'rganish Jarayoni
+            </h2>
+            {learningData && (
+              <div className="bg-violet-500/10 px-1.5 py-0.5 rounded-md">
+                <span className="text-violet-300/50 text-[9px] font-bold tracking-wider">
+                  SAVDO #{learningData.totalTrades}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Neural Network Vizualizatsiyasi */}
+          <div className="relative mb-2">
+            <div className="text-[8px] text-white/20 text-center font-bold uppercase tracking-[2px] mb-1">
+              {networkData.isReal ? (networkData.knowledge < 5 ? "AI MODEL FAOL - O'RGANISH BOSHLANDI" : "AI MODEL - O'RGANISH DAVOM ETMOQDA") :
+               networkData.knowledge === 0 ? "TARMOQ HALI BO'SH" : 
+               networkData.knowledge < 5 ? "BOSHLANG'ICH TARMOQ" :
+               networkData.knowledge < 15 ? "O'RGANISH DAVOM ETMOQDA" :
+               networkData.knowledge < 30 ? "TARMOQ KUCHAYMOQDA" : "KUCHLI TARMOQ"}
+            </div>
+            <svg width="100%" viewBox="0 0 320 240" className="rounded-xl overflow-hidden">
+              <defs>
+                <linearGradient id="nnEdgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.6" />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity="0.6" />
+                </linearGradient>
+              </defs>
+              {/* Edges */}
+              {networkData.edges.map((edge, i) => {
+                const fromN = networkData.nodes[edge.from];
+                const toN = networkData.nodes[edge.to];
+                if (!fromN || !toN) return null;
+                return (
+                  <line
+                    key={`e-${i}`}
+                    x1={fromN.x} y1={fromN.y}
+                    x2={toN.x} y2={toN.y}
+                    stroke="url(#nnEdgeGrad)"
+                    strokeWidth={0.5 + edge.strength}
+                    opacity={0.15 + edge.strength * 0.5}
+                    className="animate-pulse"
+                    style={{ animationDelay: `${(i % 7) * 0.3}s`, animationDuration: `${2 + (i % 3)}s` }}
+                  />
+                );
+              })}
+              {/* Nodes */}
+              {networkData.nodes.map((node, i) => {
+                const colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#10b981'];
+                const color = colors[node.layer] || '#8b5cf6';
+                const opacity = networkData.isReal ? Math.max(0.2, Math.min(1, node.active * 2)) : 0.9;
+                const r = networkData.isReal ? 3 + (node.active * 2) : 3.5;
+                return (
+                  <g key={`n-${i}`}>
+                     <circle
+                      cx={node.x} cy={node.y}
+                      r={r}
+                      fill={color}
+                      opacity={opacity}
+                      className={networkData.isReal ? "" : "animate-pulse"}
+                      style={networkData.isReal ? {} : { animationDelay: `${(i % 5) * 0.4}s`, animationDuration: `${2 + (i % 4)}s` }}
+                    />
+                    <circle cx={node.x} cy={node.y} r={r*1.8} fill={color} opacity={opacity * 0.2} />
+                  </g>
+                );
+              })}
+              {/* Layer labels */}
+              <text x="65" y="232" fill="white" opacity="0.15" fontSize="6.5" textAnchor="middle" fontWeight="bold">BOZOR</text>
+              <text x="255" y="232" fill="white" opacity="0.15" fontSize="6.5" textAnchor="middle" fontWeight="bold">QAROR</text>
+            </svg>
+          </div>
+
+          {/* Learning Curve (simpler and more compact) */}
+          {learningData && learningData.batches.length >= 2 && (
+            <div className="mb-2 opacity-50 scale-95 origin-center">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[9px] text-white/40 font-bold uppercase">Win Rate egri chizig'i</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] text-white/40">{learningData.firstWR}%</span>
+                  <span className="text-[9px] text-white/30">{"\u2192"}</span>
+                  <span className={cn(
+                    "text-[10px] font-black",
+                    learningData.improvement > 0 ? "text-emerald-400" : learningData.improvement < 0 ? "text-rose-400" : "text-white/60"
+                  )}>
+                    {learningData.lastWR}%
+                  </span>
+                </div>
+              </div>
+              <svg width="100%" viewBox="0 0 300 45" className="rounded-lg overflow-hidden">
+                <defs>
+                  <linearGradient id="curveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#10b981" />
+                  </linearGradient>
+                </defs>
+                {[0, 25, 50, 75, 100].map(v => (
+                  <line key={v} x1="0" y1={45 - v * 0.4} x2="300" y2={45 - v * 0.4} stroke="white" opacity="0.03" strokeDasharray="2,4" />
+                ))}
+                <polyline
+                  fill="none"
+                  stroke="url(#curveGrad)"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points={learningData.batches.map((b, i) => {
+                    const x = (i / (learningData.batches.length - 1)) * 290 + 5;
+                    const y = 40 - (b.winRate / 100) * 35;
+                    return `${x},${y}`;
+                  }).join(' ')}
+                />
+                <polygon
+                  fill="url(#curveGrad)"
+                  opacity="0.05"
+                  points={
+                    learningData.batches.map((b, i) => {
+                      const x = (i / (learningData.batches.length - 1)) * 290 + 5;
+                      const y = 40 - (b.winRate / 100) * 35;
+                      return `${x},${y}`;
+                    }).join(' ') + ' 295,43 5,43'
+                  }
+                />
+                {learningData.batches.map((b, i) => {
+                  const x = (i / (learningData.batches.length - 1)) * 290 + 5;
+                  const y = 40 - (b.winRate / 100) * 35;
+                  return <circle key={i} cx={x} cy={y} r="2" fill="#8b5cf6" opacity="0.8" />;
+                })}
+              </svg>
+            </div>
+          )}
+
+          {/* Stats Row */}
+          <div className="grid grid-cols-4 gap-0.5 bg-white/[0.01] border border-white/[0.03] rounded-xl p-0.5 backdrop-blur-md opacity-60">
+            <div className="py-1 px-0.5 text-center relative group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate" title="Savdolar (Shadow)">
+                Savdolar <span className="hidden min-[360px]:inline text-[6px] opacity-60">(Shadow)</span>
+              </div>
+              <div className="text-white/80 font-bold text-[9px] min-[340px]:text-[10px]">
+                {shadowStats.data?.total_shadow_trades || learningData?.totalTrades || 0}
+              </div>
+            </div>
+            
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate">
+                Win Rate
+              </div>
+              <div className="text-emerald-400/80 font-bold text-[9px] min-[340px]:text-[10px]">
+                {shadowStats.data?.overall_win_rate || learningData?.overallWR || 0}%
+              </div>
+            </div>
+
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate">
+                Bilimlar
+              </div>
+              <div className="text-violet-400/80 font-bold text-[9px] min-[340px]:text-[10px]">
+                {shadowStats.data?.knowledge_points || networkData.knowledge}
+              </div>
+            </div>
+
+            <div className="py-1 px-0.5 text-center relative border-l border-white/[0.03] group">
+              <div className="text-[7px] text-white/30 font-bold uppercase mb-0.5 truncate" title="Dataset Hajmi">
+                Dataset <span className="hidden min-[360px]:inline text-[6px] opacity-60">Hajmi</span>
+              </div>
+              <div className="font-bold text-[9px] min-[340px]:text-[10px] text-amber-400/80">
+                {shadowStats.data?.dataset_size || 0}
+              </div>
+            </div>
+          </div>
+
+          {/* Learning tagline */}
+          <div className="mt-1.5 text-center opacity-30">
+            <p className="text-[8px] text-violet-400/60 font-bold uppercase tracking-[2px]">
+              Learning from every trade
+            </p>
+          </div>
+        </div>
+        )}
+
+        {/* Upload Zone */}
+        {activeTab === 'overview' && (
+        <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[50px] rounded-full pointer-events-none" />
+          
+          <h2 className="text-xs font-bold text-white mb-1 flex items-center gap-1.5">
+            <BookOpen size={14} className="text-emerald-400" />
+            Baza qo'shish
+          </h2>
+          <p className="text-[10px] text-white/40 mb-2">
+            Kitob yuklang (PDF, TXT, DOCX) — AI undan yangi qoidalar o'rganadi.
+          </p>
+          
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className={cn(
+              "w-full h-12 rounded-xl border border-dashed border-white/15 flex items-center justify-center gap-1.5 transition-all group",
+              uploading ? "bg-white/5" : "hover:bg-white/5 hover:border-emerald-400/30 cursor-pointer"
+            )}
+          >
+            {uploading ? (
+              <>
+                <Loader2 size={16} className="text-emerald-400 animate-spin" />
+                <span className="text-[10px] font-bold text-white/70">{uploadProgress}% Yuklanmoqda...</span>
+              </>
+            ) : (
+              <>
+                <UploadCloud size={14} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[10px] font-bold text-white/60 group-hover:text-white/90">Faylni yuklash</span>
+              </>
+            )}
+          </button>
+
+          {/* Pending Books Status */}
+          {books.data && books.data.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <h3 className="text-[11px] font-bold text-white/40 uppercase tracking-widest mb-2">Jarayondagi fayllar</h3>
+              {books.data.map((book) => {
+                const isDone = book.status.startsWith('done');
+                let statusText = isDone ? "O'zlashtirildi" : "O'rganilmoqda";
+                let detailText = null;
+                
+                if (book.status.startsWith('done|')) {
+                  const parts = book.status.split('|');
+                  if (parts.length === 3) {
+                    statusText = `✅ ${parts[1]} TA QOIDA TOPILDI`;
+                    detailText = `AI jami ${parts[2]} ta qismni o'qib tahlil qildi. Topilgan foydali qoidalar pastdagi ro'yxatga qo'shildi.`;
+                  }
+                }
+
+                return (
+                  <div key={book.id} className="flex flex-col bg-black/40 rounded-xl p-3 border border-white/5 group transition-colors hover:bg-black/60">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        {isDone ? (
+                          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                        ) : (
+                          <Loader2 size={16} className="text-blue-400 animate-spin shrink-0" />
+                        )}
+                        <span className="text-[13px] text-white/80 truncate font-medium">{book.file_name}</span>
+                      </div>
+                      <span className={cn(
+                        "text-[10px] px-2 py-1 rounded-full font-bold uppercase shrink-0",
+                        isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/20 text-blue-400 animate-pulse"
+                      )}>
+                        {statusText}
+                      </span>
+                    </div>
+                    {detailText && (
+                      <div className="mt-2.5 text-[11px] text-emerald-400/80 bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/10 leading-relaxed">
+                        {detailText}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        )}
+
+        {/* AI Insights List */}
+        {activeTab === 'memory' && (
+        <div className="flex flex-col gap-2.5">
+        <div>
+          <h2 className="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5 px-1">
+            <Activity size={14} className="text-blue-400" />
+            AI Xulosalari (Fikrlari)
+          </h2>
+          
+          <div className="space-y-2">
+            {insights.isLoading ? (
+              Array.from({length: 3}).map((_, i) => (
+                <div key={i} className="w-full h-32 bg-[#10192e]/50 rounded-[24px] border border-white/5 animate-pulse" />
+              ))
+            ) : insights.data && insights.data.length > 0 ? (
+              insights.data.map((insight) => (
+                <div key={insight.id} className="w-full bg-[#10192e]/60 backdrop-blur-md border border-white/10 rounded-[24px] p-5 shadow-lg relative overflow-hidden group hover:bg-[#10192e]/80 transition-colors">
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-emerald-500" />
+                  
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="bg-blue-500/20 text-blue-400 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider flex items-center gap-1">
+                        <Target size={12} /> {insight.setup_type}
+                      </span>
+                      <span className="bg-emerald-500/20 text-emerald-400 text-[10px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider flex items-center gap-1">
+                        <ShieldAlert size={12} /> {insight.market_condition}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-white/40">{timeAgo(insight.created_at)}</span>
+                  </div>
+                  
+                  <p className="text-sm text-white/90 leading-relaxed font-medium mb-4">
+                    "{insight.insight_text}"
+                  </p>
+                  
+                  <div className="flex items-center gap-4 border-t border-white/10 pt-3">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-white/40 font-bold uppercase">Ish berdi (Win)</span>
+                      <span className="text-emerald-400 font-black text-sm">{insight.success_count} marta</span>
+                    </div>
+                    <div className="w-[1px] h-6 bg-white/10" />
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-white/40 font-bold uppercase">Xato qildi (Loss)</span>
+                      <span className="text-rose-400 font-black text-sm">{insight.fail_count} marta</span>
+                    </div>
+                    
+                    {/* Win Rate Bar */}
+                    <div className="flex-1 flex flex-col ml-2 justify-center">
+                      <div className="flex justify-between text-[9px] font-bold text-white/50 mb-1">
+                        <span>Win Rate</span>
+                        <span>
+                          {insight.success_count + insight.fail_count > 0 
+                            ? Math.round((insight.success_count / (insight.success_count + insight.fail_count)) * 100) 
+                            : 0}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-emerald-500 rounded-full" 
+                          style={{ 
+                            width: `${insight.success_count + insight.fail_count > 0 ? (insight.success_count / (insight.success_count + insight.fail_count)) * 100 : 0}%` 
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-1.5">
+                <Brain size={20} className="text-white/20" />
+                <p className="text-xs text-white/55">AI qoidalari yo'q. Kitob yuklang!</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* AI Memory (Saboqlar) */}
+        <div>
+          <h2 className="text-xs font-bold text-white mb-1.5 flex items-center gap-1.5 px-1">
+            <Lightbulb size={14} className="text-amber-400" />
+            AI Xotirasi (Saboqlar)
+          </h2>
+
+          <div className="space-y-2">
+            {lessons.data && lessons.data.length > 0 ? (
+              lessons.data.map((lesson) => {
+                const categoryEmoji: Record<string, string> = {
+                  trade_pattern: "📊", risk_management: "🛡️",
+                  market_regime: "🌊", strategy_effectiveness: "⚡",
+                  book_knowledge: "📚"
+                };
+                const total = lesson.success_applications + lesson.failed_applications;
+                const winRate = total > 0 ? Math.round((lesson.success_applications / total) * 100) : null;
+
+                return (
+                  <div key={lesson.id} className="w-full bg-[#10192e]/60 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-500 to-orange-500" />
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{categoryEmoji[lesson.category] || "💡"}</span>
+                        <span className="bg-amber-500/20 text-amber-400 text-[10px] px-2 py-0.5 rounded-lg font-bold uppercase">
+                          {lesson.category.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {Array.from({ length: Math.min(lesson.importance, 5) }).map((_, i) => (
+                          <div key={i} className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                        ))}
+                        <span className="text-[10px] text-white/30 font-bold">{lesson.importance}/10</span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-white/85 leading-relaxed pl-1">
+                      {lesson.lesson_text}
+                    </p>
+                    {winRate !== null && (
+                      <div className="mt-2 flex items-center gap-2 text-[11px]">
+                        <span className="text-white/40">Qo'llanildi: {total} marta</span>
+                        <span className={winRate >= 60 ? "text-emerald-400" : winRate >= 40 ? "text-amber-400" : "text-rose-400"}>
+                          {winRate}% samarali
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-1.5">
+                <Lightbulb size={20} className="text-white/20" />
+                <p className="text-xs text-white/55">Saboqlar yo'q. Savdo va kitoblardan o'rganiladi.</p>
+              </div>
+            )}
+          </div>
+        </div>
+        </div>
+        )}
+
+        {/* Strategiya Samaradorligi */}
+        {activeTab === 'overview' && stratPerf.data && stratPerf.data.length > 0 && (
+          <div className="mt-2">
+            <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2 px-1">
+              <BarChart3 size={20} className="text-violet-400" />
+              Strategiya Samaradorligi
+            </h2>
+            <div className="grid grid-cols-2 gap-3">
+              {stratPerf.data.map((sp) => {
+                const total = sp.wins + sp.losses;
+                const wr = total > 0 ? Math.round((sp.wins / total) * 100) : 0;
+                const weightColor = sp.recommended_weight >= 1.2 ? "text-emerald-400" : sp.recommended_weight <= 0.7 ? "text-rose-400" : "text-white/70";
+                return (
+                  <div key={sp.id} className="bg-[#10192e]/60 border border-white/10 rounded-2xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[12px] font-bold text-white/90 uppercase">{sp.strategy_name}</span>
+                      <span className={cn("text-[11px] font-bold", weightColor)}>
+                        <Zap size={10} className="inline mr-0.5" />{sp.recommended_weight.toFixed(1)}x
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[11px] mb-1.5">
+                      <span className="text-emerald-400">{sp.wins}W</span>
+                      <span className="text-white/20">/</span>
+                      <span className="text-rose-400">{sp.losses}L</span>
+                      <span className="text-white/40">({wr}%)</span>
+                    </div>
+                    <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
+                      <div className="h-full bg-violet-500 rounded-full" style={{ width: `${wr}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* NLP Sentiment va Dinamik Vaznlar */}
+        {activeTab === 'overview' && portfolioState.data && (
+          <div className="mt-2 flex flex-col gap-2">
+            
+            {/* Fundamental NLP Sentiment */}
+            <div className="w-full bg-gradient-to-r from-blue-900/40 to-emerald-900/40 border border-white/10 rounded-xl p-2.5 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2 opacity-10">
+                <Brain size={24} />
+              </div>
+              <h3 className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <Activity size={12} className="text-emerald-400" /> Bozor Kayfiyati (NLP)
+              </h3>
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "text-lg font-black",
+                  portfolioState.data.sentiment_score > 60 ? "text-emerald-400" : 
+                  portfolioState.data.sentiment_score < 40 ? "text-rose-400" : "text-amber-400"
+                )}>
+                  {portfolioState.data.sentiment_score}
+                </div>
+                <div className="flex-1">
+                  <div className="w-full h-1.5 bg-black/50 rounded-full overflow-hidden relative">
+                    {/* Gradient bar */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 opacity-50" />
+                    {/* Pointer */}
+                    <div 
+                      className="absolute top-0 bottom-0 w-1 bg-white shadow-[0_0_10px_rgba(255,255,255,1)] z-10"
+                      style={{ left: `${portfolioState.data.sentiment_score}%`, transform: 'translateX(-50%)' }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[7.5px] text-white/40 mt-0.5 uppercase font-bold">
+                    <span>Kuchli Sell</span>
+                    <span>Neutral</span>
+                    <span>Kuchli Buy</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Dinamik Vaznlar */}
+            <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-2.5">
+              <h3 className="text-[10px] font-bold text-white/70 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+                <Target size={12} className="text-blue-400" /> Multi-Strategy AI Vaznlari
+              </h3>
+              <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-1.5">
+                {(stratPerf.data && stratPerf.data.length > 0 
+                  ? stratPerf.data.map(sp => ({ name: sp.strategy_name, weight: Math.round(sp.recommended_weight * 50) }))
+                  : [
+                      {name: "SMC", weight: 60}, {name: "PATTERN", weight: 60}, {name: "NEWS", weight: 60},
+                      {name: "WYCKOFF", weight: 50}, {name: "SR_VOLUME", weight: 50}, {name: "AUTO_PATTERN", weight: 50}
+                    ]
+                ).map((strat) => (
+                  <div key={strat.name} className="bg-black/30 rounded-lg p-1.5 border border-white/5 flex flex-col gap-0.5 group hover:border-white/20 transition-all">
+                    <span className="text-[9px] font-bold text-white/60 uppercase">{strat.name}</span>
+                    <div className="flex items-end justify-between">
+                      <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">
+                        {strat.weight}
+                      </span>
+                      <span className="text-[7.5px] text-white/30 mb-0.5">Max 100</span>
+                    </div>
+                    <div className="w-full h-0.5 bg-white/10 rounded-full overflow-hidden mt-0.5">
+                      <div className="h-full bg-blue-500" style={{ width: `${Math.min(100, Math.max(0, strat.weight))}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QORA QUTI (BLACK BOX) */}
+        {activeTab === 'blackbox' && (
+          <div className="flex flex-col gap-2.5">
+            <h2 className="text-xs font-bold text-white mb-1 flex items-center gap-1.5 px-1">
+              <Icon icon="mdi:box-cutter" className="text-emerald-400 w-4 h-4" />
+              Qora Quti Tahlili
+            </h2>
+
+            {blackbox.isLoading ? (
+               <div className="flex justify-center py-6"><Loader2 className="animate-spin text-emerald-400" size={24} /></div>
+            ) : blackbox.data ? (
+              <>
+                {/* RL Agent Progress (Qora Quti Simulyatori) */}
+                {blackbox.data.rl_agent_progress && (
+                  <div className="w-full bg-[#10192e]/60 backdrop-blur-xl border border-emerald-500/20 rounded-xl p-3 relative overflow-hidden mb-2 shadow-[0_0_15px_rgba(16,185,129,0.1)]">
+                    <div className="absolute top-0 right-0 p-2">
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    </div>
+                    <h3 className="text-[10px] font-bold text-white/90 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <Brain className="text-emerald-400" size={14} /> RL Agent (PPO) Simulyatori
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">Epizodlar</span>
+                        <span className="text-sm font-bold text-white">{blackbox.data.rl_agent_progress.episodes_played.toLocaleString()}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">Simulyator WR</span>
+                        <span className="text-sm font-bold text-emerald-400">{blackbox.data.rl_agent_progress.win_rate_simulation}%</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">O'rtacha mukofot</span>
+                        <span className="text-sm font-bold text-violet-400">{blackbox.data.rl_agent_progress.avg_reward.toFixed(1)}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-white/40 uppercase font-bold mb-0.5 line-clamp-1">O'sish</span>
+                        <span className="text-sm font-bold text-emerald-400">+{blackbox.data.rl_agent_progress.growth}%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Close Mechanism Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">Close Mechanism bo'yicha Zararlar</h3>
+                  {blackbox.data.close_mechanism.length > 0 ? (
+                    <div className="space-y-2">
+                      {blackbox.data.close_mechanism.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        return (
+                          <div key={i} className="flex flex-col gap-1">
+                            <div className="flex justify-between items-end">
+                              <span className="text-[10px] font-bold text-white/90 uppercase">{stat.mechanism}</span>
+                              <div className="text-[9px] text-white/40 space-x-1.5">
+                                <span>{stat.trade_count} ta savdo</span>
+                                <span className="text-rose-400">{stat.loss_count} ta zarar</span>
+                                <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                              </div>
+                            </div>
+                            <div className="w-full h-1.5 bg-black/40 rounded-full overflow-hidden flex">
+                              <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                              <div className="h-full bg-rose-500 transition-all duration-1000" style={{ width: `${100 - winRate}%` }} />
+                            </div>
+                            <div className="text-[8px] text-white/20 text-right">Win Rate: {winRate}%</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      Savdolar hali yo'q.
+                    </div>
+                  )}
+                </div>
+
+                {/* News Coverage Gap Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden mt-2">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">News Coverage bo'yicha Zararlar</h3>
+                  {blackbox.data.news_coverage_gap.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {blackbox.data.news_coverage_gap.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        const label = stat.gap === "1" ? "Yangilik Gap Bor" : stat.gap === "0" ? "Yangilik Gap Yo'q" : "Noma'lum";
+                        return (
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-lg p-2 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-white/80 uppercase">{label}</span>
+                            <div className="flex justify-between items-center">
+                              <div className="text-sm font-bold text-white">{stat.trade_count}</div>
+                              <div className="text-[10px] text-rose-400">-{stat.loss_count}L</div>
+                            </div>
+                            <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                            </div>
+                            <div className="flex justify-between items-center text-[9px]">
+                              <span className="text-white/40">Win Rate</span>
+                              <span className="text-white/70 font-bold">{winRate}%</span>
+                            </div>
+                            <div className="text-[9px] text-right mt-0.5">
+                              P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      Yangiliklar bo'yicha savdo yo'q.
+                    </div>
+                  )}
+                </div>
+
+                {/* News Strategy Style Analizi */}
+                <div className="w-full bg-[#10192e]/40 backdrop-blur-xl border border-white/5 rounded-xl p-2.5 relative overflow-hidden mt-2">
+                  <h3 className="text-[10px] font-bold text-white/80 uppercase tracking-wider mb-2">News Strategy bo'yicha Zararlar</h3>
+                  {blackbox.data.news_strategy_style && blackbox.data.news_strategy_style.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {blackbox.data.news_strategy_style.map((stat, i) => {
+                        const winRate = stat.trade_count > 0 ? Math.round(((stat.trade_count - stat.loss_count) / stat.trade_count) * 100) : 0;
+                        const label = stat.style === "BEFORE_NEWS" ? "Yangilikdan Oldin" : stat.style === "AFTER_NEWS" ? "Yangilikdan Keyin" : stat.style || "Noma'lum";
+                        return (
+                          <div key={i} className="bg-black/30 border border-white/10 rounded-lg p-2 flex flex-col gap-1.5">
+                            <span className="text-[9px] font-bold text-white/80 uppercase">{label}</span>
+                            <div className="flex justify-between items-center">
+                              <div className="text-sm font-bold text-white">{stat.trade_count}</div>
+                              <div className="text-[10px] text-rose-400">-{stat.loss_count}L</div>
+                            </div>
+                            <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-violet-500 transition-all duration-1000" style={{ width: `${winRate}%` }} />
+                            </div>
+                            <div className="flex justify-between items-center text-[9px]">
+                              <span className="text-white/40">Win Rate</span>
+                              <span className="text-white/70 font-bold">{winRate}%</span>
+                            </div>
+                            <div className="text-[9px] text-right mt-0.5">
+                              P/L: <span className={stat.total_profit > 0 ? "text-emerald-400" : "text-rose-400"}>${stat.total_profit}</span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-white/40 text-[10px] italic">
+                      News strategiyasida savdo yo'q.
+                    </div>
+                  )}
+                </div>
+              </>
+            ) : (
+               <div className="w-full bg-[#10192e]/40 border border-white/5 rounded-xl p-4 text-center flex flex-col items-center justify-center gap-2">
+                 <Icon icon="mdi:box-cutter" className="text-white/20 w-8 h-8" />
+                 <p className="text-xs text-white/55">Qora quti ma'lumotlari hozircha yo'q.</p>
+               </div>
+            )}
+            
+            <AnalyticsView />
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}

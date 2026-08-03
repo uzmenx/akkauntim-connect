@@ -1,0 +1,6 @@
+{
+  "name": "Akcume AI - Forex Bot Control",
+  "description": "AI-powered forex trading bot control panel. Monitor positions, signals, and performance in real time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

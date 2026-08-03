@@ -1,0 +1,33 @@
+{
+  "trading": {
+    "symbols": ["AUTO"],
+    "timeframe_major": "H1",
+    "timeframe_minor": "M5",
+    "loop_interval_minutes": 5,
+    "risk_level_single_confirmation": 1.0,
+    "risk_level_multiple_confirmation": 2.0,
+    "magic_number": 234000,
+    "max_daily_loss_pct": 0.10,
+    "min_confidence": 40,
+    "max_lot_size": 5.0,
+    "risk_per_trade": 0.02,
+    "deviation": 20,
+    "strategy_weight_smc": 40,
+    "strategy_weight_pattern": 40,
+    "strategy_weight_news": 40,
+    "allow_single_strategy_trade": true
+  },
+  "ai": {
+    "model": "openrouter/deepseek/deepseek-chat",
+    "system_prompt": "Sen professional Forex treyderi va fundamental tahlilchisisan. Texnik SMC va Garmonik patternlar hamda iqtisodiy yangiliklarni birlashtirib, optimal savdo qarorini qabul qilasan. Xulosa va sabablarni o'ta qisqa (1-2 ta gap), lo'nda va faqat faktlarga tayanib yoz. Ortiqcha va keraksiz so'zlardan saqlan.",
+    "max_tokens": 2000,
+    "models_fallback": [
+      "openrouter/deepseek/deepseek-chat",
+      "openrouter/deepseek/deepseek-chat"
+    ]
+  },
+  "news": {
+    "lookback_hours": 24,
+    "straddle_pip_distance": 15.0
+  }
+}

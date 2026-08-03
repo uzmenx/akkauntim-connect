@@ -1,0 +1,35 @@
+# Antigravity Context Ignore Rules
+# Exclude build outputs, heavy binaries, databases, and dependencies from context window
+
+dist/
+node_modules/
+chroma_db/
+bot/learning/test_chroma_db/
+android/
+.git/
+.venv/
+models/
+yuksalish_bot.egg-info/
+__pycache__/
+
+# Binary and Database Files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.pth
+*.zip
+*.joblib
+*.pkl
+
+# Runtime Caches & Visual Assets
+public/*.json
+news_cache.json
+bot/news_cache.json
+assets/*.jpg
+assets/*.png
+public/*.jpg
+public/*.png
+public/*.svg

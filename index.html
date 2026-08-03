@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c1520" />
+    <meta name="google-site-verification" content="SavtKOj3pNrZ-e8IGfGWzeoaJS6wkcqRYHMEqft4v_c" />
+    <title>Akcume AI — AI Forex Bot Control</title>
+    <link rel="canonical" href="https://akkauntim-connect.vercel.app/" />
+    <meta property="og:url" content="https://akkauntim-connect.vercel.app/" />
+    <meta name="description" content="AI-powered forex trading bot control panel. Monitor positions, signals and performance in real time." />
+    <meta property="og:title" content="Akcume AI — AI Forex Bot Control" />
+    <meta property="og:description" content="Real-time AI forex trading bot dashboard." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <script>
+      window.addEventListener('error', function(e) {
+        if (e.target && e.target.nodeName === 'SCRIPT') {
+          console.error("Script load failed:", e.target.src);
+          if (sessionStorage.getItem('script_reload')) return;
+          sessionStorage.setItem('script_reload', 'true');
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for(var i = 0; i < regs.length; i++) { regs[i].unregister(); }
+              window.location.reload(true);
+            });
+          } else {
+            window.location.reload(true);
+          }
+        }
+      }, true);
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
