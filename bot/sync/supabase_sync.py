@@ -204,14 +204,16 @@ class SupabaseSync:
         
         return closed_rows
 
-    def sync_chart_data(self, symbol: str, timeframe: str, candles: List[dict], smc_zones: List[dict]) -> None:
-        """SMC va Candles ma'lumotlarini UI uchun yuboradi (Asinxron va filtrmalangan)"""
-        if not candles and not smc_zones:
+    def sync_chart_data(self, symbol: str, timeframe: str, candles: List[dict], strategy_overlays: Optional[Dict[str, List[dict]]] = None) -> None:
+        """Kandllar va barcha turdagi strategiya zonalarini UI uchun yuboradi"""
+        if not candles and not strategy_overlays:
             return
 
         payload = {
+            "symbol": symbol,
+            "timeframe": timeframe,
             "candles": candles,
-            "smc_zones": smc_zones
+            "strategy_overlays": strategy_overlays or {}
         }
         
         import threading
@@ -219,7 +221,8 @@ class SupabaseSync:
             try:
                 res = self._post(payload)
                 if res:
-                    logger.info(f"Chart data sync OK: {symbol} {timeframe} - {len(candles)} candles, {len(smc_zones)} zones")
+                    num_overlays = sum(len(v) for v in (strategy_overlays or {}).values())
+                    logger.info(f"Chart data sync OK: {symbol} {timeframe} - {len(candles)} candles, {num_overlays} overlay elements")
             except Exception as e:
                 logger.debug(f"Chart sync error: {e}")
                 

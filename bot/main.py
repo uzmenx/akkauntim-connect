@@ -164,8 +164,8 @@ class TradingBot:
             logger.error(f"SMC Engine xatolik: {e}")
             return None
 
-    def _sync_chart(self, symbol: str, timeframe: str, df: pd.DataFrame, smc_data: Dict[str, Any]):
-        """Yangi chart (Candles + SMC) ma'lumotlarini jo'natish"""
+    def _sync_chart(self, symbol: str, timeframe: str, df: pd.DataFrame, strategy_results: Dict[str, Any] = None):
+        """Yangi chart (Candles + Strategy Overlays) ma'lumotlarini jo'natish"""
         try:
             import datetime
             candles_list = []
@@ -182,39 +182,85 @@ class TradingBot:
                         "volume": float(row.get('tick_volume', 0.0))
                     })
             
-            zones_list = []
-            if smc_data and isinstance(smc_data, dict):
-                ob_dict = smc_data.get('order_blocks', {})
-                fvg_dict = smc_data.get('fvg', {})
-                
-                blocks = ob_dict.get('demand', []) + ob_dict.get('supply', []) if isinstance(ob_dict, dict) else []
-                fvgs = fvg_dict.get('demand', []) + fvg_dict.get('supply', []) if isinstance(fvg_dict, dict) else []
-                
-                for ob in blocks:
-                    zones_list.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "zone_type": "order_block",
-                        "direction": ob.get("ob_type", "demand"),
-                        "top": float(ob.get("top", 0)),
-                        "bottom": float(ob.get("bottom", 0)),
-                        "status": ob.get("status", "fresh"),
-                        "formed_at": str(ob.get("timestamp", datetime.datetime.now().isoformat()))
+            strategy_overlays = {
+                "smc": [],
+                "harmonic": [],
+                "wyckoff": [],
+                "sr_volume": [],
+                "auto_patterns": []
+            }
+            
+            if strategy_results and isinstance(strategy_results, dict):
+                # 1. SMC
+                smc_data = strategy_results.get("SMC", {})
+                if smc_data and isinstance(smc_data, dict):
+                    ob_dict = smc_data.get('order_blocks', {})
+                    fvg_dict = smc_data.get('fvg', {})
+                    
+                    blocks = ob_dict.get('demand', []) + ob_dict.get('supply', []) if isinstance(ob_dict, dict) else []
+                    fvgs = fvg_dict.get('demand', []) + fvg_dict.get('supply', []) if isinstance(fvg_dict, dict) else []
+                    
+                    for ob in blocks:
+                        strategy_overlays["smc"].append({
+                            "symbol": symbol, "timeframe": timeframe, "zone_type": "order_block",
+                            "direction": ob.get("ob_type", "demand"), "top": float(ob.get("top", 0)),
+                            "bottom": float(ob.get("bottom", 0)), "status": ob.get("status", "fresh"),
+                            "formed_at": str(ob.get("timestamp", datetime.datetime.now().isoformat()))
+                        })
+                    for fvg in fvgs:
+                        strategy_overlays["smc"].append({
+                            "symbol": symbol, "timeframe": timeframe, "zone_type": "fvg",
+                            "direction": fvg.get("type", "demand"), "top": float(fvg.get("top", 0)),
+                            "bottom": float(fvg.get("bottom", 0)), "status": fvg.get("status", "fresh"),
+                            "formed_at": str(fvg.get("timestamp", datetime.datetime.now().isoformat()))
+                        })
+                        
+                # 2. Harmonic (Pattern deb keladi PortfolioManager dan)
+                harmonic_data = strategy_results.get("Pattern", {})
+                if harmonic_data and harmonic_data.get("signal") and harmonic_data.get("signal") != "HOLD":
+                    strategy_overlays["harmonic"].append({
+                        "symbol": symbol, "timeframe": timeframe,
+                        "pattern_type": harmonic_data.get("pattern", "unknown"),
+                        "signal": harmonic_data.get("signal"),
+                        "confidence": harmonic_data.get("confidence", 0),
+                        "entry": harmonic_data.get("entry_zone", []),
+                        "sl": harmonic_data.get("sl", 0),
+                        "tp": harmonic_data.get("tp", [])
                     })
-                for fvg in fvgs:
-                    zones_list.append({
-                        "symbol": symbol,
-                        "timeframe": timeframe,
-                        "zone_type": "fvg",
-                        "direction": fvg.get("type", "demand"),
-                        "top": float(fvg.get("top", 0)),
-                        "bottom": float(fvg.get("bottom", 0)),
-                        "status": fvg.get("status", "fresh"),
-                        "formed_at": str(fvg.get("timestamp", datetime.datetime.now().isoformat()))
+                    
+                # 3. Wyckoff
+                wyckoff_data = strategy_results.get("Wyckoff", {})
+                if wyckoff_data and wyckoff_data.get("phase"):
+                    strategy_overlays["wyckoff"].append({
+                        "symbol": symbol, "timeframe": timeframe,
+                        "phase": wyckoff_data.get("phase"),
+                        "signal": wyckoff_data.get("signal", "HOLD"),
+                        "confidence": wyckoff_data.get("confidence", 0)
+                    })
+                    
+                # 4. SR Volume
+                sr_data = strategy_results.get("SR_Volume", {})
+                if sr_data and isinstance(sr_data.get("levels"), list):
+                    for lvl in sr_data.get("levels", []):
+                        strategy_overlays["sr_volume"].append({
+                            "symbol": symbol, "timeframe": timeframe,
+                            "price": float(lvl.get("price", 0)),
+                            "type": lvl.get("type", "unknown"),
+                            "strength": lvl.get("strength", 0)
+                        })
+                        
+                # 5. Auto Patterns
+                auto_data = strategy_results.get("Auto_Pattern", {})
+                if auto_data and auto_data.get("pattern"):
+                    strategy_overlays["auto_patterns"].append({
+                        "symbol": symbol, "timeframe": timeframe,
+                        "pattern_type": auto_data.get("pattern"),
+                        "signal": auto_data.get("signal", "HOLD"),
+                        "confidence": auto_data.get("confidence", 0)
                     })
 
             if hasattr(self, 'sync') and hasattr(self.sync, 'sync_chart_data'):
-                self.sync.sync_chart_data(symbol, timeframe, candles_list, zones_list)
+                self.sync.sync_chart_data(symbol, timeframe, candles_list, strategy_overlays)
         except Exception as e:
             logger.error(f"Chart sync failed for {symbol}: {e}")
 
@@ -394,7 +440,7 @@ class TradingBot:
                 
         return df
 
-    def _sync_all_timeframes(self, symbol: str):
+    def _sync_all_timeframes(self, symbol: str, major_strategy_results: Dict[str, Any] = None):
         """Barcha taymfreymlarni aqlli filtrlash bilan Supabase ga yuklash"""
         timeframes = ["M1", "M5", "M15", "H1", "H4", "D1"]
         if symbol not in getattr(self, 'last_synced_time', {}):
@@ -407,7 +453,10 @@ class TradingBot:
                 if df is None or df.empty:
                     continue
                     
-                smc_data = self._get_smc_data(df)
+                if tf == self.config.timeframe_major and major_strategy_results:
+                    strat_res = major_strategy_results
+                else:
+                    strat_res = {"SMC": self._get_smc_data(df)}
                 
                 last_time = self.last_synced_time[symbol].get(tf)
                 if last_time:
@@ -415,8 +464,8 @@ class TradingBot:
                 else:
                     df_new = df
                     
-                if not df_new.empty or smc_data:
-                    self._sync_chart(symbol, tf, df_new, smc_data)
+                if not df_new.empty or strat_res:
+                    self._sync_chart(symbol, tf, df_new, strat_res)
                     
                 self.last_synced_time[symbol][tf] = df['time'].max()
             except Exception as e:
@@ -471,7 +520,7 @@ class TradingBot:
         
         # Frontend Chart uchun ma'lumotlarni sinxronizatsiya qilamiz
         with self.profiler.track("2.2_sync_all_timeframes"):
-            self._sync_all_timeframes(symbol)
+            self._sync_all_timeframes(symbol, portfolio_result.get("details", {}))
         
         pattern_result = portfolio_result["details"].get("Pattern", {})
         news_result = portfolio_result["details"].get("News", {})
