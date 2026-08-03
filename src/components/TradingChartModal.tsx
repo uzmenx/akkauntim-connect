@@ -786,7 +786,34 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
         });
       }
 
+      // 6. Shadow signallari (faqat kuzatuv, order bilan bog'liq emas)
+      if (shadowSignals && shadowSignals.length > 0) {
+        const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
+        shadowSignals.forEach((s) => {
+          if (s.signal !== "BUY" && s.signal !== "SELL") return;
+          const sTimeSec = parseTimeToSec(s.candle_time);
+          if (Math.abs(hoverTimeSec - sTimeSec) <= stepSeconds * 1.5) {
+            const f = (s.features || {}) as any;
+            const status = s.was_correct === null || s.was_correct === undefined
+              ? "kutilmoqda"
+              : s.was_correct ? "TO'G'RI ✓" : "XATO ✗";
+            matchedIndicators.push({
+              strategy: "Shadow Edge (statistik)",
+              signalType: `${s.signal} · ${status}`,
+              confidence: null,
+              reasoning: `score ${Number(s.score).toFixed(2)} | trend ${f.trend ?? "-"} | momentum ${f.momentum_3 ?? "-"} | volatility ${f.atr_pct ?? "-"} | RSI ${f.rsi14 ?? "-"}`,
+              color: s.signal === "BUY"
+                ? "border-emerald-500/50 text-emerald-300 bg-emerald-950/90"
+                : "border-rose-500/50 text-rose-300 bg-rose-950/90",
+              priceRange: new Date(sTimeSec * 1000).toLocaleString(),
+              dist: Math.abs(hoverTimeSec - sTimeSec) / stepSeconds,
+            });
+          }
+        });
+      }
+
       if (matchedIndicators.length > 0) {
+
         matchedIndicators.sort((a, b) => a.dist - b.dist);
         const bestMatch = matchedIndicators[0];
         setHoveredTooltip({
