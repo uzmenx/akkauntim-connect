@@ -28,12 +28,13 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
+  // Vite replaces import.meta.env.* at build time. This file runs in the
+  // browser only (no SSR here), so there is no `process` global — referencing
+  // process.env would throw ReferenceError and crash the whole app.
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'placeholder-anon-key';
 
-  if (!import.meta.env.VITE_SUPABASE_URL && !process.env.SUPABASE_URL) {
+  if (!import.meta.env.VITE_SUPABASE_URL) {
     console.warn('[Supabase] VITE_SUPABASE_URL environment variable is missing. Operating with fallback client.');
   }
 
@@ -64,4 +65,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-
