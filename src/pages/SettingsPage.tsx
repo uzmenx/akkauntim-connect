@@ -403,15 +403,41 @@ export function SettingsPage() {
                 options={MINOR_TIMEFRAME_OPTIONS}
               />
             </div>
-            <div className="col-span-2">
-              <Slider
-                label="Bozorni tahlil qilish tezligi (Daqiqa)"
-                value={Number(form.loop_interval_minutes ?? 5)}
-                min={1} max={240} step={1}
-                format={(v) => `Har ${v} daqiqada`}
-                onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
-              />
+            <div className="col-span-2 flex items-center justify-between py-3 border-t border-white/5">
+              <div className="flex-1 pr-4">
+                <p className="text-sm font-semibold text-white/90">Real-time rejim</p>
+                <p className="text-[11px] text-white/40 leading-snug mt-0.5">
+                  Yoqilganda bot daqiqa emas, sekundlik oraliqda bozorni uzluksiz tekshiradi.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm(f => ({ ...f, realtime_enabled: !f.realtime_enabled }))}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-300 ${form.realtime_enabled ? 'bg-accent' : 'bg-white/10'}`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-300 ${form.realtime_enabled ? 'translate-x-[18px]' : 'translate-x-1'}`} />
+              </button>
             </div>
+            <div className="col-span-2">
+              {form.realtime_enabled ? (
+                <Slider
+                  label="Real-time tekshiruv oralig'i (Sekund)"
+                  value={Number(form.loop_interval_seconds ?? 15)}
+                  min={1} max={60} step={1}
+                  format={(v) => `Har ${v} sekundda`}
+                  onChange={(v) => setForm((f) => ({ ...f, loop_interval_seconds: v }))}
+                />
+              ) : (
+                <Slider
+                  label="Bozorni tahlil qilish tezligi (Daqiqa)"
+                  value={Number(form.loop_interval_minutes ?? 5)}
+                  min={1} max={240} step={1}
+                  format={(v) => `Har ${v} daqiqada`}
+                  onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
+                />
+              )}
+            </div>
+
           </div>
         </div>
       </Card>
