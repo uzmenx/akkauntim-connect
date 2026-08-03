@@ -589,6 +589,75 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     };
   }, [showWyckoff, wyckoffData, candlesData]);
 
+  // ---- Shadow signallari: yuklash + realtime (faqat vizual kuzatuv) ----
+  const shadowTimeframe = timeframe === "M1" ? "1min"
+    : timeframe === "M5" ? "5min"
+    : timeframe === "M15" ? "15min"
+    : timeframe === "H1" ? "1h"
+    : timeframe === "H4" ? "4h" : "1day";
+
+  useEffect(() => {
+    if (!isOpen || !activeSymbol || isGuest) return;
+    let isMounted = true;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("shadow_signals")
+        .select("id, symbol, timeframe, candle_time, signal, score, features, shadow_outcomes(was_correct)")
+        .eq("symbol", activeSymbol)
+        .eq("timeframe", shadowTimeframe)
+        .order("candle_time", { ascending: false })
+        .limit(300);
+
+      if (!isMounted) return;
+      const rows: ShadowSignalRow[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        symbol: r.symbol,
+        timeframe: r.timeframe,
+        candle_time: r.candle_time,
+        signal: r.signal,
+        score: r.score,
+        features: r.features,
+        was_correct: r.shadow_outcomes?.[0]?.was_correct ?? null,
+      }));
+      setShadowSignals(rows);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`shadow_chart_${activeSymbol}_${shadowTimeframe}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_signals" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_outcomes" }, () => load())
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, activeSymbol, shadowTimeframe, isGuest]);
+
+  // Shadow markerlarini chizish (setMarkers — chart qayta chizilmaydi)
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (!shadowMarkersRef.current) {
+      shadowMarkersRef.current = new ShadowSignalMarkers(series);
+    }
+    shadowMarkersRef.current.update(shadowSignals, candlesData.map((c) => Number(c.time)));
+  }, [shadowSignals, candlesData]);
+
+  useEffect(() => {
+    return () => {
+      if (shadowMarkersRef.current) {
+        try { shadowMarkersRef.current.detach(); } catch {}
+        shadowMarkersRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+
   // Connected Lines - Harmonic (Gold) & Auto Patterns (Orange)
   useEffect(() => {
     const series = candlestickSeriesRef.current;
