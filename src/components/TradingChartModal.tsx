@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { ZoneRectanglePrimitive, ZoneData } from "./chart-primitives/ZoneRectanglePrimitive";
 import { ConnectedLinePrimitive, LineData } from "./chart-primitives/ConnectedLinePrimitive";
 import { EventMarkerPrimitive, EventMarkerData } from "./chart-primitives/EventMarkerPrimitive";
+import { ShadowSignalMarkers, ShadowSignalRow } from "./chart-primitives/ShadowSignalMarkers";
+
 
 import { guestMock } from "@/lib/guestMock";
 
