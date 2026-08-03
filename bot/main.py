@@ -96,7 +96,23 @@ class TradingBot:
 
         # Sync
         self.sync = SupabaseSync(config)
+        self.ai.sync_callback = self.sync.update_bot_settings
         self.telegram = TelegramSync(config)
+
+        # Chart overlay managers (created once, reused for every symbol/cycle
+        # in _sync_chart — previously these were re-instantiated on every call,
+        # re-running schema DDL ~94 times per cycle and multiplying SQLite
+        # connection churn).
+        from bot.strategy.smc.zones import ZoneManager
+        from bot.strategy.harmonic.manager import HarmonicPatternManager
+        from bot.strategy.wyckoff.manager import WyckoffEventManager
+        from bot.strategy.sr_volume.manager import SRVolumeZoneManager
+        from bot.strategy.auto_patterns.manager import AutoPatternManager
+        self._chart_zone_manager = ZoneManager()
+        self._chart_harmonic_manager = HarmonicPatternManager()
+        self._chart_wyckoff_manager = WyckoffEventManager()
+        self._chart_sr_volume_manager = SRVolumeZoneManager()
+        self._chart_auto_pattern_manager = AutoPatternManager()
         
         # AI Memory sync
         self.ai_memory.sync_client = self.sync
@@ -182,17 +198,11 @@ class TradingBot:
                         "volume": float(row.get('tick_volume', 0.0))
                     })
             
-            from bot.strategy.smc.zones import ZoneManager
-            from bot.strategy.harmonic.manager import HarmonicPatternManager
-            from bot.strategy.wyckoff.manager import WyckoffEventManager
-            from bot.strategy.sr_volume.manager import SRVolumeZoneManager
-            from bot.strategy.auto_patterns.manager import AutoPatternManager
-            
-            zm = ZoneManager()
-            hm = HarmonicPatternManager()
-            wm = WyckoffEventManager()
-            srm = SRVolumeZoneManager()
-            apm = AutoPatternManager()
+            zm = self._chart_zone_manager
+            hm = self._chart_harmonic_manager
+            wm = self._chart_wyckoff_manager
+            srm = self._chart_sr_volume_manager
+            apm = self._chart_auto_pattern_manager
             
             strategy_overlays = {
                 "smc": zm.get_active_zones(symbol, timeframe),
@@ -397,7 +407,7 @@ class TradingBot:
                 
         return df
 
-    def _sync_all_timeframes(self, symbol: str, major_strategy_results: Dict[str, Any] = None):
+    def _sync_all_timeframes(self, symbol: str, major_strategy_results: Dict[str, Any] = None, base_context: Dict[str, Any] = None):
         """Barcha taymfreymlarni aqlli filtrlash bilan Supabase ga yuklash"""
         timeframes = ["M1", "M5", "M15", "H1", "H4", "D1"]
         if symbol not in getattr(self, 'last_synced_time', {}):
@@ -413,15 +423,43 @@ class TradingBot:
                 if tf == self.config.timeframe_major and major_strategy_results:
                     strat_res = major_strategy_results
                 else:
-                    smc_res = self._get_smc_data(df)
-                    strat_res = {"SMC": smc_res}
+                    # Tahlil qilib barcha strategiyalarni bazaga saqlaymiz
+                    strat_context = {
+                        "symbol": symbol,
+                        "current_price": float(df.iloc[-1]['close']),
+                        "kill_zones": self._get_kill_zones_analysis(df),
+                        "regime": base_context.get("regime", "NORMAL") if base_context else "NORMAL"
+                    }
+                    tf_result = self.portfolio_manager.analyze_all(df, strat_context)
+                    strat_res = tf_result.get("details", {})
+                    
                     from bot.strategy.smc.zones import ZoneManager
+                    from bot.strategy.harmonic.manager import HarmonicPatternManager
+                    from bot.strategy.wyckoff.manager import WyckoffEventManager
+                    from bot.strategy.sr_volume.manager import SRVolumeZoneManager
+                    from bot.strategy.auto_patterns.manager import AutoPatternManager
+                    
                     minor_zm = ZoneManager()
-                    minor_zm.save_zones(symbol, tf, smc_res)
+                    minor_hm = HarmonicPatternManager()
+                    minor_wm = WyckoffEventManager()
+                    minor_srm = SRVolumeZoneManager()
+                    minor_apm = AutoPatternManager()
+                    
+                    minor_zm.save_zones(symbol, tf, strat_res.get("SMC", {}))
+                    minor_hm.save_patterns(symbol, tf, strat_res.get("Pattern", {}))
+                    minor_wm.save_events(symbol, tf, strat_res.get("Wyckoff", {}))
+                    minor_srm.save_zones(symbol, tf, strat_res.get("SR_Volume", {}))
+                    minor_apm.save_pattern(symbol, tf, strat_res.get("Auto_Pattern", {}))
+                    
                     # For minor timeframes we also need to mitigate
                     current_high = float(df.iloc[-1]['high'])
                     current_low = float(df.iloc[-1]['low'])
+                    
                     minor_zm.update_mitigations(symbol, tf, current_high, current_low)
+                    if hasattr(minor_hm, 'update_mitigations'): minor_hm.update_mitigations(symbol, tf, current_high, current_low)
+                    if hasattr(minor_wm, 'update_mitigations'): minor_wm.update_mitigations(symbol, tf, current_high, current_low)
+                    if hasattr(minor_srm, 'update_mitigations'): minor_srm.update_mitigations(symbol, tf, current_high, current_low)
+                    if hasattr(minor_apm, 'update_mitigations'): minor_apm.update_mitigations(symbol, tf, current_high, current_low)
                 
                 last_time = self.last_synced_time[symbol].get(tf)
                 if last_time:
@@ -485,7 +523,7 @@ class TradingBot:
         
         # Frontend Chart uchun ma'lumotlarni sinxronizatsiya qilamiz
         with self.profiler.track("2.2_sync_all_timeframes"):
-            self._sync_all_timeframes(symbol, portfolio_result.get("details", {}))
+            self._sync_all_timeframes(symbol, portfolio_result.get("details", {}), strat_context)
         
         pattern_result = portfolio_result["details"].get("Pattern", {})
         news_result = portfolio_result["details"].get("News", {})
@@ -748,15 +786,17 @@ class TradingBot:
                 )
 
         ai_decision = None
+        
+        # 1. Gate tekshiruvi hamma holat (AI bor yoki yo'q) uchun o'rinli
+        if not call_needed:
+            logger.info(f"[{symbol}] Savdo qarori o'tkazib yuborildi ({gate_reason}). "
+                        f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
+            return
+            
         if not getattr(self.config, "ai_enabled", True):
             logger.warning(f"[{symbol}] ⚙️ AI-siz rejim faol! Faqat algoritmik qaror chiqariladi.")
         else:
-            if not call_needed:
-                logger.info(f"[{symbol}] AI chaqiruvi o'tkazib yuborildi ({gate_reason}). "
-                            f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
-                return
-            else:
-                logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
+            logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
     
             with self.profiler.track("3.7_ai_decision_api_call"):
                 prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)

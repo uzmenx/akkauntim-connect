@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { get, set } from "idb-keyval";
 import { createChart, ColorType, LineStyle, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, LineSeries } from "lightweight-charts";
 import { X, TrendingUp, TrendingDown, Layers, Activity, Eye, RefreshCw, BarChart2, ShieldAlert, Target, Loader2, ChevronDown, Search, ArrowLeft } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -9,8 +10,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { ZoneRectanglePrimitive, ZoneData } from "./chart-primitives/ZoneRectanglePrimitive";
 import { ConnectedLinePrimitive, LineData } from "./chart-primitives/ConnectedLinePrimitive";
 import { EventMarkerPrimitive, EventMarkerData } from "./chart-primitives/EventMarkerPrimitive";
-import { ShadowSignalMarkers, ShadowSignalRow } from "./chart-primitives/ShadowSignalMarkers";
-
 
 import { guestMock } from "@/lib/guestMock";
 
@@ -54,8 +53,6 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const zonePrimitiveRef = useRef<ZoneRectanglePrimitive | null>(null);
   const linePrimitiveRef = useRef<ConnectedLinePrimitive | null>(null);
   const eventMarkerRef = useRef<EventMarkerPrimitive | null>(null);
-  const shadowMarkersRef = useRef<ShadowSignalMarkers | null>(null);
-
 
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -79,8 +76,6 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const [wyckoffData, setWyckoffData] = useState<any[]>([]);
   const [srVolumeData, setSrVolumeData] = useState<any[]>([]);
   const [autoPatternData, setAutoPatternData] = useState<any[]>([]);
-  const [shadowSignals, setShadowSignals] = useState<ShadowSignalRow[]>([]);
-
 
   const [activeSymbol, setActiveSymbol] = useState(symbol);
   const [activePosition, setActivePosition] = useState<Position | null | undefined>(position);
@@ -198,8 +193,32 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       setIsLoading(true);
       setError(null);
       setIsEmpty(false);
+
+      const cacheKey = `chartData_${activeSymbol}_${timeframe}`;
+      
       try {
-        // Fetch candles
+        // Try to load cached data for offline support
+        const cached = await get(cacheKey).catch(() => null);
+        if (cached && isMounted) {
+          if (cached.candles && cached.candles.length > 0) setCandlesData(cached.candles);
+          if (cached.smc && showSMC) setSmcZonesData(cached.smc);
+          if (cached.harmonic && showHarmonic) setHarmonicData(cached.harmonic);
+          if (cached.wyckoff && showWyckoff) setWyckoffData(cached.wyckoff);
+          if (cached.srVolume && showSRVolume) setSrVolumeData(cached.srVolume);
+          if (cached.autoPattern && showAutoPattern) setAutoPatternData(cached.autoPattern);
+          
+          if (cached.candles && cached.candles.length > 0) {
+             setIsLoading(false); // Stop loading early if we have cache
+          }
+        }
+        
+        let newSmc = showSMC ? [] : cached?.smc || [];
+        let newHarmonic = showHarmonic ? [] : cached?.harmonic || [];
+        let newWyckoff = showWyckoff ? [] : cached?.wyckoff || [];
+        let newSrVolume = showSRVolume ? [] : cached?.srVolume || [];
+        let newAutoPattern = showAutoPattern ? [] : cached?.autoPattern || [];
+
+        // Fetch fresh candles
         const { data: candles, error: candlesError } = await supabase
           .from("candles")
           .select("*")
@@ -211,11 +230,10 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
         if (candlesError) throw candlesError;
 
         if (!candles || candles.length === 0) {
-          if (isMounted) setIsEmpty(true);
+          if (isMounted && !cached?.candles?.length) setIsEmpty(true);
           return;
         }
 
-        // Convert to ascending order and required format
         const formattedCandles = candles.reverse().map((c: any) => ({
           time: Math.floor(new Date(c.time).getTime() / 1000),
           open: Number(c.open),
@@ -227,21 +245,47 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
 
         if (isMounted) setCandlesData(formattedCandles);
 
-        // Fetch SMC zones if enabled
         if (showSMC) {
-          const { data: zones, error: zonesError } = await supabase
-            .from("smc_zones")
-            .select("*")
-            .eq("symbol", activeSymbol)
-            .eq("timeframe", timeframe)
-            .eq("status", "fresh");
-            
-          if (!zonesError && zones) {
-            if (isMounted) setSmcZonesData(zones);
-          }
+          const { data: zones } = await supabase.from("smc_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
+          if (zones) { newSmc = zones; if (isMounted) setSmcZonesData(zones); }
         }
+
+        if (showHarmonic) {
+          const { data: harmonics } = await (supabase as any).from("harmonic_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
+          if (harmonics) { newHarmonic = harmonics; if (isMounted) setHarmonicData(harmonics); }
+        }
+
+        if (showWyckoff) {
+          const { data: wyckoffs } = await (supabase as any).from("wyckoff_events").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
+          if (wyckoffs) { newWyckoff = wyckoffs; if (isMounted) setWyckoffData(wyckoffs); }
+        }
+
+        if (showSRVolume) {
+          const { data: sr } = await (supabase as any).from("sr_volume_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
+          if (sr) { newSrVolume = sr; if (isMounted) setSrVolumeData(sr); }
+        }
+
+        if (showAutoPattern) {
+          const { data: ap } = await (supabase as any).from("auto_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
+          if (ap) { newAutoPattern = ap; if (isMounted) setAutoPatternData(ap); }
+        }
+        
+        // Cache the fresh data
+        await set(cacheKey, {
+          candles: formattedCandles,
+          smc: newSmc,
+          harmonic: newHarmonic,
+          wyckoff: newWyckoff,
+          srVolume: newSrVolume,
+          autoPattern: newAutoPattern
+        }).catch(() => null);
+
       } catch (err: any) {
-        if (isMounted) setError(err.message || "Ma'lumotlarni yuklashda xatolik yuz berdi");
+        // If we have cached data, silently fail
+        const cached = await get(cacheKey).catch(() => null);
+        if (!cached?.candles?.length && isMounted) {
+           setError(err.message || "Ma'lumotlarni yuklashda xatolik yuz berdi");
+        }
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -399,9 +443,16 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     return () => {
       resizeObserver.disconnect();
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {}
         chartRef.current = null;
       }
+      candlestickSeriesRef.current = null;
+      fanSeriesRefs.current = null;
+      zonePrimitiveRef.current = null;
+      eventMarkerRef.current = null;
+      linePrimitiveRef.current = null;
     };
   }, [isOpen, candlesData, isEmpty, isLoading, error, showVolume, openPrice, stopLoss, takeProfit, isBuy, volume]);
 
@@ -594,75 +645,6 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       }
     };
   }, [showWyckoff, wyckoffData, candlesData]);
-
-  // ---- Shadow signallari: yuklash + realtime (faqat vizual kuzatuv) ----
-  const shadowTimeframe = timeframe === "M1" ? "1min"
-    : timeframe === "M5" ? "5min"
-    : timeframe === "M15" ? "15min"
-    : timeframe === "H1" ? "1h"
-    : timeframe === "H4" ? "4h" : "1day";
-
-  useEffect(() => {
-    if (!isOpen || !activeSymbol || isGuest) return;
-    let isMounted = true;
-
-    const load = async () => {
-      const { data } = await supabase
-        .from("shadow_signals")
-        .select("id, symbol, timeframe, candle_time, signal, score, features, shadow_outcomes(was_correct)")
-        .eq("symbol", activeSymbol)
-        .eq("timeframe", shadowTimeframe)
-        .order("candle_time", { ascending: false })
-        .limit(300);
-
-      if (!isMounted) return;
-      const rows: ShadowSignalRow[] = (data ?? []).map((r: any) => ({
-        id: r.id,
-        symbol: r.symbol,
-        timeframe: r.timeframe,
-        candle_time: r.candle_time,
-        signal: r.signal,
-        score: r.score,
-        features: r.features,
-        was_correct: r.shadow_outcomes?.[0]?.was_correct ?? null,
-      }));
-      setShadowSignals(rows);
-    };
-
-    load();
-
-    const channel = supabase
-      .channel(`shadow_chart_${activeSymbol}_${shadowTimeframe}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_signals" }, () => load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_outcomes" }, () => load())
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, [isOpen, activeSymbol, shadowTimeframe, isGuest]);
-
-  // Shadow markerlarini chizish (setMarkers — chart qayta chizilmaydi)
-  useEffect(() => {
-    const series = candlestickSeriesRef.current;
-    if (!series) return;
-
-    if (!shadowMarkersRef.current) {
-      shadowMarkersRef.current = new ShadowSignalMarkers(series);
-    }
-    shadowMarkersRef.current.update(shadowSignals, candlesData.map((c) => Number(c.time)));
-  }, [shadowSignals, candlesData]);
-
-  useEffect(() => {
-    return () => {
-      if (shadowMarkersRef.current) {
-        try { shadowMarkersRef.current.detach(); } catch {}
-        shadowMarkersRef.current = null;
-      }
-    };
-  }, [isOpen]);
-
 
   // Connected Lines - Harmonic (Gold) & Auto Patterns (Orange)
   useEffect(() => {
@@ -861,34 +843,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
         });
       }
 
-      // 6. Shadow signallari (faqat kuzatuv, order bilan bog'liq emas)
-      if (shadowSignals && shadowSignals.length > 0) {
-        const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
-        shadowSignals.forEach((s) => {
-          if (s.signal !== "BUY" && s.signal !== "SELL") return;
-          const sTimeSec = parseTimeToSec(s.candle_time);
-          if (Math.abs(hoverTimeSec - sTimeSec) <= stepSeconds * 1.5) {
-            const f = (s.features || {}) as any;
-            const status = s.was_correct === null || s.was_correct === undefined
-              ? "kutilmoqda"
-              : s.was_correct ? "TO'G'RI ✓" : "XATO ✗";
-            matchedIndicators.push({
-              strategy: "Shadow Edge (statistik)",
-              signalType: `${s.signal} · ${status}`,
-              confidence: null,
-              reasoning: `score ${Number(s.score).toFixed(2)} | trend ${f.trend ?? "-"} | momentum ${f.momentum_3 ?? "-"} | volatility ${f.atr_pct ?? "-"} | RSI ${f.rsi14 ?? "-"}`,
-              color: s.signal === "BUY"
-                ? "border-emerald-500/50 text-emerald-300 bg-emerald-950/90"
-                : "border-rose-500/50 text-rose-300 bg-rose-950/90",
-              priceRange: new Date(sTimeSec * 1000).toLocaleString(),
-              dist: Math.abs(hoverTimeSec - sTimeSec) / stepSeconds,
-            });
-          }
-        });
-      }
-
       if (matchedIndicators.length > 0) {
-
         matchedIndicators.sort((a, b) => a.dist - b.dist);
         const bestMatch = matchedIndicators[0];
         setHoveredTooltip({
@@ -908,9 +863,9 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
 
     chart.subscribeCrosshairMove(handleCrosshairMove);
     return () => {
-      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+      try { chart.unsubscribeCrosshairMove(handleCrosshairMove); } catch(e) {}
     };
-  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe, shadowSignals]);
+  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe]);
 
 
   if (!isOpen) return null;

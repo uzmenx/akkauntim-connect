@@ -136,13 +136,13 @@ class SupabaseSync:
                 "take_profit": float(o.tp) if o.tp else None,
             })
 
-        # Closed history - always query the last 30 days to avoid timezone mismatch or missed trades
-        from_date = datetime.datetime.now() - datetime.timedelta(days=30)
+        # Closed history - always query all history (from 2020) to avoid timezone mismatch or missed trades
+        from_date = datetime.datetime(2020, 1, 1)
         to_date = datetime.datetime.now() + datetime.timedelta(days=1)
         deals = mt5.history_deals_get(from_date, to_date) or []
         closed_rows = []
         for d in deals:
-            if d.entry in (1, 2) and d.symbol:
+            if d.entry in (1, 2, 3) and d.symbol:
                 # Side and opening price logic
                 side = "SELL" if d.type == mt5.DEAL_TYPE_BUY else "BUY"  # Fallback: opposite of close deal
                 open_price = float(d.price)
@@ -175,8 +175,6 @@ class SupabaseSync:
                     "profit": float(d.profit),
                     "opened_at": opened_at,
                     "closed_at": closed_at,
-                    "mt5_comment": str(d.comment) if getattr(d, 'comment', None) else "",
-                    "mt5_reason": int(d.reason) if hasattr(d, 'reason') else None,
                     "agreed_strategies": agreed_strategies,
                     "ai_used": ai_used
                 })
@@ -216,6 +214,54 @@ class SupabaseSync:
             "strategy_overlays": strategy_overlays or {}
         }
         
+        import threading
+        def _do_post():
+            # POST strategy overlays directly using REST API
+            try:
+                import requests
+                headers = {
+                    "apikey": self.config.supabase_key,
+                    "Authorization": f"Bearer {self.config.supabase_key}",
+                    "Content-Type": "application/json",
+                    "Prefer": "resolution=merge-duplicates"
+                }
+                
+                # Fetch user_id using mt5_login
+                user_res = requests.get(
+                    f"{self.config.supabase_url}/rest/v1/users?mt5_login=eq.{self.mt5_login}&select=id",
+                    headers=headers
+                )
+                if user_res.status_code < 300 and user_res.json():
+                    user_id = user_res.json()[0]['id']
+                    
+                    if strategy_overlays:
+                        tables = {
+                            "smc": "smc_zones",
+                            "harmonic": "harmonic_patterns",
+                            "wyckoff": "wyckoff_events",
+                            "sr_volume": "sr_volume_zones",
+                            "auto_patterns": "auto_patterns"
+                        }
+                        
+                        for key, table in tables.items():
+                            items = strategy_overlays.get(key, [])
+                            if items:
+                                # First, delete fresh ones for this symbol/tf
+                                requests.delete(
+                                    f"{self.config.supabase_url}/rest/v1/{table}?symbol=eq.{symbol}&timeframe=eq.{timeframe}&status=eq.fresh&user_id=eq.{user_id}",
+                                    headers=headers
+                                )
+                                # Then insert new ones
+                                for item in items:
+                                    item['user_id'] = user_id
+                                requests.post(
+                                    f"{self.config.supabase_url}/rest/v1/{table}",
+                                    headers=headers,
+                                    json=items
+                                )
+                                
+            except Exception as e:
+                logger.debug(f"Direct REST strategy sync error: {e}")
         import threading
         def _do_post():
             try:
@@ -379,3 +425,20 @@ class SupabaseSync:
             requests.post(url, headers=headers, json=perf_data, timeout=10)
         except Exception as e:
             logger.error(f"upload_strategy_performance xatolik: {e}")
+
+    def update_bot_settings(self, updates: dict) -> None:
+        if not self.config.supabase_url or not self.config.supabase_key:
+            return
+        url = f"{self.config.supabase_url}/rest/v1/bot_settings?mt5_login=eq.{self.config.mt5_login}"
+        headers = {
+            "apikey": self.config.supabase_key,
+            "Authorization": f"Bearer {self.config.supabase_key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal"
+        }
+        try:
+            requests.patch(url, headers=headers, json=updates, timeout=10)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"update_bot_settings xatolik: {e}")
+

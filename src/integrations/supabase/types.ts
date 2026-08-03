@@ -144,7 +144,6 @@ export type Database = {
           created_at: string
           id: string
           loop_interval_minutes: number | null
-          loop_interval_seconds: number
           max_daily_loss: number
           max_lot_size: number
           min_confidence: number
@@ -158,7 +157,6 @@ export type Database = {
           prompt_strategy: string | null
           prompt_temporary: string | null
           prompt_temporary_expires_at: string | null
-          realtime_enabled: boolean
           risk_level_multiple_confirmation: number
           risk_level_single_confirmation: number
           risk_per_trade: number
@@ -179,7 +177,6 @@ export type Database = {
           created_at?: string
           id?: string
           loop_interval_minutes?: number | null
-          loop_interval_seconds?: number
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
@@ -193,7 +190,6 @@ export type Database = {
           prompt_strategy?: string | null
           prompt_temporary?: string | null
           prompt_temporary_expires_at?: string | null
-          realtime_enabled?: boolean
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
@@ -214,7 +210,6 @@ export type Database = {
           created_at?: string
           id?: string
           loop_interval_minutes?: number | null
-          loop_interval_seconds?: number
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
@@ -228,7 +223,6 @@ export type Database = {
           prompt_strategy?: string | null
           prompt_temporary?: string | null
           prompt_temporary_expires_at?: string | null
-          realtime_enabled?: boolean
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number

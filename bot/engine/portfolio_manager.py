@@ -168,12 +168,22 @@ class PortfolioManager:
         # State ni Veb UI uchun eksport qilish
         self._export_portfolio_state(sentiment_score)
         
+        # Score (ishonchlilik darajasi) ni hisoblash
+        total_score = 0
+        if winner_strategies:
+            for s in winner_strategies:
+                total_score += detailed_results.get(s, {}).get("confidence", 0)
+            avg_score = int(total_score / len(winner_strategies))
+        else:
+            avg_score = 0
+            
         return {
             "signal": winner_direction,
             "risk_pct": risk_pct,
             "agreed_strategies": list(winner_strategies),
             "details": detailed_results,
-            "reasoning": reasoning
+            "reasoning": reasoning,
+            "score": avg_score
         }
 
     def _export_portfolio_state(self, sentiment_score: int):

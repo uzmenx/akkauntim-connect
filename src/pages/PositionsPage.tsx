@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
-import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
+import { fmtMoney, fmtNum, timeAgo, fmtDateShort } from "@/lib/utils";
 import type { Position } from "@/lib/types";
 import { Loader2, CandlestickChart } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
@@ -76,7 +76,7 @@ export function PositionsPage() {
                   <p className={`tabular text-lg font-black ${profit >= 0 ? "text-success" : "text-danger"}`}>
                     {profit >= 0 ? "+" : ""}{fmtMoney(profit)}
                   </p>
-                  <p className="text-[11px] text-fg-dim">{fmtNum(p.volume, 2)} lot</p>
+                  <p className="text-[11px] text-fg-dim">{fmtNum(p.volume, 2)} lot &bull; {fmtDateShort(p.opened_at)}</p>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-4 gap-1 text-[10px]">

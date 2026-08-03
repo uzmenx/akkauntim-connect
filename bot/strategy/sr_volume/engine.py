@@ -96,13 +96,16 @@ def analyze_sr_volume(df: pd.DataFrame, lookbackPeriod: int = 20, vol_len: int =
     res_indices = np.where(res_cond, np.arange(n), np.nan)
     
     # Forward-fill to propagate active S/R levels efficiently using pandas
-    s_val = pd.Series(sup_vals).ffill().values
-    s_val_1 = pd.Series(sup_vals_1).ffill().values
-    s_idx = pd.Series(sup_indices).ffill().values
+    # NOTE: .copy() is required — pandas 2.x/3.x Copy-on-Write mode returns a
+    # read-only array from .values here, and the slice-assignment below would
+    # raise "assignment destination is read-only" without it.
+    s_val = pd.Series(sup_vals).ffill().values.copy()
+    s_val_1 = pd.Series(sup_vals_1).ffill().values.copy()
+    s_idx = pd.Series(sup_indices).ffill().values.copy()
     
-    r_val = pd.Series(res_vals).ffill().values
-    r_val_1 = pd.Series(res_vals_1).ffill().values
-    r_idx = pd.Series(res_indices).ffill().values
+    r_val = pd.Series(res_vals).ffill().values.copy()
+    r_val_1 = pd.Series(res_vals_1).ffill().values.copy()
+    r_idx = pd.Series(res_indices).ffill().values.copy()
     
     # Mask values before lookbackPeriod * 2 as nan
     s_val[:lookbackPeriod * 2] = np.nan

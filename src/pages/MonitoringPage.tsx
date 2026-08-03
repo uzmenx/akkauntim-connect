@@ -510,45 +510,45 @@ export function MonitoringPage() {
   const summary = telemetry?.summary || { final_signal: "NEUTRAL", confidence_pct: 0, agreement: false, veto_triggered: false };
 
   return (
-    <div className="flex flex-col gap-4 p-4 min-h-full max-w-7xl mx-auto pb-16">
+    <div className="flex flex-col gap-2 p-2.5 min-h-full max-w-7xl mx-auto pb-16">
       
       {/* Top Banner KPI Header */}
-      <div className="bg-[#11131a] border border-white/10 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4 relative overflow-hidden backdrop-blur-xl">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 shadow-lg flex flex-wrap items-center justify-between gap-3 relative overflow-hidden backdrop-blur-xl">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
         
-        <div className="flex items-center gap-3 z-10">
+        <div className="flex items-center gap-2 z-10">
           <div className={cn(
-            "p-3 rounded-xl border flex items-center justify-center shrink-0 shadow-lg",
-            sysStatus === "HEALTHY" ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-            sysStatus === "WARNING" ? "bg-amber-500/10 border-amber-500/30 text-amber-400" :
-            "bg-rose-500/10 border-rose-500/30 text-rose-400"
+            "p-1.5 rounded-lg border flex items-center justify-center shrink-0",
+            sysStatus === "HEALTHY" ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400" :
+            sysStatus === "WARNING" ? "bg-amber-500/5 border-amber-500/20 text-amber-400" :
+            "bg-rose-500/5 border-rose-500/20 text-rose-400"
           )}>
-            <Activity className="animate-pulse" size={24} />
+            <Activity className="animate-pulse" size={14} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-extrabold text-white tracking-tight">System Monitoring & Transparency</h2>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-xs font-black text-white/95 uppercase tracking-wide">System Diagnostics</h2>
               <span className={cn(
-                "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border",
-                sysStatus === "HEALTHY" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                "px-1.5 py-0.2 text-[8px] font-black uppercase tracking-widest rounded-md border",
+                sysStatus === "HEALTHY" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-amber-500/10 text-amber-300 border-amber-500/20"
               )}>
                 {sysStatus}
               </span>
             </div>
-            <p className="text-xs text-white/50">Har bir signal komponenti (Voting, LSTM, PPO, Merger) real-time holati va xato tahlili</p>
+            <p className="text-[10px] text-white/40">Real-time telemetry and component audit stream</p>
           </div>
         </div>
 
         {/* Currency Pair Selector & Refresh */}
-        <div className="flex items-center gap-2 z-10">
-          <div className="flex bg-black/40 border border-white/10 rounded-xl p-1 gap-1">
+        <div className="flex items-center gap-1.5 z-10">
+          <div className="flex bg-black/40 border border-white/5 rounded-lg p-0.5 gap-0.5">
             {["EURUSD", "GBPUSD", "XAUUSD", "BTCUSD"].map(s => (
               <button
                 key={s}
                 onClick={() => setActiveSymbol(s)}
                 className={cn(
-                  "px-2.5 py-1 text-xs font-extrabold rounded-lg transition-all",
-                  activeSymbol === s ? "bg-blue-600 text-white shadow-md shadow-blue-600/20" : "text-white/50 hover:text-white"
+                  "px-2 py-0.5 text-[10px] font-bold rounded-md transition-all",
+                  activeSymbol === s ? "bg-blue-600 text-white shadow-sm" : "text-white/40 hover:text-white"
                 )}
               >
                 {s}
@@ -559,71 +559,71 @@ export function MonitoringPage() {
           <button
             onClick={() => refetch()}
             disabled={isRefetching}
-            className="p-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white transition-all active:scale-95"
+            className="p-1.5 rounded-lg bg-white/5 border border-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-all active:scale-95"
             title="Yangilash"
           >
-            <RefreshCw size={14} className={cn(isRefetching && "animate-spin text-blue-400")} />
+            <RefreshCw size={11} className={cn(isRefetching && "animate-spin text-blue-400")} />
           </button>
         </div>
       </div>
 
       {/* Metric Counters Strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="bg-[#11131a]/80 border border-white/5 rounded-xl p-3 flex items-center gap-3">
-          <Gauge className="text-blue-400 shrink-0" size={20} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-2.5 flex items-center gap-2">
+          <Gauge className="text-blue-400 shrink-0" size={15} />
           <div>
-            <div className="text-[10px] text-white/40 font-bold uppercase">Umumiy Latency</div>
-            <div className="text-sm font-black text-white tabular-nums">{totalLatency} ms</div>
+            <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">LATENCY</div>
+            <div className="text-xs font-black text-white tabular-nums">{totalLatency} ms</div>
           </div>
         </div>
 
-        <div className="bg-[#11131a]/80 border border-white/5 rounded-xl p-3 flex items-center gap-3">
-          <GitMerge className="text-emerald-400 shrink-0" size={20} />
+        <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-2.5 flex items-center gap-2">
+          <GitMerge className="text-emerald-400 shrink-0" size={15} />
           <div>
-            <div className="text-[10px] text-white/40 font-bold uppercase">Merged Signal</div>
-            <div className="text-sm font-black text-emerald-400 flex items-center gap-1.5">
+            <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">MERGED SIGNAL</div>
+            <div className="text-xs font-black text-emerald-400 flex items-center gap-1">
               <span>{summary.final_signal}</span>
-              <span className="text-xs text-white/60">({summary.confidence_pct}%)</span>
+              <span className="text-[10px] text-white/50">({summary.confidence_pct}%)</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#11131a]/80 border border-white/5 rounded-xl p-3 flex items-center gap-3">
-          <ShieldCheck className="text-cyan-400 shrink-0" size={20} />
+        <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-2.5 flex items-center gap-2">
+          <ShieldCheck className="text-cyan-400 shrink-0" size={15} />
           <div>
-            <div className="text-[10px] text-white/40 font-bold uppercase">Kelishuv (Agreement)</div>
-            <div className="text-sm font-black text-white">
-              {summary.agreement ? <span className="text-emerald-400">Ha (Kelishildi)</span> : <span className="text-amber-400">Yo'q (Ziddiyat)</span>}
+            <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">CONSENSUS</div>
+            <div className="text-xs font-black text-white">
+              {summary.agreement ? <span className="text-emerald-400">AGREED</span> : <span className="text-amber-400">CONFLICT</span>}
             </div>
           </div>
         </div>
 
-        <div className="bg-[#11131a]/80 border border-white/5 rounded-xl p-3 flex items-center gap-3">
-          <AlertTriangle className={cn("shrink-0", activeAnomalies > 0 ? "text-amber-400 animate-bounce" : "text-emerald-400")} size={20} />
+        <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-2.5 flex items-center gap-2">
+          <AlertTriangle className={cn("shrink-0", activeAnomalies > 0 ? "text-amber-400 animate-bounce" : "text-emerald-400")} size={15} />
           <div>
-            <div className="text-[10px] text-white/40 font-bold uppercase">Anomaliya & Veto</div>
-            <div className="text-sm font-black text-white">
-              {summary.veto_triggered ? <span className="text-rose-400">VETO FAOL</span> : <span className="text-emerald-400">Normal (0 Veto)</span>}
+            <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">VETO & EXCEPTION</div>
+            <div className="text-xs font-black text-white">
+              {summary.veto_triggered ? <span className="text-rose-400">ACTIVE</span> : <span className="text-emerald-400">NORMAL (0)</span>}
             </div>
           </div>
         </div>
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex bg-[#10192e]/80 border border-white/10 rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
+      <div className="grid grid-cols-3 bg-[#080a0f]/90 border border-white/5 rounded-lg p-1 gap-1">
         {[
-          { id: "overview", label: "Umumiy Pipe", icon: Activity },
-          { id: "voting", label: "1. Voting Engine", icon: Zap },
-          { id: "lstm", label: "2. LSTM Model", icon: Cpu },
-          { id: "ppo", label: "3. PPO Agent", icon: Brain },
-          { id: "merger", label: "4. Signal Merger", icon: GitMerge },
-          { id: "why_chain", label: "Anti-Blackbox (WHY Chain)", icon: FileSearch },
-          { id: "ab_test", label: "A/B Test Shadow", icon: Split },
-          { id: "train_report", label: "Train Solishtirma", icon: GitCompare },
-          { id: "errors_hub", label: "Markaziy Xatolar Hub", icon: Bug },
-          { id: "drift", label: "Model Drift & Anomaliya", icon: Gauge },
-          { id: "anomalies", label: "Anomaliyalar Logi", icon: AlertTriangle },
-          { id: "logs", label: "Audit & Loglar", icon: Terminal }
+          { id: "overview", label: "Pipe Overview", icon: Activity },
+          { id: "voting", label: "Voting", icon: Zap },
+          { id: "lstm", label: "LSTM", icon: Cpu },
+          { id: "ppo", label: "PPO", icon: Brain },
+          { id: "merger", label: "Merger", icon: GitMerge },
+          { id: "why_chain", label: "Audit (WHY)", icon: FileSearch },
+          { id: "ab_test", label: "A/B Shadow", icon: Split },
+          { id: "train_report", label: "Train Delta", icon: GitCompare },
+          { id: "errors_hub", label: "Faults Hub", icon: Bug },
+          { id: "drift", label: "Drift Control", icon: Gauge },
+          { id: "anomalies", label: "Exceptions", icon: AlertTriangle },
+          { id: "logs", label: "Terminal Logs", icon: Terminal }
         ].map(tab => {
           const IconComp = tab.icon;
           return (
@@ -631,14 +631,14 @@ export function MonitoringPage() {
               key={tab.id}
               onClick={() => setSelectedTab(tab.id as any)}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-lg transition-all shrink-0 whitespace-nowrap cursor-pointer",
+                "flex items-center justify-center gap-1.5 px-2 py-1.5 text-[9px] sm:text-[10px] font-bold rounded-md transition-all cursor-pointer text-center",
                 selectedTab === tab.id
-                  ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20 border border-white/10"
-                  : "text-white/60 hover:text-white hover:bg-white/5"
+                  ? "bg-blue-600 text-white shadow-md border border-white/10"
+                  : "text-white/40 hover:text-white hover:bg-white/5"
               )}
             >
-              <IconComp size={14} />
-              <span>{tab.label}</span>
+              <IconComp size={11} className="shrink-0" />
+              <span className="truncate">{tab.label}</span>
             </button>
           );
         })}
@@ -648,77 +648,77 @@ export function MonitoringPage() {
 
       {/* 1. OVERVIEW PIPE TAB */}
       {(selectedTab === "overview" || selectedTab === "merger") && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in duration-300">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 animate-in fade-in duration-300">
           
           {/* Component 1: Voting Engine */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Zap className="text-amber-400" size={18} />
-                <h3 className="text-sm font-extrabold text-white">Voting Engine</h3>
+          <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-3 flex flex-col justify-between shadow-md relative overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-white/5">
+              <div className="flex items-center gap-1.5">
+                <Zap className="text-amber-400" size={13} />
+                <h3 className="text-[11px] font-bold text-white/90">Voting Engine</h3>
               </div>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-md">
                 {telemetry?.voting_engine?.latency_ms || 0.8} ms
               </span>
             </div>
 
-            <div className="py-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Faol strategiyalar:</span>
-                <span className="text-white font-bold">{telemetry?.voting_engine?.active_strategies_count || 7} ta</span>
+            <div className="py-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Faol stratlar:</span>
+                <span className="text-white/90 font-medium">{telemetry?.voting_engine?.active_strategies_count || 7} ta</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Kelishgan strategiyalar:</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Kelishgan:</span>
                 <span className="text-emerald-400 font-bold">{telemetry?.voting_engine?.agreed_count || 4} ta</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">So'nggi Ovoz:</span>
-                <span className="text-blue-400 font-black">{telemetry?.voting_engine?.final_direction} ({Math.round((telemetry?.voting_engine?.confidence || 0.75) * 100)}%)</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Ovoz:</span>
+                <span className="text-blue-400 font-bold">{telemetry?.voting_engine?.final_direction} ({Math.round((telemetry?.voting_engine?.confidence || 0.75) * 100)}%)</span>
               </div>
 
               {/* Agreed strategy badges */}
-              <div className="flex flex-wrap gap-1 pt-2">
+              <div className="flex flex-wrap gap-0.5 pt-1">
                 {(telemetry?.voting_engine?.agreed_strategies || []).map((s: string) => (
-                  <span key={s} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 border border-blue-500/30">
+                  <span key={s} className="text-[8px] font-bold px-1 py-0.2 rounded bg-blue-500/10 text-blue-300">
                     ✓ {s}
                   </span>
                 ))}
               </div>
             </div>
 
-            <button onClick={() => setSelectedTab("voting")} className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-bold text-white/80 rounded-xl border border-white/5 transition-all">
-              Batafsil ko'rish →
+            <button onClick={() => setSelectedTab("voting")} className="w-full py-1 mt-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/70 rounded-md border border-white/5 transition-all">
+              Batafsil ko'rish
             </button>
           </div>
 
           {/* Component 2: LSTM Model */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Cpu className="text-cyan-400" size={18} />
-                <h3 className="text-sm font-extrabold text-white">LSTM Model</h3>
+          <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-3 flex flex-col justify-between shadow-md relative overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-white/5">
+              <div className="flex items-center gap-1.5">
+                <Cpu className="text-cyan-400" size={13} />
+                <h3 className="text-[11px] font-bold text-white/90">LSTM Model</h3>
               </div>
-              <span className="text-[10px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20">
+              <span className="text-[8px] font-bold text-cyan-400 bg-cyan-500/10 px-1.5 py-0.2 rounded-md">
                 {telemetry?.lstm_predictor?.latency_ms || 3.2} ms
               </span>
             </div>
 
-            <div className="py-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Rejim / Modellar:</span>
-                <span className="text-white font-bold">{telemetry?.lstm_predictor?.is_ensemble ? "3-Model Ensemble" : "Single Model"}</span>
+            <div className="py-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Modellar:</span>
+                <span className="text-white/90 font-medium">{telemetry?.lstm_predictor?.is_ensemble ? "3-Model Ensemble" : "Single"}</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Normalizatsiya (12 F):</span>
-                <span className="text-emerald-400 font-bold">Sozlangan</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Normalizatsiya:</span>
+                <span className="text-emerald-400 font-medium">Sozlangan</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">LSTM Bashorati:</span>
-                <span className="text-cyan-400 font-black">{telemetry?.lstm_predictor?.prediction} ({telemetry?.lstm_predictor?.confidence}%)</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Bashorat:</span>
+                <span className="text-cyan-400 font-bold">{telemetry?.lstm_predictor?.prediction} ({telemetry?.lstm_predictor?.confidence}%)</span>
               </div>
 
               {/* Progress bar for prediction probability */}
-              <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden mt-2">
+              <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mt-1">
                 <div 
                   className="bg-cyan-500 h-full rounded-full transition-all duration-500" 
                   style={{ width: `${telemetry?.lstm_predictor?.confidence || 75}%` }} 
@@ -726,72 +726,72 @@ export function MonitoringPage() {
               </div>
             </div>
 
-            <button onClick={() => setSelectedTab("lstm")} className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-bold text-white/80 rounded-xl border border-white/5 transition-all">
-              Batafsil ko'rish →
+            <button onClick={() => setSelectedTab("lstm")} className="w-full py-1 mt-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/70 rounded-md border border-white/5 transition-all">
+              Batafsil ko'rish
             </button>
           </div>
 
           {/* Component 3: PPO Agent */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <Brain className="text-purple-400" size={18} />
-                <h3 className="text-sm font-extrabold text-white">PPO Agent</h3>
+          <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-3 flex flex-col justify-between shadow-md relative overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-white/5">
+              <div className="flex items-center gap-1.5">
+                <Brain className="text-purple-400" size={13} />
+                <h3 className="text-[11px] font-bold text-white/90">PPO Agent</h3>
               </div>
-              <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
+              <span className="text-[8px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded-md">
                 {telemetry?.ppo_agent?.latency_ms || 0.9} ms
               </span>
             </div>
 
-            <div className="py-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Shadow Trades:</span>
-                <span className="text-white font-bold">{telemetry?.ppo_agent?.total_shadow_trades || 48} ta</span>
+            <div className="py-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Shadow Trades:</span>
+                <span className="text-white/90 font-medium">{telemetry?.ppo_agent?.total_shadow_trades || 48} ta</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Shadow Win Rate:</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Win Rate:</span>
                 <span className="text-emerald-400 font-bold">{telemetry?.ppo_agent?.shadow_win_rate_pct || 62.5}%</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Wilson CI (95% LB):</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Wilson CI (95%):</span>
                 <span className="text-purple-300 font-mono font-bold">{telemetry?.ppo_agent?.wilson_ci_95_lower_bound || 0.485}</span>
               </div>
             </div>
 
-            <button onClick={() => setSelectedTab("ppo")} className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-bold text-white/80 rounded-xl border border-white/5 transition-all">
-              Batafsil ko'rish →
+            <button onClick={() => setSelectedTab("ppo")} className="w-full py-1 mt-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/70 rounded-md border border-white/5 transition-all">
+              Batafsil ko'rish
             </button>
           </div>
 
           {/* Component 4: Signal Merger */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-4 flex flex-col justify-between shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-white/10">
-              <div className="flex items-center gap-2">
-                <GitMerge className="text-emerald-400" size={18} />
-                <h3 className="text-sm font-extrabold text-white">Signal Merger</h3>
+          <div className="bg-[#0b0d13]/70 border border-white/5 rounded-xl p-3 flex flex-col justify-between shadow-md relative overflow-hidden">
+            <div className="flex items-center justify-between pb-1.5 border-b border-white/5">
+              <div className="flex items-center gap-1.5">
+                <GitMerge className="text-emerald-400" size={13} />
+                <h3 className="text-[11px] font-bold text-white/90">Signal Merger</h3>
               </div>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+              <span className="text-[8px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded-md">
                 {telemetry?.signal_merger?.latency_ms || 0.8} ms
               </span>
             </div>
 
-            <div className="py-3 space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Kelishuv (Agreement):</span>
+            <div className="py-2 space-y-1">
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Agreement:</span>
                 <span className="text-emerald-400 font-bold">✓ Ha</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">LSTM Vazni (Wilson):</span>
-                <span className="text-cyan-400 font-bold">{telemetry?.signal_merger?.lstm_input?.calculated_weight || 0.58}</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">LSTM Weight:</span>
+                <span className="text-cyan-400 font-medium">{telemetry?.signal_merger?.lstm_input?.calculated_weight || 0.58}</span>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-white/50">Yakuniy Signal:</span>
-                <span className="text-emerald-400 font-black text-sm">{summary.final_signal} ({summary.confidence_pct}%)</span>
+              <div className="flex justify-between text-[10px]">
+                <span className="text-white/40">Signal:</span>
+                <span className="text-emerald-400 font-black">{summary.final_signal} ({summary.confidence_pct}%)</span>
               </div>
             </div>
 
-            <button onClick={() => setSelectedTab("merger")} className="w-full py-1.5 bg-white/5 hover:bg-white/10 text-xs font-bold text-white/80 rounded-xl border border-white/5 transition-all">
-              Batafsil ko'rish →
+            <button onClick={() => setSelectedTab("merger")} className="w-full py-1 mt-1 bg-white/5 hover:bg-white/10 text-[9px] font-bold text-white/70 rounded-md border border-white/5 transition-all">
+              Batafsil ko'rish
             </button>
           </div>
 
@@ -800,41 +800,41 @@ export function MonitoringPage() {
 
       {/* 2. VOTING ENGINE DETAILED TAB */}
       {selectedTab === "voting" && (
-        <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-2.5 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Zap className="text-amber-400" size={20} />
-                Voting Engine Matrix (7 Strategiya)
+              <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="text-amber-400" size={13} />
+                Voting Engine Matrix
               </h3>
-              <p className="text-xs text-white/50">Yetti strategiyaning har biridan olingan signal va ishonch ko'rsatkichlari</p>
+              <p className="text-[10px] text-white/40">7 strategiya ovoz berish va ishonch ko'rsatkichlari</p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">
-              Winner: {telemetry?.voting_engine?.final_direction}
+            <span className="px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] font-bold">
+              WINNER: {telemetry?.voting_engine?.final_direction}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-2">
             {Object.entries(telemetry?.voting_engine?.strategy_matrix || {}).map(([key, strat]: [string, any]) => (
-              <div key={key} className="bg-black/40 border border-white/5 rounded-xl p-3 flex flex-col justify-between gap-2">
+              <div key={key} className="bg-black/40 border border-white/5 rounded-lg p-2.5 flex flex-col justify-between gap-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white">{strat.name}</span>
+                  <span className="text-[10px] font-bold text-white/95 leading-none">{strat.name}</span>
                   <span className={cn(
-                    "text-[10px] font-black px-2 py-0.5 rounded uppercase",
-                    strat.signal === "BUY" ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30" :
-                    strat.signal === "SELL" ? "bg-rose-500/20 text-rose-300 border border-rose-500/30" :
-                    "bg-white/10 text-white/60"
+                    "text-[8px] font-black px-1 py-0.2 rounded uppercase",
+                    strat.signal === "BUY" ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" :
+                    strat.signal === "SELL" ? "bg-rose-500/10 text-rose-300 border border-rose-500/20" :
+                    "bg-white/5 text-white/40"
                   )}>
                     {strat.signal}
                   </span>
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] text-white/50">
+                  <div className="flex justify-between text-[9px] text-white/40">
                     <span>Ishonch (Confidence):</span>
                     <span className="font-bold text-white">{strat.confidence}%</span>
                   </div>
-                  <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
                     <div 
                       className={cn("h-full rounded-full", strat.signal === "BUY" ? "bg-emerald-500" : strat.signal === "SELL" ? "bg-rose-500" : "bg-amber-500")}
                       style={{ width: `${strat.confidence}%` }} 
@@ -842,9 +842,9 @@ export function MonitoringPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between text-[10px] text-white/40 pt-1 border-t border-white/5">
-                  <span>Vazn Chegarasi: {strat.weight}</span>
-                  <span>Holat: {strat.active ? "Faol" : "O'chirilgan"}</span>
+                <div className="flex justify-between text-[8px] text-white/30 pt-1 border-t border-white/5">
+                  <span>Vazn: {strat.weight}</span>
+                  <span>{strat.active ? "Faol" : "O'chirilgan"}</span>
                 </div>
               </div>
             ))}
@@ -854,52 +854,52 @@ export function MonitoringPage() {
 
       {/* 3. LSTM DETAILED TAB */}
       {selectedTab === "lstm" && (
-        <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Cpu className="text-cyan-400" size={20} />
-                LSTM Neural Network Predictor Diagnostics
+              <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                <Cpu className="text-cyan-400" size={13} />
+                LSTM Neural Net Predictor
               </h3>
-              <p className="text-xs text-white/50">12 Input feature alignment, scaler calibration va Temporal Candle Attention weights</p>
+              <p className="text-[10px] text-white/40">12 Input feature alignment & Temporal Candle Attention</p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-xs font-bold">
-              Device: {telemetry?.lstm_predictor?.execution_device}
+            <span className="px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[9px] font-bold">
+              DEVICE: {telemetry?.lstm_predictor?.execution_device}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider">Model Kalibrovkasi</h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-white/60">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+            <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-2">
+              <h4 className="text-[9px] font-bold text-white/50 uppercase tracking-wider">Model Kalibrovkasi</h4>
+              <div className="space-y-1.5 text-[10px]">
+                <div className="flex justify-between text-white/50">
                   <span>Input Features:</span>
-                  <span className="font-bold text-white">12 ta xususiyat</span>
+                  <span className="font-bold text-white">12 features</span>
                 </div>
-                <div className="flex justify-between text-white/60">
+                <div className="flex justify-between text-white/50">
                   <span>Scaler Class:</span>
-                  <span className="font-bold text-emerald-400">InstitutionalFeatureScaler</span>
+                  <span className="font-bold text-emerald-400">InstFeatureScaler</span>
                 </div>
-                <div className="flex justify-between text-white/60">
+                <div className="flex justify-between text-white/50">
                   <span>Ensemble Status:</span>
-                  <span className="font-bold text-cyan-400">{telemetry?.lstm_predictor?.is_ensemble ? "3-Model Ensemble Active" : "Single Model"}</span>
+                  <span className="font-bold text-cyan-400">{telemetry?.lstm_predictor?.is_ensemble ? "3-Model Ensemble" : "Single"}</span>
                 </div>
               </div>
             </div>
 
-            <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3 md:col-span-2">
-              <h4 className="text-xs font-bold text-white/80 uppercase tracking-wider">Temporal Candle Attention Weights (E'tibor Og'irliklari)</h4>
-              <p className="text-[11px] text-white/50">Modellash jarayonida neyron tarmog'i har bir shamning ahamiyatini quyidagicha baholagan:</p>
+            <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-2 md:col-span-2">
+              <h4 className="text-[9px] font-bold text-white/50 uppercase tracking-wider">Temporal Candle Attention Weights</h4>
+              <p className="text-[9px] text-white/40">Neyron tarmog'ining har bir sham uchun baholangan ahamiyati:</p>
 
-              <div className="flex items-end gap-1.5 h-24 pt-2">
+              <div className="flex items-end gap-1 h-14 pt-1">
                 {(telemetry?.lstm_predictor?.attention_mechanism?.attention_weights || [0.05, 0.1, 0.15, 0.2, 0.25, 0.1, 0.05, 0.08, 0.02, 0.01]).map((w: number, idx: number) => (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                    <span className="text-[9px] text-cyan-300 font-mono">{(w * 100).toFixed(0)}%</span>
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-0.5 h-full justify-end">
+                    <span className="text-[8px] text-cyan-300 font-mono">{(w * 100).toFixed(0)}%</span>
                     <div 
                       className="w-full bg-gradient-to-t from-cyan-600 to-blue-400 rounded-t transition-all duration-500"
                       style={{ height: `${Math.max(10, w * 350)}%` }} 
                     />
-                    <span className="text-[8px] text-white/40">C-{10 - idx}</span>
+                    <span className="text-[7px] text-white/30">C-{10 - idx}</span>
                   </div>
                 ))}
               </div>
@@ -910,30 +910,30 @@ export function MonitoringPage() {
 
       {/* 4. PPO AGENT TAB */}
       {selectedTab === "ppo" && (
-        <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 animate-in fade-in duration-300">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Brain className="text-purple-400" size={20} />
-                PPO Reinforcement Learning & Shadow Edge
+              <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                <Brain className="text-purple-400" size={13} />
+                PPO RL & Shadow Edge
               </h3>
-              <p className="text-xs text-white/50">Wilson Confidence Interval quyi chegarasi va statistika</p>
+              <p className="text-[10px] text-white/40">Wilson Confidence Interval & stats</p>
             </div>
-            <span className="px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20 text-xs font-bold">
-              Wilson 95% LB = {telemetry?.ppo_agent?.wilson_ci_95_lower_bound}
+            <span className="px-1.5 py-0.2 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20 text-[9px] font-bold">
+              WILSON 95% LB = {telemetry?.ppo_agent?.wilson_ci_95_lower_bound}
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-white/80 uppercase">Policy Output Action</h4>
-              <div className="flex items-center justify-between p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-                <span className="text-xs text-white/60">Tavsiya etilgan amal:</span>
-                <span className="text-base font-black text-purple-300">{telemetry?.ppo_agent?.policy_action}</span>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-2">
+              <h4 className="text-[9px] font-bold text-white/50 uppercase">Policy Output</h4>
+              <div className="flex items-center justify-between p-1.5 bg-purple-500/10 border border-purple-500/20 rounded-md">
+                <span className="text-[9px] text-white/50">Action:</span>
+                <span className="text-xs font-extrabold text-purple-300">{telemetry?.ppo_agent?.policy_action}</span>
               </div>
-              <div className="space-y-1 pt-2">
+              <div className="space-y-1">
                 {Object.entries(telemetry?.ppo_agent?.action_probabilities || {}).map(([act, prob]: [string, any]) => (
-                  <div key={act} className="flex items-center justify-between text-xs text-white/60">
+                  <div key={act} className="flex items-center justify-between text-[9px] text-white/40">
                     <span>{act}:</span>
                     <span className="font-bold text-white">{(prob * 100).toFixed(1)}%</span>
                   </div>
@@ -941,21 +941,21 @@ export function MonitoringPage() {
               </div>
             </div>
 
-            <div className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-3">
-              <h4 className="text-xs font-bold text-white/80 uppercase">Shadow Performance Edge</h4>
-              <div className="space-y-2 text-xs">
-                <div className="flex justify-between text-white/60">
-                  <span>Jami Shadow Savdolar:</span>
+            <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-2">
+              <h4 className="text-[9px] font-bold text-white/50 uppercase">Shadow Performance</h4>
+              <div className="space-y-1.5 text-[9px]">
+                <div className="flex justify-between text-white/50">
+                  <span>Shadow Trades:</span>
                   <span className="font-bold text-white">{telemetry?.ppo_agent?.total_shadow_trades} ta</span>
                 </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Shadow Win Rate:</span>
+                <div className="flex justify-between text-white/50">
+                  <span>Win Rate:</span>
                   <span className="font-bold text-emerald-400">{telemetry?.ppo_agent?.shadow_win_rate_pct}%</span>
                 </div>
-                <div className="flex justify-between text-white/60">
-                  <span>Statistik Ustunlik (Edge):</span>
-                  <span className="font-bold text-purple-400">
-                    {telemetry?.ppo_agent?.has_statistical_edge ? "✓ Tasdiqlangan (LB > 0.5)" : "Yetarlicha verification yo'q"}
+                <div className="flex justify-between text-white/50">
+                  <span>Statistical Edge:</span>
+                  <span className="font-bold text-purple-400 text-right leading-none">
+                    {telemetry?.ppo_agent?.has_statistical_edge ? "✓ Tasdiq" : "No edge"}
                   </span>
                 </div>
               </div>
@@ -966,26 +966,26 @@ export function MonitoringPage() {
 
       {/* ANTI-BLACKBOX WHY CHAIN INSPECTOR TAB */}
       {selectedTab === "why_chain" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="space-y-2 animate-in fade-in duration-300">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <FileSearch className="text-cyan-400" size={20} />
-                  "Qora Quti Bo'lmaslik" Audit va Yakuniy Qaror "NEGA" (WHY Chain) Zanjiri
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileSearch className="text-cyan-400" size={13} />
+                  WHY Chain Audit Inspector
                 </h3>
-                <p className="text-xs text-white/50">
-                  Institutional trading boti tomonidan qabul qilingan har bir signalning 5 bosqichli to'liq hisob-kitob, xususiyatlar og'irligi va matematika zanjiri
+                <p className="text-[10px] text-white/40">
+                  Institutional trading boti 5 bosqichli qaror zanjiri
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-cyan-500/10 text-cyan-300">
                   ID: {whyChainAudit?.decision_id || "DEC-9984"}
                 </span>
                 <span className={cn(
-                  "px-3 py-1 rounded-full text-xs font-black uppercase border",
-                  whyChainAudit?.final_action === "BUY" ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : "bg-rose-500/20 text-rose-300 border-rose-500/40"
+                  "px-1.5 py-0.2 rounded text-[8px] font-black uppercase border",
+                  whyChainAudit?.final_action === "BUY" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-rose-500/10 text-rose-300 border-rose-500/20"
                 )}>
                   {whyChainAudit?.final_action || "BUY"} ({whyChainAudit?.final_lot_size} Lot)
                 </span>
@@ -993,72 +993,67 @@ export function MonitoringPage() {
             </div>
 
             {/* Overall Confidence Header */}
-            <div className="bg-gradient-to-r from-cyan-950/40 via-blue-950/30 to-purple-950/40 border border-cyan-500/30 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+            <div className="bg-gradient-to-r from-cyan-950/20 via-blue-950/15 to-purple-950/20 border border-cyan-500/20 rounded-lg p-2.5 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-xs text-cyan-300 font-bold uppercase">Umumiy Ishonch Balli (Integrated Confidence WScore)</div>
-                <div className="text-2xl font-black text-white tabular-nums">
+                <div className="text-[9px] text-cyan-300 font-bold uppercase tracking-wider">Integrated Confidence WScore</div>
+                <div className="text-base font-black text-white tabular-nums">
                   {whyChainAudit?.total_confidence_score_pct || 82.4}%
                 </div>
-                <div className="text-[11px] text-white/50">Stop Loss: {whyChainAudit?.stop_loss_pips} pips | Take Profit: {whyChainAudit?.take_profit_pips} pips</div>
+                <div className="text-[9px] text-white/40">SL: {whyChainAudit?.stop_loss_pips} | TP: {whyChainAudit?.take_profit_pips} pips</div>
               </div>
 
-              <div className="text-xs text-right space-y-1">
-                <div className="text-emerald-400 font-bold">✓ Institutional Full Audit Trail Logged</div>
-                <div className="text-white/40 font-mono text-[10px]">Veto: PASS | Conflict: RESOLVED</div>
+              <div className="text-right text-[9px] space-y-0.5">
+                <div className="text-emerald-400 font-bold">✓ Full Audit Logged</div>
+                <div className="text-white/30 font-mono text-[8px]">Veto: PASS | Resolved</div>
               </div>
             </div>
 
             {/* 5-Step WHY Chain Accordion / Timeline */}
-            <div className="space-y-4 pt-2">
+            <div className="space-y-2 pt-1">
               {(whyChainAudit?.why_chain_steps || []).map((step: any) => (
-                <div key={step.step} className="bg-black/40 border border-white/10 rounded-xl p-4 space-y-3 relative">
-                  <div className="flex items-center gap-3 border-b border-white/10 pb-2">
-                    <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 font-mono text-xs font-bold flex items-center justify-center border border-cyan-500/40 shrink-0">
+                <div key={step.step} className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-2 relative">
+                  <div className="flex items-center gap-2 border-b border-white/5 pb-1.5">
+                    <span className="w-4 h-4 rounded-full bg-cyan-500/10 text-cyan-300 font-mono text-[9px] font-bold flex items-center justify-center border border-cyan-500/20 shrink-0">
                       {step.step}
                     </span>
                     <div>
-                      <h4 className="text-sm font-extrabold text-white">{step.title}</h4>
-                      <p className="text-xs text-white/50">{step.description}</p>
+                      <h4 className="text-[10px] font-black text-white/90 leading-tight">{step.title}</h4>
+                      <p className="text-[9px] text-white/40 leading-none">{step.description}</p>
                     </div>
                   </div>
 
                   {/* Step 1: Voting Details */}
                   {step.step === 1 && (
-                    <div className="space-y-2 text-xs">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="space-y-1.5 text-[9px]">
+                      <div className="grid grid-cols-2 gap-1.5">
                         {(step.details?.votes || []).map((v: any, idx: number) => (
-                          <div key={idx} className="bg-white/5 p-2 rounded-lg flex items-center justify-between">
-                            <span className="text-white/80 font-mono text-[11px]">{v.strategy}</span>
-                            <div className="flex items-center gap-2 font-mono">
+                          <div key={idx} className="bg-white/5 p-1 rounded-md flex items-center justify-between">
+                            <span className="text-white/70 font-mono text-[9px] truncate max-w-[60px]">{v.strategy}</span>
+                            <div className="flex items-center gap-1 font-mono">
                               <span className={cn(
-                                "px-1.5 py-0.5 rounded text-[10px] font-bold",
-                                v.vote === "BUY" ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white/60"
+                                "px-1 py-0.1 rounded text-[8px] font-bold",
+                                v.vote === "BUY" ? "bg-emerald-500/10 text-emerald-300" : "bg-white/5 text-white/40"
                               )}>
                                 {v.vote}
                               </span>
-                              <span className="text-white/60 text-[10px]">Weight: {v.wilson_lb_weight}</span>
                             </div>
                           </div>
                         ))}
-                      </div>
-                      <div className="text-[11px] text-cyan-300 pt-1 font-mono">
-                        Voting Engine Result Score: +{step.details?.voting_score} (Consensus: {step.details?.consensus_percentage}%)
                       </div>
                     </div>
                   )}
 
                   {/* Step 2: LSTM Features */}
                   {step.step === 2 && (
-                    <div className="space-y-2 text-xs">
-                      <div className="text-white/70 mb-1">Top 5 Feature Importance Weightings:</div>
-                      <div className="space-y-1.5">
-                        {(step.details?.top_features || []).map((f: any, idx: number) => (
+                    <div className="space-y-1 text-[9px]">
+                      <div className="space-y-1">
+                        {(step.details?.top_features || []).slice(0, 3).map((f: any, idx: number) => (
                           <div key={idx} className="space-y-0.5">
-                            <div className="flex justify-between text-[11px]">
-                              <span className="font-mono text-white">{f.feature} ({f.impact})</span>
+                            <div className="flex justify-between text-[9px]">
+                              <span className="font-mono text-white/70 truncate max-w-[120px]">{f.feature}</span>
                               <span className="font-mono text-cyan-400 font-bold">{(f.importance_score * 100).toFixed(0)}%</span>
                             </div>
-                            <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                            <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
                               <div className="bg-cyan-400 h-full rounded-full" style={{ width: `${f.importance_score * 100}%` }} />
                             </div>
                           </div>
@@ -1069,17 +1064,17 @@ export function MonitoringPage() {
 
                   {/* Step 3: PPO Policy */}
                   {step.step === 3 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs font-mono">
-                      <div className="bg-white/5 p-2.5 rounded-lg">
-                        <div className="text-white/40 text-[10px]">Action Selected</div>
+                    <div className="grid grid-cols-3 gap-1.5 text-[9px] font-mono">
+                      <div className="bg-white/5 p-1 rounded">
+                        <div className="text-white/30 text-[7px] uppercase">Action</div>
                         <div className="text-emerald-400 font-bold">{step.details?.action_selected}</div>
                       </div>
-                      <div className="bg-white/5 p-2.5 rounded-lg">
-                        <div className="text-white/40 text-[10px]">Log Prob & State Value</div>
-                        <div className="text-purple-300 font-bold">{step.details?.policy_log_prob} / V={step.details?.estimated_state_value}</div>
+                      <div className="bg-white/5 p-1 rounded">
+                        <div className="text-white/30 text-[7px] uppercase">LogProb</div>
+                        <div className="text-purple-300 font-bold truncate">{step.details?.policy_log_prob}</div>
                       </div>
-                      <div className="bg-white/5 p-2.5 rounded-lg">
-                        <div className="text-white/40 text-[10px]">Sharpe Bonus</div>
+                      <div className="bg-white/5 p-1 rounded">
+                        <div className="text-white/30 text-[7px] uppercase">Bonus</div>
                         <div className="text-cyan-300 font-bold">+{step.details?.reward_penalty_checks?.sharpe_bonus}</div>
                       </div>
                     </div>
@@ -1087,31 +1082,27 @@ export function MonitoringPage() {
 
                   {/* Step 4: Merger & Veto */}
                   {step.step === 4 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-emerald-300">
-                        <div className="text-[10px] text-emerald-400/70 font-bold uppercase">Spread Guard</div>
-                        <div className="font-mono text-[11px]">{step.details?.spread_filter}</div>
+                    <div className="grid grid-cols-3 gap-1 text-[9px]">
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 p-1 rounded text-emerald-300">
+                        <div className="text-[7px] text-emerald-400/50 uppercase">Spread</div>
+                        <div className="font-mono truncate">{step.details?.spread_filter}</div>
                       </div>
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-emerald-300">
-                        <div className="text-[10px] text-emerald-400/70 font-bold uppercase">News Calendar Guard</div>
-                        <div className="font-mono text-[11px]">{step.details?.news_filter}</div>
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 p-1 rounded text-emerald-300">
+                        <div className="text-[7px] text-emerald-400/50 uppercase">News</div>
+                        <div className="font-mono truncate">{step.details?.news_filter}</div>
                       </div>
-                      <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg text-emerald-300">
-                        <div className="text-[10px] text-emerald-400/70 font-bold uppercase">Margin Health Guard</div>
-                        <div className="font-mono text-[11px]">{step.details?.margin_health_filter}</div>
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 p-1 rounded text-emerald-300">
+                        <div className="text-[7px] text-emerald-400/50 uppercase">Margin</div>
+                        <div className="font-mono truncate">{step.details?.margin_health_filter}</div>
                       </div>
                     </div>
                   )}
 
                   {/* Step 5: Final Math Formula */}
                   {step.step === 5 && (
-                    <div className="bg-white/5 p-3 rounded-lg space-y-2 text-xs font-mono">
-                      <div className="text-purple-300 font-bold">Formulalar formulasi: {step.details?.formula}</div>
-                      <div className="text-white/80">Matematik hisob: {step.details?.math_eval}</div>
-                      <div className="text-emerald-400 font-bold">Qaror chegarasi: {step.details?.decision_threshold}</div>
-                      <div className="text-white/60 text-[11px] italic border-t border-white/10 pt-1">
-                        Xulosa: {step.details?.conclusion}
-                      </div>
+                    <div className="bg-white/5 p-1.5 rounded space-y-1 text-[9px] font-mono">
+                      <div className="text-purple-300 font-bold truncate">{step.details?.formula}</div>
+                      <div className="text-white/50 truncate">Eval: {step.details?.math_eval}</div>
                     </div>
                   )}
 
@@ -1125,133 +1116,125 @@ export function MonitoringPage() {
 
       {/* A/B TEST SHADOW INFRASTRUCTURE TAB */}
       {selectedTab === "ab_test" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="space-y-2 animate-in fade-in duration-300">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Split className="text-purple-400" size={20} />
-                  Doimiy A/B Test Shadow Infratuzilmasi (Zero-Risk Observation Mode)
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <Split className="text-purple-400" size={13} />
+                  A/B Test Shadow Infrastructure
                 </h3>
-                <p className="text-xs text-white/50">
-                  Yangi nomzod modelni (Model B) mavjud production model (Model A) bilan parallel real-bozor sharoitida (hech qanday xatarsiz) kuzatuv rejimida tahlil qilish
+                <p className="text-[10px] text-white/40">
+                  Zero-Risk Observation Mode parallel real-time candidate model analysis
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1.5">
-                  <EyeOff size={13} strokeWidth={2.5} />
-                  100% Shadow Mode (Zero Execution Impact)
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-purple-500/10 text-purple-300 border border-purple-500/20 flex items-center gap-1">
+                  <EyeOff size={10} strokeWidth={2.5} />
+                  Shadow Mode
                 </span>
               </div>
             </div>
 
             {/* Metrics Header Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Signal Disagreement Rate</div>
-                <div className="text-lg font-black text-amber-400 tabular-nums">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Disagreement Rate</div>
+                <div className="text-sm font-black text-amber-400 tabular-nums">
                   {abTestReport?.divergence_metrics?.signal_disagreement_pct || 18.5}%
                 </div>
-                <div className="text-[10px] text-white/40">Modellar signal farqi (4,820 tick)</div>
+                <div className="text-[8px] text-white/30">Modellar signal farqi (4.8k ticks)</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Candidate Outperformance</div>
-                <div className="text-lg font-black text-emerald-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Candidate Alpha</div>
+                <div className="text-sm font-black text-emerald-400 tabular-nums">
                   +{abTestReport?.divergence_metrics?.candidate_outperformance_pct || 6.2}%
                 </div>
-                <div className="text-[10px] text-white/40">Model B Win Rate ustunligi</div>
+                <div className="text-[8px] text-white/30">Model B Win Rate advantage</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Simulated Alpha Gain</div>
-                <div className="text-lg font-black text-cyan-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Simulated Gain</div>
+                <div className="text-sm font-black text-cyan-400 tabular-nums">
                   +${abTestReport?.divergence_metrics?.simulated_alpha_gain_usd || 469.70}
                 </div>
-                <div className="text-[10px] text-white/40">Shadow rejimida ko'rilgan qo'shimcha foyda</div>
+                <div className="text-[8px] text-white/30">Shadow extra profit</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Statistical Significance</div>
-                <div className="text-lg font-black text-purple-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Stat Significance</div>
+                <div className="text-sm font-black text-purple-400 tabular-nums">
                   p = {abTestReport?.divergence_metrics?.p_value_statistical_significance || 0.021}
                 </div>
-                <div className="text-[10px] text-emerald-400 font-bold">✓ Confirmed (p &lt; 0.05)</div>
+                <div className="text-[8px] text-emerald-400 font-bold">✓ Confirmed (p &lt; 0.05)</div>
               </div>
             </div>
 
             {/* Side-by-Side Dual Engine Comparison Matrix */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
               
               {/* Model A - Active Production */}
-              <div className="bg-black/40 border border-blue-500/30 rounded-xl p-4 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-                    <span className="text-xs font-black text-white uppercase">Model A — Active Production</span>
+              <div className="bg-black/40 border border-blue-500/20 rounded-lg p-2.5 space-y-1.5 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    <span className="text-[9px] font-black text-white/90 uppercase">Model A — Production</span>
                   </div>
-                  <span className="text-[10px] font-mono bg-blue-500/20 px-2 py-0.5 rounded text-blue-300 border border-blue-500/30">
-                    REAL ORDERS ACTIVE
+                  <span className="text-[8px] font-mono bg-blue-500/10 px-1 py-0.2 rounded text-blue-300">
+                    LIVE ORDERS
                   </span>
                 </div>
 
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-white/70">
-                    <span>Versiya Identifikatori:</span>
-                    <span className="font-mono text-white font-bold">{abTestReport?.model_a_production?.version}</span>
+                <div className="space-y-1 text-[10px]">
+                  <div className="flex justify-between text-white/50">
+                    <span>Versiya ID:</span>
+                    <span className="font-mono text-white font-medium">{abTestReport?.model_a_production?.version}</span>
                   </div>
-                  <div className="flex justify-between text-white/70">
+                  <div className="flex justify-between text-white/50">
                     <span>Real Win Rate:</span>
-                    <span className="font-mono text-blue-400 font-extrabold">{abTestReport?.model_a_production?.win_rate_pct}%</span>
+                    <span className="font-mono text-blue-400 font-bold">{abTestReport?.model_a_production?.win_rate_pct}%</span>
                   </div>
-                  <div className="flex justify-between text-white/70">
+                  <div className="flex justify-between text-white/50">
                     <span>Jami Net Profit:</span>
-                    <span className="font-mono text-emerald-400 font-bold">${abTestReport?.model_a_production?.total_profit_usd}</span>
+                    <span className="font-mono text-emerald-400 font-medium">${abTestReport?.model_a_production?.total_profit_usd}</span>
                   </div>
-                  <div className="flex justify-between text-white/70">
+                  <div className="flex justify-between text-white/50">
                     <span>Sharpe Ratio:</span>
                     <span className="font-mono text-white">{abTestReport?.model_a_production?.sharpe_ratio}</span>
-                  </div>
-                  <div className="flex justify-between text-white/70">
-                    <span>Max Drawdown:</span>
-                    <span className="font-mono text-rose-400">{abTestReport?.model_a_production?.max_drawdown_pct}%</span>
                   </div>
                 </div>
               </div>
 
-              {/* Model B - Candidate Shadow */}
-              <div className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-4 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between border-b border-purple-500/20 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-purple-400 animate-ping" />
-                    <span className="text-xs font-black text-purple-300 uppercase">Model B — Challenger Candidate</span>
+              {/* Model B - Challenger Shadow */}
+              <div className="bg-purple-950/10 border border-purple-500/20 rounded-lg p-2.5 space-y-1.5 relative overflow-hidden">
+                <div className="flex items-center justify-between border-b border-purple-500/10 pb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-ping" />
+                    <span className="text-[9px] font-black text-purple-300 uppercase">Model B — Challenger</span>
                   </div>
-                  <span className="text-[10px] font-mono bg-purple-500/20 px-2 py-0.5 rounded text-purple-300 border border-purple-500/30">
-                    100% SHADOW (NO RISK)
+                  <span className="text-[8px] font-mono bg-purple-500/10 px-1 py-0.2 rounded text-purple-300">
+                    100% SHADOW
                   </span>
                 </div>
 
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-white/80">
-                    <span>Versiya Identifikatori:</span>
-                    <span className="font-mono text-white font-bold">{abTestReport?.model_b_candidate?.version}</span>
+                <div className="space-y-1 text-[10px]">
+                  <div className="flex justify-between text-white/60">
+                    <span>Versiya ID:</span>
+                    <span className="font-mono text-white font-medium">{abTestReport?.model_b_candidate?.version}</span>
                   </div>
-                  <div className="flex justify-between text-white/80">
+                  <div className="flex justify-between text-white/60">
                     <span>Simulated Win Rate:</span>
-                    <span className="font-mono text-emerald-400 font-black">{abTestReport?.model_b_candidate?.win_rate_pct}%</span>
+                    <span className="font-mono text-emerald-400 font-bold">{abTestReport?.model_b_candidate?.win_rate_pct}%</span>
                   </div>
-                  <div className="flex justify-between text-white/80">
+                  <div className="flex justify-between text-white/60">
                     <span>Simulated Net Profit:</span>
-                    <span className="font-mono text-cyan-400 font-extrabold">${abTestReport?.model_b_candidate?.total_simulated_profit_usd}</span>
+                    <span className="font-mono text-cyan-400 font-bold">${abTestReport?.model_b_candidate?.total_simulated_profit_usd}</span>
                   </div>
-                  <div className="flex justify-between text-white/80">
+                  <div className="flex justify-between text-white/60">
                     <span>Sharpe Ratio:</span>
-                    <span className="font-mono text-purple-300 font-bold">{abTestReport?.model_b_candidate?.sharpe_ratio}</span>
-                  </div>
-                  <div className="flex justify-between text-white/80">
-                    <span>Max Drawdown:</span>
-                    <span className="font-mono text-emerald-300">{abTestReport?.model_b_candidate?.max_drawdown_pct}%</span>
+                    <span className="font-mono text-purple-300 font-medium">{abTestReport?.model_b_candidate?.sharpe_ratio}</span>
                   </div>
                 </div>
               </div>
@@ -1259,20 +1242,20 @@ export function MonitoringPage() {
             </div>
 
             {/* Bottom Recommendation & Auto-Promote Control */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
-              <div className="flex items-center gap-2 text-xs text-white/70">
-                <CheckCircle2 className="text-emerald-400" size={16} />
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-2">
+              <div className="flex items-center gap-1 text-[9px] text-white/50">
+                <CheckCircle2 className="text-emerald-400" size={11} />
                 <span>
-                  Tavsiya: <b className="text-white">Model B (+6.2% win rate)</b> shadow testida o'zini to'liq oqladi.
+                  Tavsiya: <b className="text-white">Model B (+6.2%)</b> shadow testida o'zini to'liq oqladi.
                 </span>
               </div>
 
               <button
                 onClick={() => alert("Model B (v1.3.0-shadow-experimental) muvaffaqiyatli Production ga ko'chirildi!")}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-xl shadow-lg shadow-purple-600/20 border border-white/10 transition-all active:scale-95 cursor-pointer flex items-center gap-2 text-xs"
+                className="px-2.5 py-1 bg-purple-600 hover:bg-purple-500 text-white font-extrabold rounded-lg shadow-md border border-white/5 transition-all active:scale-95 cursor-pointer flex items-center gap-1.5 text-[9px]"
               >
-                <RefreshCw size={14} />
-                <span>Model B-ni Production-ga O'tkazish (Promote to Live)</span>
+                <RefreshCw size={10} />
+                <span>Production-ga O'tkash (Promote)</span>
               </button>
             </div>
 
@@ -1282,131 +1265,115 @@ export function MonitoringPage() {
 
       {/* AUTOMATIC TRAIN VERSION COMPARISON TAB */}
       {selectedTab === "train_report" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="space-y-2 animate-in fade-in duration-300">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <GitCompare className="text-purple-400" size={20} />
-                  Train Sikli Keyingi Model Versiyalari Solishtirma Hisoboti (Version Delta)
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <GitCompare className="text-purple-400" size={13} />
+                  Train Version Delta
                 </h3>
-                <p className="text-xs text-white/50">
-                  Har bir retrain siklidan keyin yangi va oldingi model versiyalari ko'rsatkichlarini avtomatik solishtirish
+                <p className="text-[10px] text-white/40">
+                  Retrain siklidan keyingi model versiyalari solishtirma hisoboti
                 </p>
               </div>
 
-              <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
-                <CheckCircle2 size={13} />
-                Karor: {trainReport?.deployment_decision || "PROMOTED_TO_PRODUCTION"}
+              <span className="px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 flex items-center gap-1">
+                <CheckCircle2 size={10} />
+                Decision: {trainReport?.deployment_decision ? "PROMOTED" : "ACTIVE"}
               </span>
             </div>
 
             {/* Version Delta Key Metrics Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Val Loss Yaxshilanishi</div>
-                <div className="text-lg font-black text-emerald-400 tabular-nums">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Val Loss Improvement</div>
+                <div className="text-xs font-black text-emerald-400 tabular-nums">
                   -{trainReport?.version_delta?.val_loss_improvement_pct || 25.18}%
                 </div>
-                <div className="text-[10px] text-white/40">
+                <div className="text-[8px] text-white/30">
                   {trainReport?.previous_version?.val_loss} → {trainReport?.current_version?.val_loss}
                 </div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Aniqlik O'sishi (Accuracy)</div>
-                <div className="text-lg font-black text-cyan-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Accuracy Gain</div>
+                <div className="text-xs font-black text-cyan-400 tabular-nums">
                   +{trainReport?.version_delta?.accuracy_gain_pct || 5.8}%
                 </div>
-                <div className="text-[10px] text-white/40">
+                <div className="text-[8px] text-white/30">
                   {trainReport?.previous_version?.directional_accuracy_pct}% → {trainReport?.current_version?.directional_accuracy_pct}%
                 </div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Latency Tezlashishi</div>
-                <div className="text-lg font-black text-indigo-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Latency Reduction</div>
+                <div className="text-xs font-black text-indigo-400 tabular-nums">
                   -{trainReport?.version_delta?.latency_reduction_ms || 0.9} ms
                 </div>
-                <div className="text-[10px] text-white/40">
+                <div className="text-[8px] text-white/30">
                   {trainReport?.previous_version?.inference_latency_ms}ms → {trainReport?.current_version?.inference_latency_ms}ms
                 </div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Sharpe Ratio Delta</div>
-                <div className="text-lg font-black text-purple-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-0.5">
+                <div className="text-[9px] text-white/40 font-bold uppercase tracking-wider">Sharpe Delta</div>
+                <div className="text-xs font-black text-purple-400 tabular-nums">
                   +{trainReport?.version_delta?.sharpe_delta || 0.37}
                 </div>
-                <div className="text-[10px] text-white/40">
+                <div className="text-[8px] text-white/30">
                   {trainReport?.previous_version?.sharpe_ratio} → {trainReport?.current_version?.sharpe_ratio}
                 </div>
               </div>
             </div>
 
             {/* Side-by-side Matrix comparison */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
               {/* Previous Version Box */}
-              <div className="bg-black/30 border border-white/10 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                  <span className="text-xs font-bold text-white/60 uppercase">Oldingi Baseline Versiya</span>
-                  <span className="text-[10px] font-mono bg-white/5 px-2 py-0.5 rounded text-white/50">
+              <div className="bg-black/30 border border-white/5 rounded-lg p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-[9px] font-bold text-white/40 uppercase">Baseline Versiya</span>
+                  <span className="text-[8px] font-mono bg-white/5 px-1 py-0.2 rounded text-white/40">
                     {trainReport?.previous_version?.version || "v1.2.0-checkpoint"}
                   </span>
                 </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-white/70">
+                <div className="space-y-1 text-[9px]">
+                  <div className="flex justify-between text-white/50">
                     <span>Validation Loss:</span>
                     <span className="font-mono text-white">{trainReport?.previous_version?.val_loss}</span>
                   </div>
-                  <div className="flex justify-between text-white/70">
-                    <span>Directional Accuracy:</span>
+                  <div className="flex justify-between text-white/50">
+                    <span>Accuracy:</span>
                     <span className="font-mono text-white">{trainReport?.previous_version?.directional_accuracy_pct}%</span>
-                  </div>
-                  <div className="flex justify-between text-white/70">
-                    <span>Inference Latency:</span>
-                    <span className="font-mono text-white">{trainReport?.previous_version?.inference_latency_ms} ms</span>
-                  </div>
-                  <div className="flex justify-between text-white/70">
-                    <span>Wilson CI Lower Bound:</span>
-                    <span className="font-mono text-white">{trainReport?.previous_version?.wilson_ci_lb}</span>
                   </div>
                 </div>
               </div>
 
               {/* Active Promoted Version Box */}
-              <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                  <span className="text-xs font-bold text-emerald-400 uppercase flex items-center gap-1">
-                    <CheckCircle2 size={12} /> Yangi Production Versiya (Faol)
+              <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-lg p-2.5 space-y-1.5">
+                <div className="flex items-center justify-between border-b border-emerald-500/10 pb-1.5">
+                  <span className="text-[9px] font-bold text-emerald-400 uppercase flex items-center gap-1">
+                    <CheckCircle2 size={10} /> Active Promoted (Faol)
                   </span>
-                  <span className="text-[10px] font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-emerald-300">
+                  <span className="text-[8px] font-mono bg-emerald-500/10 px-1 py-0.2 rounded text-emerald-300">
                     {trainReport?.current_version?.version || "v1.3.0-active"}
                   </span>
                 </div>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between text-white/80">
+                <div className="space-y-1 text-[9px]">
+                  <div className="flex justify-between text-white/75">
                     <span>Validation Loss:</span>
                     <span className="font-mono text-emerald-400 font-bold">{trainReport?.current_version?.val_loss}</span>
                   </div>
-                  <div className="flex justify-between text-white/80">
-                    <span>Directional Accuracy:</span>
+                  <div className="flex justify-between text-white/75">
+                    <span>Accuracy:</span>
                     <span className="font-mono text-emerald-400 font-bold">{trainReport?.current_version?.directional_accuracy_pct}%</span>
-                  </div>
-                  <div className="flex justify-between text-white/80">
-                    <span>Inference Latency:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{trainReport?.current_version?.inference_latency_ms} ms</span>
-                  </div>
-                  <div className="flex justify-between text-white/80">
-                    <span>Wilson CI Lower Bound:</span>
-                    <span className="font-mono text-emerald-400 font-bold">{trainReport?.current_version?.wilson_ci_lb}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="text-xs text-white/50 border-t border-white/5 pt-3">
-              Trigger sababi: <b className="text-white">{trainReport?.retrain_trigger_reason}</b>
+            <div className="text-[9px] text-white/30 border-t border-white/5 pt-1.5">
+              Trigger sababi: <b className="text-white/60">{trainReport?.retrain_trigger_reason}</b>
             </div>
           </div>
         </div>
@@ -1414,52 +1381,52 @@ export function MonitoringPage() {
 
       {/* CENTRALIZED ERROR AGGREGATOR TAB */}
       {selectedTab === "errors_hub" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="space-y-2 animate-in fade-in duration-300">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Bug className="text-rose-400" size={20} />
-                  Markazlashtirilgan Xatolar Hub va Chastota Tahlili
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <Bug className="text-rose-400" size={13} />
+                  Faults Diagnostics Hub
                 </h3>
-                <p className="text-xs text-white/50">
-                  MT5 ulanish uzilishlari, LLM API xatoliklari va bazaviy lock larni guruhlab tahlil qilish
+                <p className="text-[10px] text-white/40 font-medium">
+                  API error, MT5 disconnections va database locks guruhlangan tahlili
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-white/5 text-white/70 border border-white/10">
-                  24 Soatlik Xatolar: <b className="text-amber-400">{errorAggregation?.total_faults_count || 32}</b>
+              <div className="flex items-center gap-1.5">
+                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-white/5 text-white/60">
+                  24H: <b className="text-amber-400">{errorAggregation?.total_faults_count || 32}</b>
                 </span>
-                <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  Resilience Index: {errorAggregation?.system_resilience_score_pct || 94.2}%
+                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Resilience: {errorAggregation?.system_resilience_score_pct || 94.2}%
                 </span>
               </div>
             </div>
 
             {/* Error Categories Breakdown List */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               {(errorAggregation?.error_categories || []).map((err: any, idx: number) => (
-                <div key={idx} className="bg-black/40 border border-white/5 rounded-xl p-4 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
+                <div key={idx} className="bg-black/40 border border-white/5 rounded-lg p-2.5 space-y-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5">
                       <span className={cn(
-                        "px-2 py-0.5 rounded text-[10px] font-black uppercase border",
-                        err.severity === "WARNING" ? "bg-amber-500/15 text-amber-300 border-amber-500/30" : "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                        "px-1 py-0.1 rounded text-[8px] font-black uppercase border",
+                        err.severity === "WARNING" ? "bg-amber-500/10 text-amber-300 border-amber-500/20" : "bg-blue-500/10 text-blue-300 border-blue-500/20"
                       )}>
                         {err.code}
                       </span>
-                      <span className="text-sm font-bold text-white">{err.category}</span>
+                      <span className="text-[10px] font-bold text-white/95">{err.category}</span>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs font-mono">
-                      <span className="text-white/60">Chastotasi: <b className="text-rose-400">{err.count} marta</b></span>
-                      <span className="text-white/60">Ulushi: <b className="text-cyan-400">{err.percentage}%</b></span>
+                    <div className="flex items-center gap-2 text-[9px] font-mono">
+                      <span className="text-white/40">Count: <b className="text-rose-400">{err.count}</b></span>
+                      <span className="text-white/40">Ratio: <b className="text-cyan-400">{err.percentage}%</b></span>
                     </div>
                   </div>
 
                   {/* Frequency Progress Bar */}
-                  <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
                     <div 
                       className={cn(
                         "h-full rounded-full transition-all duration-500",
@@ -1469,12 +1436,12 @@ export function MonitoringPage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-1">
-                    <div className="bg-white/5 p-2 rounded-lg text-white/70">
-                      <b>Asosiy Sabab:</b> {err.primary_cause}
+                  <div className="grid grid-cols-2 gap-2 text-[9px] pt-1 leading-normal">
+                    <div className="bg-white/5 p-1.5 rounded text-white/50">
+                      <b>Sabab:</b> {err.primary_cause}
                     </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-lg text-emerald-300">
-                      <b>Avtomatik Yechim:</b> {err.remediation}
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 p-1.5 rounded text-emerald-300">
+                      <b>Yechim:</b> {err.remediation}
                     </div>
                   </div>
                 </div>
@@ -1486,138 +1453,124 @@ export function MonitoringPage() {
 
       {/* MODEL DRIFT & ANOMALY ENGINE TAB */}
       {selectedTab === "drift" && (
-        <div className="space-y-4 animate-in fade-in duration-300">
+        <div className="space-y-2 animate-in fade-in duration-300">
           
           {/* Top Drift Status & Health Card */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 shadow-lg relative overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Gauge className="text-blue-400" size={20} />
-                  Model Accuracy Drift & Performance Degradation Control
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <Gauge className="text-blue-400" size={13} />
+                  Model Accuracy Drift Control
                 </h3>
-                <p className="text-xs text-white/50">
-                  Vaqt o'tishi bilan neyron tarmog'i va RL agenti aniqligi pasayishini (concept drift) erta aniqlash va auto-retrain
+                <p className="text-[10px] text-white/40">
+                  Concept drift monitoring and incremental calibration threshold alerts
                 </p>
               </div>
 
               <span className={cn(
-                "px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border",
-                (telemetry?.model_drift?.drift_status || "NORMAL") === "NORMAL" ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" :
-                (telemetry?.model_drift?.drift_status || "NORMAL") === "MODERATE_DRIFT" ? "bg-amber-500/15 text-amber-300 border-amber-500/30" :
-                "bg-rose-500/15 text-rose-300 border-rose-500/30"
+                "px-1.5 py-0.2 rounded text-[8px] font-black uppercase tracking-wider border",
+                (telemetry?.model_drift?.drift_status || "NORMAL") === "NORMAL" ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" : "bg-amber-500/10 text-amber-300 border-amber-500/20"
               )}>
                 Status: {telemetry?.model_drift?.drift_status || "NORMAL"}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Historic Baseline Win Rate</div>
-                <div className="text-lg font-black text-white tabular-nums">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-0.5">
+                <div className="text-[8px] text-white/40 font-bold uppercase tracking-wider">Baseline WR</div>
+                <div className="text-xs font-black text-white tabular-nums">
                   {telemetry?.model_drift?.baseline_win_rate_pct || 65.0}%
                 </div>
-                <div className="text-[10px] text-white/40">50 ta o'tmish savdolar namunasi</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Recent Rolling Win Rate</div>
-                <div className="text-lg font-black text-cyan-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-0.5">
+                <div className="text-[8px] text-white/40 font-bold uppercase tracking-wider">Rolling WR</div>
+                <div className="text-xs font-black text-cyan-400 tabular-nums">
                   {telemetry?.model_drift?.recent_win_rate_pct || 62.0}%
                 </div>
-                <div className="text-[10px] text-white/40">So'nggi 15 ta savdo oynasi</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Accuracy Drift Delta</div>
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-0.5">
+                <div className="text-[8px] text-white/40 font-bold uppercase tracking-wider">Drift Delta</div>
                 <div className={cn(
-                  "text-lg font-black tabular-nums",
+                  "text-xs font-black tabular-nums",
                   (telemetry?.model_drift?.drift_delta_pct || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                 )}>
-                  {(telemetry?.model_drift?.drift_delta_pct || -3.0) >= 0 ? "+" : ""}
                   {telemetry?.model_drift?.drift_delta_pct || -3.0}%
                 </div>
-                <div className="text-[10px] text-white/40">Tenglama: Recent WR - Baseline WR</div>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-1">
-                <div className="text-[10px] text-white/40 font-bold uppercase">Model Health Index</div>
-                <div className="text-lg font-black text-emerald-400 tabular-nums">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-0.5">
+                <div className="text-[8px] text-white/40 font-bold uppercase tracking-wider">Health Index</div>
+                <div className="text-xs font-black text-emerald-400 tabular-nums">
                   {telemetry?.model_drift?.health_score_pct || 92.5}%
-                </div>
-                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden mt-1">
-                  <div 
-                    className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
-                    style={{ width: `${telemetry?.model_drift?.health_score_pct || 92.5}%` }} 
-                  />
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/5 text-xs">
-              <div className="flex items-center gap-2 text-white/60">
-                <ShieldCheck size={16} className="text-emerald-400" />
-                <span>
-                  Automated Drift Safeguard: Win Rate pasayishi <b>-15%</b> dan oshsa, bot xatarlarni kamaytirish uchun lot hajmini vaqtinchalik 50% ga qisqartiradi.
-                </span>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5 text-[9px]">
+              <div className="flex items-center gap-1 text-white/40 max-w-xs leading-normal">
+                <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
+                <span>Drift Guard: Win Rate pasayishi <b>-15%</b> dan oshsa, lot 50% ga qisqaradi.</span>
               </div>
 
               <button
                 onClick={() => alert("Model re-calibration va incremental retraining jarayoni ishga tushirildi!")}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-xl shadow-lg shadow-blue-600/20 border border-white/10 transition-all active:scale-95 cursor-pointer flex items-center gap-2"
+                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-extrabold rounded-lg shadow-md border border-white/5 transition-all active:scale-95 cursor-pointer flex items-center gap-1"
               >
-                <RefreshCw size={14} />
-                <span>Incremental Retrain (Qayta Train Qilish)</span>
+                <RefreshCw size={10} />
+                <span>Qayta Train</span>
               </button>
             </div>
           </div>
 
           {/* Constant / Stuck Output Anomaly Detector Card */}
-          <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+          <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-2.5 shadow-lg">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
               <div>
-                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                  <Zap className="text-amber-400" size={20} />
-                  Constant & Frozen Output Anomaly Detector (Muzlab Qolgan Modellarni Aniqlash)
+                <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                  <Zap className="text-amber-400" size={13} />
+                  Frozen Output Anomaly Detector
                 </h3>
-                <p className="text-xs text-white/50">
-                  Model to'satdan g'alati yoki ketma-ket bir xil (stuck/constant) natija bera boshlasa avtomatik signal holatini muzlatadi.
+                <p className="text-[10px] text-white/40">
+                  Zero Variance check across voting, confidence, and RL entropy metrics
                 </p>
               </div>
 
-              <span className="px-3 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">
-                Zero Variance Check: PASS
+              <span className="px-1.5 py-0.2 rounded text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">
+                Zero Variance: PASS
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-white">Voting Constant Output Check:</span>
-                  <span className="text-emerald-400 font-bold">✓ Normal (No Freeze)</span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-[10px]">
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white/90">Voting Output Check:</span>
+                  <span className="text-emerald-400 font-bold text-[9px]">✓ Normal</span>
                 </div>
-                <p className="text-[11px] text-white/50 leading-relaxed">
-                  Yetti strategiya so'nggi 10 ta tick davomida o'zgaruvchan va har xil bozor sharoitiga ko'ra dinamik ovoz bergan.
+                <p className="text-[9px] text-white/40 leading-relaxed">
+                  Dynamic strategy consensus (no frozen voting state detected).
                 </p>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-white">LSTM Confidence Variance:</span>
-                  <span className="text-emerald-400 font-bold">✓ Normal Variance</span>
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white/90">LSTM Prob Check:</span>
+                  <span className="text-emerald-400 font-bold text-[9px]">✓ Normal Variance</span>
                 </div>
-                <p className="text-[11px] text-white/50 leading-relaxed">
-                  PyTorch LSTM probabilities distributsiyasi doimiy bir xil konstant qiymatlarda qotib qolmagan.
+                <p className="text-[9px] text-white/40 leading-relaxed">
+                  LSTM confidence probabilities maintain active dispersion.
                 </p>
               </div>
 
-              <div className="bg-black/40 border border-white/5 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-white">PPO Policy Entropy:</span>
-                  <span className="text-emerald-400 font-bold">✓ Healthy Entropy</span>
+              <div className="bg-black/40 border border-white/5 rounded-lg p-2 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white/90">PPO Action Entropy:</span>
+                  <span className="text-emerald-400 font-bold text-[9px]">✓ Healthy Entropy</span>
                 </div>
-                <p className="text-[11px] text-white/50 leading-relaxed">
-                  Reinforcement Learning harakatlar jadvali (action distribution) yetarli darajada ehtimollik tarqalishiga ega.
+                <p className="text-[9px] text-white/40 leading-relaxed">
+                  Reinforcement learning actions verify active exploratory rate.
                 </p>
               </div>
             </div>
@@ -1628,36 +1581,36 @@ export function MonitoringPage() {
 
       {/* 5. ANOMALIES TAB */}
       {selectedTab === "anomalies" && (
-        <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+        <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 animate-in fade-in duration-300 shadow-lg">
+          <div className="flex items-center justify-between border-b border-white/5 pb-2">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <AlertTriangle className="text-amber-400" size={20} />
+              <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                <AlertTriangle className="text-amber-400" size={13} />
                 Anomaliyalar va Xatoliklar Logi
               </h3>
-              <p className="text-xs text-white/50">Tizimdagi kelishmovchiliklar, sekinlashuv va veto hodisalari</p>
+              <p className="text-[10px] text-white/40">Tizimdagi kelishmovchiliklar, sekinlashuv va veto hodisalari</p>
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {(telemetry?.anomalies || []).map((anom: Anomaly) => (
               <div key={anom.id} className={cn(
-                "p-4 rounded-xl border space-y-1.5",
-                anom.severity === "WARNING" ? "bg-amber-500/10 border-amber-500/30 text-amber-200" :
-                anom.severity === "ERROR" ? "bg-rose-500/10 border-rose-500/30 text-rose-200" :
-                "bg-blue-500/10 border-blue-500/30 text-blue-200"
+                "p-2.5 rounded-lg border space-y-1",
+                anom.severity === "WARNING" ? "bg-amber-500/5 border-amber-500/20 text-amber-200" :
+                anom.severity === "ERROR" ? "bg-rose-500/5 border-rose-500/20 text-rose-200" :
+                "bg-blue-500/5 border-blue-500/20 text-blue-200"
               )}>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black tracking-wider uppercase flex items-center gap-1.5">
-                    <AlertTriangle size={14} />
+                  <span className="text-[9px] font-black tracking-wider uppercase flex items-center gap-1.5">
+                    <AlertTriangle size={11} />
                     [{anom.code}] - {anom.component}
                   </span>
-                  <span className="text-[10px] text-white/50 font-mono">{anom.timestamp}</span>
+                  <span className="text-[8px] text-white/40 font-mono">{anom.timestamp}</span>
                 </div>
-                <p className="text-xs font-medium leading-relaxed">{anom.message}</p>
+                <p className="text-[10px] font-medium leading-relaxed">{anom.message}</p>
                 {anom.action && (
-                  <p className="text-[11px] opacity-80 pt-1 font-bold">
-                    Tavsiya etilgan amal: {anom.action}
+                  <p className="text-[9px] opacity-80 pt-0.5 font-bold">
+                    Tavsiya: {anom.action}
                   </p>
                 )}
               </div>
@@ -1668,33 +1621,33 @@ export function MonitoringPage() {
 
       {/* 6. LOGS & AUDIT TAB */}
       {selectedTab === "logs" && (
-        <div className="bg-[#11131a] border border-white/10 rounded-2xl p-5 space-y-4 animate-in fade-in duration-300">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+        <div className="bg-[#0b0d13]/90 border border-white/5 rounded-xl p-3 space-y-3 animate-in fade-in duration-300 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 pb-2">
             <div>
-              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
-                <Terminal className="text-blue-400" size={20} />
-                Komponent Diagnostika va Audit Loglari
+              <h3 className="text-xs font-black text-white/95 uppercase tracking-wider flex items-center gap-1.5">
+                <Terminal className="text-blue-400" size={13} />
+                Diagnostika va Audit Loglari
               </h3>
-              <p className="text-xs text-white/50">Barcha oraliq hisob-kitoblar va signallar tarixi</p>
+              <p className="text-[10px] text-white/40">Barcha oraliq hisob-kitoblar va signallar tarixi</p>
             </div>
 
             {/* Filter controls */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-2.5 text-white/40" />
+                <Search size={11} className="absolute left-2 top-2 text-white/30" />
                 <input
                   type="text"
                   placeholder="Qidiruv..."
                   value={logSearch}
                   onChange={e => setLogSearch(e.target.value)}
-                  className="bg-black/40 border border-white/10 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-white/30 focus:outline-none focus:border-blue-500"
+                  className="bg-black/40 border border-white/5 rounded-lg pl-6 pr-2 py-1 text-[10px] text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/40"
                 />
               </div>
 
               <select
                 value={logFilterLevel}
                 onChange={e => setLogFilterLevel(e.target.value)}
-                className="bg-black/40 border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none"
+                className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-[10px] text-white focus:outline-none cursor-pointer"
               >
                 <option value="ALL">Barcha Darajalar</option>
                 <option value="INFO">INFO</option>
@@ -1704,28 +1657,28 @@ export function MonitoringPage() {
             </div>
           </div>
 
-          <div className="space-y-2 font-mono text-xs max-h-[500px] overflow-y-auto no-scrollbar">
+          <div className="space-y-1.5 font-mono text-[10px] max-h-[360px] overflow-y-auto no-scrollbar">
             {filteredLogs.map((log, idx) => (
               <div
                 key={idx}
                 onClick={() => setSelectedLogPayload(log)}
-                className="bg-black/40 hover:bg-white/5 border border-white/5 rounded-xl p-3 transition-all cursor-pointer flex items-center justify-between gap-3"
+                className="bg-black/40 hover:bg-white/5 border border-white/5 rounded-lg p-2 transition-all cursor-pointer flex items-center justify-between gap-2"
               >
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
                   <span className={cn(
-                    "px-2 py-0.5 rounded text-[9px] font-black shrink-0",
-                    log.level === "INFO" ? "bg-emerald-500/20 text-emerald-300" :
-                    log.level === "WARN" ? "bg-amber-500/20 text-amber-300" :
-                    "bg-rose-500/20 text-rose-300"
+                    "px-1 py-0.2 rounded text-[8px] font-black shrink-0",
+                    log.level === "INFO" ? "bg-emerald-500/10 text-emerald-300" :
+                    log.level === "WARN" ? "bg-amber-500/10 text-amber-300" :
+                    "bg-rose-500/10 text-rose-300"
                   )}>
                     {log.level}
                   </span>
-                  <span className="text-white/40 text-[10px] shrink-0">{log.timestamp.slice(11, 19)}</span>
+                  <span className="text-white/30 text-[9px] shrink-0">{log.timestamp.slice(11, 19)}</span>
                   <span className="text-blue-400 font-bold shrink-0">[{log.component}]</span>
-                  <span className="text-white/90 truncate">{log.event}</span>
+                  <span className="text-white/80 truncate">{log.event}</span>
                 </div>
 
-                <Eye size={14} className="text-white/40 hover:text-white shrink-0" />
+                <Eye size={12} className="text-white/30 hover:text-white shrink-0" />
               </div>
             ))}
           </div>
@@ -1734,16 +1687,16 @@ export function MonitoringPage() {
 
       {/* Audit Payload JSON Modal */}
       {selectedLogPayload && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-[#11131a] border border-white/15 rounded-2xl w-full max-w-lg p-5 space-y-4 font-mono text-xs">
-            <div className="flex justify-between items-center border-b border-white/10 pb-2">
-              <h4 className="text-sm font-bold text-white">Log Inspection Details</h4>
-              <button onClick={() => setSelectedLogPayload(null)} className="text-white/50 hover:text-white text-xs font-bold">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3">
+          <div className="bg-[#0b0d13] border border-white/10 rounded-xl w-full max-w-md p-4 space-y-3 font-mono text-[10px] shadow-2xl">
+            <div className="flex justify-between items-center border-b border-white/5 pb-1.5">
+              <h4 className="text-[11px] font-bold text-white/90">Log Details</h4>
+              <button onClick={() => setSelectedLogPayload(null)} className="text-white/40 hover:text-white text-[10px] font-black cursor-pointer">
                 [X] Yopish
               </button>
             </div>
 
-            <pre className="bg-black/60 p-4 rounded-xl border border-white/10 text-emerald-400 overflow-x-auto text-[11px] max-h-80">
+            <pre className="bg-black/60 p-3 rounded-lg border border-white/5 text-emerald-400 overflow-x-auto text-[9px] max-h-60 no-scrollbar">
               {JSON.stringify(selectedLogPayload, null, 2)}
             </pre>
           </div>

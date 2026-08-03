@@ -20,14 +20,33 @@ class BaseStrategyManager:
         self.table_name = table_name
         self._init_base_db()
 
-    def get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def get_connection(self):
         """
         Creates and configures SQLite connection with WAL mode and dict row factory.
+
+        NOTE: `with sqlite3.Connection(...) as conn:` on its own only manages
+        commit/rollback — it does NOT close the connection (this is documented
+        Python behavior, not a bug in sqlite3). Every call site in this class
+        used that pattern without ever closing, which leaked one open SQLite
+        connection per call. With 94 symbols re-syncing every few minutes,
+        this accumulated into hundreds of open handles per cycle and was the
+        direct cause of "database is locked" errors. Making this method an
+        actual contextmanager (with try/finally close) fixes every call site
+        below with no other code changes needed, since they already use
+        `with self.get_connection() as conn:`.
         """
         conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.row_factory = sqlite3.Row
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
 
     def _init_base_db(self):
         """

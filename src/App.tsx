@@ -12,6 +12,7 @@ import { ShadowLearningPage } from "@/pages/ShadowLearningPage";
 import { ShadowEdgePage } from "@/pages/ShadowEdgePage";
 import { NotesPage } from "@/pages/NotesPage";
 import { MonitoringPage } from "@/pages/MonitoringPage";
+import { OfflineSyncManager } from "@/components/OfflineSyncManager";
 import { Loader2, ChevronLeft, RotateCcw, Save, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,8 +102,8 @@ export default function App() {
   return (
     <div className="mx-auto flex h-[100dvh] w-full flex-col overflow-hidden">
       {!isDashboard && (
-        <header className="sticky top-0 z-40 flex items-center justify-between px-5 py-4 pt-[max(env(safe-area-inset-top),1rem)] bg-bg-deep/85 backdrop-blur-lg border-b border-white/5">
-          <div className="flex items-center gap-3">
+        <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-2.5 pt-[max(env(safe-area-inset-top),0.75rem)] bg-bg-deep/85 backdrop-blur-lg border-b border-white/5">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => {
                 if (location.pathname === "/signals") {
@@ -111,36 +112,36 @@ export default function App() {
                   navigate(-1);
                 }
               }} 
-              className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white border border-white/10"
+              className="grid h-7 w-7 place-items-center rounded-lg bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white border border-white/5"
               aria-label="Go back"
             >
-              <ChevronLeft size={20} />
+              <ChevronLeft size={14} />
             </button>
-            <h1 className="text-base font-bold text-white">{title}</h1>
+            <h1 className="text-[11px] font-extrabold uppercase tracking-widest text-white/90">{title}</h1>
           </div>
           {location.pathname === "/settings" && settingsState.hasChanges && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button 
                 onClick={() => window.dispatchEvent(new Event('saveSettings'))}
                 disabled={settingsState.busy}
                 className={cn(
-                  "flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer shadow-lg",
+                  "flex items-center gap-1 px-3 py-1 rounded-lg text-[10px] font-bold transition-all active:scale-95 cursor-pointer shadow-md",
                   settingsState.saved 
                     ? "bg-emerald-500 text-white shadow-emerald-500/20"
                     : "bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20"
                 )}
               >
                 {settingsState.busy ? (
-                  <Loader2 className="animate-spin" size={14} />
+                  <Loader2 className="animate-spin" size={10} />
                 ) : (
-                  <Check size={16} strokeWidth={3} />
+                  <Check size={11} strokeWidth={3} />
                 )}
                 <span>{settingsState.saved ? "Saqlandi" : "Saqlash"}</span>
               </button>
 
               <button 
                 onClick={() => window.dispatchEvent(new Event('resetSettings'))}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/60 transition-all text-xs font-bold active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-white/60 transition-all text-[10px] font-bold active:scale-95 cursor-pointer"
               >
                 <span>Standart</span>
               </button>
@@ -149,6 +150,7 @@ export default function App() {
         </header>
       )}
       <main className="flex-1 w-full overflow-y-auto no-scrollbar relative">
+        <OfflineSyncManager />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/positions" element={<PositionsPage />} />

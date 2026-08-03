@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { guestMock } from "@/lib/guestMock";
-import { fmtMoney, fmtNum, timeAgo, cn } from "@/lib/utils";
+import { fmtMoney, fmtNum, timeAgo, cn, fmtDateShort } from "@/lib/utils";
 import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } from "@/lib/types";
 import { Icon } from "@iconify/react";
 import {
@@ -377,15 +377,7 @@ export function DashboardPage() {
                 )}
               </div>
 
-              {/* 2. Qaydlar & Keep */}
-              <Link 
-                to="/notes" 
-                className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer active:scale-95 shrink-0 relative"
-                title="Qaydlar va Google Keep"
-              >
-                <FileText size={11} />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-              </Link>
+
 
               {/* 2.5 Monitoring & Diagnostics */}
               <Link 
@@ -865,7 +857,7 @@ function PositionRow({ p, onClick }: { p: Position; onClick?: () => void }) {
             {p.symbol}
             <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
           </span>
-          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(p.volume, 2)} lot &bull; {fmtDateShort(p.opened_at)}</span>
         </div>
         <span className={`inline-flex items-center gap-1 text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
           <Icon icon={profit >= 0 ? "mdi:rocket-launch" : "game-icons:evil-hand"} width="14" height="14" className={profit >= 0 ? "text-emerald-400" : "text-rose-400"} />
@@ -915,7 +907,7 @@ function PendingRow({ o, onClick }: { o: PendingOrder; onClick?: () => void }) {
             {o.symbol}
             <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
           </span>
-          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot &bull; {fmtDateShort(o.created_at)}</span>
         </div>
         <Clock size={12} className="text-white/40" />
       </div>
@@ -945,7 +937,7 @@ function HistoryRow({ t, onClick }: { t: TradeHistory; onClick?: () => void }) {
             {t.symbol}
             <CandlestickChart size={10} className="opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
           </span>
-          <span className="text-[8.5px] text-white/40 shrink-0">{timeAgo(t.closed_at)}</span>
+          <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(t.volume, 2)} lot &bull; {fmtDateShort(t.closed_at)}</span>
         </div>
         <span className={`inline-flex items-center gap-1 text-xs font-black tabular-nums ${profit >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
           <Icon icon={profit >= 0 ? "mdi:rocket-launch" : "game-icons:evil-hand"} width="14" height="14" className={profit >= 0 ? "text-emerald-400" : "text-rose-400"} />

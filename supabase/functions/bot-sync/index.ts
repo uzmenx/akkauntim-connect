@@ -197,8 +197,16 @@ Deno.serve(async (req) => {
     results.ai_signal = error ? { error: error.message } : "ok";
   }
 
+  if (body.update_settings) {
+    const { error } = await supabase.from("bot_settings").update(body.update_settings).eq("user_id", user_id);
+    results.update_settings = error ? { error: error.message } : "ok";
+  }
+
   if (body.closed_trades && body.closed_trades.length > 0) {
-    const rows = body.closed_trades.map((t) => ({ ...t, user_id }));
+    const rows = body.closed_trades.map((t) => {
+      const { mt5_comment, mt5_reason, ...rest } = t;
+      return { ...rest, user_id };
+    });
     const { error } = await supabase.from("trade_history").upsert(rows, { onConflict: "user_id,ticket" });
     results.closed_trades = error ? { error: error.message } : `ok:${rows.length}`;
   }

@@ -1,9 +1,27 @@
 import json
 import logging
 import re
+import time
 from typing import Dict, Any, Optional
 import requests
 from anthropic import Anthropic
+
+# HTTP statuses that mean "this account/key cannot use this model right now"
+# (bad/missing key, no credits, forbidden). These are account-level and will
+# NOT resolve by retrying the same request — unlike 429 (rate limit, transient)
+# or 5xx (server-side, transient). Retrying these wastes time and, worse, does
+# it again for every symbol in the scan loop.
+PERMANENT_ERROR_CODES = {401, 402, 403}
+
+# How long to stop trying a model after it fails with a permanent error,
+# before giving it another chance (e.g. in case credits get topped up).
+MODEL_COOLDOWN_SECONDS = 900  # 15 daqiqa
+
+
+class PermanentAPIError(Exception):
+    """Raised for account-level API errors (401/402/403) that retrying won't fix."""
+    pass
+
 
 class AIClient:
     def __init__(self, config):
@@ -17,6 +35,28 @@ class AIClient:
         self.total_tokens_out = 0
         self.total_cost = 0.0
         self.consecutive_failures = 0
+        # model_name -> epoch time until which we skip it (see PermanentAPIError)
+        self._model_cooldown_until: Dict[str, float] = {}
+        # Dedup timestamp so get_simple_response doesn't spam Telegram once per symbol
+        self._last_simple_response_alert = 0.0
+
+    def _is_model_cooling_down(self, model: str) -> bool:
+        return time.time() < self._model_cooldown_until.get(model, 0)
+
+    def _start_cooldown(self, model: str, reason: str):
+        self._model_cooldown_until[model] = time.time() + MODEL_COOLDOWN_SECONDS
+        self.logger.warning(
+            f"{model} {MODEL_COOLDOWN_SECONDS // 60} daqiqaga cooldown'ga qo'yildi (sabab: {reason})"
+        )
+
+    @staticmethod
+    def _raise_if_permanent(resp, provider: str):
+        """Call right after a requests.post — raises PermanentAPIError for
+        account-level failures instead of the generic retryable Exception."""
+        if resp.status_code in PERMANENT_ERROR_CODES:
+            raise PermanentAPIError(f"{provider} Error {resp.status_code}: {resp.text}")
+        if resp.status_code != 200:
+            raise Exception(f"{provider} Error {resp.status_code}: {resp.text}")
 
     @staticmethod
     def _extract_json(text: str) -> Dict[str, Any]:
@@ -83,11 +123,13 @@ class AIClient:
             
         models_to_try = [m for m in dict.fromkeys(models_to_try) if m]  # Remove duplicates and empty strings
 
-        import time
         import anthropic
         
         last_exception = None
         for model in models_to_try:
+            if self._is_model_cooling_down(model):
+                self.logger.debug(f"{model} cooldown'da, o'tkazib yuborilmoqda.")
+                continue
             retries = 2
             for attempt in range(retries + 1):
                 try:
@@ -114,8 +156,7 @@ class AIClient:
                             payload["max_tokens"] = max_tok
                             
                         resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=180)
-                        if resp.status_code != 200:
-                            raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
+                        self._raise_if_permanent(resp, "Moonshot")
                             
                         rdata = resp.json()
                         content = rdata["choices"][0]["message"]["content"]
@@ -145,8 +186,7 @@ class AIClient:
                             payload["max_tokens"] = max_tok
                             
                         resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=180)
-                        if resp.status_code != 200:
-                            raise Exception(f"OpenRouter Error {resp.status_code}: {resp.text}")
+                        self._raise_if_permanent(resp, "OpenRouter")
                             
                         rdata = resp.json()
                         content = rdata["choices"][0]["message"]["content"]
@@ -240,6 +280,12 @@ class AIClient:
                     self.logger.warning(f"Model {model} topilmadi (404). Keyingi modelga o'tilmoqda...")
                     last_exception = e
                     break
+                except PermanentAPIError as e:
+                    # 401/402/403 — hisob darajasidagi xato, qayta urinish foyda bermaydi.
+                    # Modelni cooldown'ga qo'yib, darhol keyingi modelga o'tamiz.
+                    self._start_cooldown(model, str(e))
+                    last_exception = e
+                    break
                 except Exception as e:
                     # Boshqa xatoliklar (masalan API key xato bo'lsa yoki 500 error)
                     # not_found_error bo'lsa tekshiramiz
@@ -257,9 +303,19 @@ class AIClient:
         self.logger.error(f"Hech qaysi AI modeli ishlamadi. Oxirgi xato: {last_exception}")
         
         self.consecutive_failures += 1
-        if self.consecutive_failures >= 3 and len(models_to_try) == 1:
+        # ESLATMA: avval bu shart `len(models_to_try) == 1` bilan cheklangan edi —
+        # amalda models_to_try deyarli hech qachon 1 ta bo'lmagani uchun (odatda
+        # asosiy + zaxira model) bu xavfsizlik mexanizmi hech qachon ishga
+        # tushmagan. Endi nechta model sinalganidan qat'iy nazar, 3 marta
+        # ketma-ket muvaffaqiyatsizlikdan keyin ishga tushadi.
+        if self.consecutive_failures >= 3:
             self.logger.critical("Ketma-ket 3 marta AI ishlamadi. Avtomatik AI-siz rejimga o'tilmoqda!")
             self.config.ai_enabled = False
+            
+            # Sinxronlash (frontend va database uchun)
+            if hasattr(self, 'sync_callback') and self.sync_callback:
+                self.sync_callback({"ai_enabled": False})
+                
             self.consecutive_failures = 0
             if getattr(self, "telegram", None):
                 try:
@@ -317,11 +373,15 @@ class AIClient:
             
         models_to_try = [m for m in dict.fromkeys(models_to_try) if m]  # Remove duplicates and empty strings
 
-        import time
         import anthropic
         
         last_exception = None
+        any_model_attempted = False
         for model in models_to_try:
+            if self._is_model_cooling_down(model):
+                self.logger.debug(f"{model} cooldown'da, o'tkazib yuborilmoqda (get_simple_response).")
+                continue
+            any_model_attempted = True
             retries = 2
             for attempt in range(retries):
                 try:
@@ -343,8 +403,7 @@ class AIClient:
                             "max_tokens": max_tokens
                         }
                         resp = requests.post("https://api.moonshot.ai/v1/chat/completions", headers=headers, json=payload, timeout=120)
-                        if resp.status_code != 200:
-                            raise Exception(f"Moonshot Error {resp.status_code}: {resp.text}")
+                        self._raise_if_permanent(resp, "Moonshot")
                         content = resp.json()["choices"][0]["message"]["content"]
                         return content.strip()
                     elif model.startswith("openrouter/"):
@@ -369,8 +428,7 @@ class AIClient:
                             "max_tokens": max_tokens
                         }
                         resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=120)
-                        if resp.status_code != 200:
-                            raise Exception(f"OpenRouter Error {resp.status_code}: {resp.text}")
+                        self._raise_if_permanent(resp, "OpenRouter")
                         content = resp.json()["choices"][0]["message"]["content"]
                         return content.strip()
                     else:
@@ -397,6 +455,16 @@ class AIClient:
                     self.logger.warning(f"Rate limit for {model}: {e}")
                     last_exception = e
                     time.sleep(3)
+                except PermanentAPIError as e:
+                    # Hisob darajasidagi xato (masalan kredit tugagan) — qayta
+                    # urinish foyda bermaydi. Modelni cooldown'ga qo'yamiz va
+                    # BU CHAQIRUV ICHIDA darhol keyingi modelga o'tamiz, shu
+                    # bilan birga keyingi 94 juftlik/tsikl davomida ham bu
+                    # model qayta-qayta urinilmaydi.
+                    self.logger.error(f"{model}: {e}")
+                    self._start_cooldown(model, str(e))
+                    last_exception = e
+                    break
                 except Exception as e:
                     self.logger.error(f"Failed to get simple response with {model} (attempt {attempt+1}): {e}")
                     last_exception = e
@@ -405,6 +473,21 @@ class AIClient:
                         break
                     if attempt < retries - 1:
                         time.sleep(2)
-        
-        self.logger.error(f"Hech qaysi AI modeli oddiy javob bera olmadi. Oxirgi xato: {last_exception}")
+
+        if any_model_attempted:
+            self.logger.error(f"Hech qaysi AI modeli oddiy javob bera olmadi. Oxirgi xato: {last_exception}")
+            # Telegramga faqat 30 daqiqada bir marta ogohlantiramiz — 94 juftlik
+            # tsiklida har safar spam qilmaslik uchun. Oldin bu funksiya
+            # umuman Telegram'ga xabar bermas edi.
+            now = time.time()
+            if now - self._last_simple_response_alert > 1800:
+                self._last_simple_response_alert = now
+                telegram = getattr(self, "telegram", None)
+                if telegram:
+                    try:
+                        telegram.send_message(
+                            f"⚠️ AI (oddiy javob) ishlamayapti: {', '.join(models_to_try)}\nOxirgi xato: {last_exception}"
+                        )
+                    except Exception as tg_err:
+                        self.logger.error(f"Telegram alert xatosi (get_simple_response): {tg_err}")
         return ""

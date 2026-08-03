@@ -90,29 +90,15 @@ export function ShadowEdgePage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <StatCard
-          label="Win rate"
-          value={evaluated.length ? `${winRate.toFixed(1)}%` : "Hali baholanmagan"}
-          sub={evaluated.length ? `${evaluated.length} baholangan` : "natijalar kutilmoqda"}
-        />
+        <StatCard label="Win rate" value={`${winRate.toFixed(1)}%`} sub={`${evaluated.length} baholangan`} />
         <StatCard
           label="Edge (50% dan)"
-          value={evaluated.length ? `${edge >= 0 ? "+" : ""}${edge.toFixed(1)}%` : "Hali ma'lumot yo'q"}
-          sub={
-            evaluated.length
-              ? edge > 2
-                ? "ijobiy ustunlik"
-                : "hali isbotlanmagan"
-              : "hisoblash uchun ma'lumot yetarli emas"
-          }
+          value={`${edge >= 0 ? "+" : ""}${edge.toFixed(1)}%`}
+          sub={edge > 2 ? "ijobiy ustunlik" : "hali isbotlanmagan"}
         />
-        <StatCard
-          label="Jami pips"
-          value={evaluated.length ? `${totalPips >= 0 ? "+" : ""}${totalPips.toFixed(1)}` : "—"}
-        />
+        <StatCard label="Jami pips" value={`${totalPips >= 0 ? "+" : ""}${totalPips.toFixed(1)}`} />
         <StatCard label="Signallar" value={String(rows.length)} sub="oxirgi 200" />
       </div>
-
 
       {bySymbol.length > 0 && (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-lg">

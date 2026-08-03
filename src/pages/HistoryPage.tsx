@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
-import { fmtMoney, fmtNum, timeAgo } from "@/lib/utils";
+import { fmtMoney, fmtNum, timeAgo, fmtDateShort } from "@/lib/utils";
 import type { TradeHistory } from "@/lib/types";
 import { Loader2, Bot } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
@@ -75,7 +75,7 @@ export function HistoryPage() {
                     <div className="min-w-0">
                       <p className="truncate text-sm font-bold">{t.symbol}</p>
                       <p className="truncate text-[11px] text-fg-dim">
-                        {fmtNum(t.open_price, 5)} → {fmtNum(t.close_price, 5)} · {timeAgo(t.closed_at)}
+                        {fmtNum(t.volume, 2)} lot &bull; {fmtNum(t.open_price, 5)} → {fmtNum(t.close_price, 5)} &bull; {fmtDateShort(t.closed_at)}
                       </p>
                     </div>
                   </div>
