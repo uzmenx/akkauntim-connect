@@ -52,6 +52,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const zonePrimitiveRef = useRef<ZoneRectanglePrimitive | null>(null);
   const linePrimitiveRef = useRef<ConnectedLinePrimitive | null>(null);
   const eventMarkerRef = useRef<EventMarkerPrimitive | null>(null);
+  const shadowMarkersRef = useRef<ShadowSignalMarkers | null>(null);
+
 
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
