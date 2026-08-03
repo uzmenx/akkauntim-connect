@@ -75,6 +75,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const [wyckoffData, setWyckoffData] = useState<any[]>([]);
   const [srVolumeData, setSrVolumeData] = useState<any[]>([]);
   const [autoPatternData, setAutoPatternData] = useState<any[]>([]);
+  const [shadowSignals, setShadowSignals] = useState<ShadowSignalRow[]>([]);
+
 
   const [activeSymbol, setActiveSymbol] = useState(symbol);
   const [activePosition, setActivePosition] = useState<Position | null | undefined>(position);
