@@ -1095,7 +1095,10 @@ class TradingBot:
         logger.info("🤖 AI Trading Bot ishga tushdi!")
         logger.info(f"   Symbollar: {self.config.trading_symbols}")
         logger.info(f"   Timeframe: {self.config.timeframe_major} / {self.config.timeframe_minor}")
-        logger.info(f"   Interval: {self.config.loop_interval_minutes} daqiqa")
+        if getattr(self.config, "realtime_enabled", False):
+            logger.info(f"   Interval: REAL-TIME har {self.config.loop_interval_seconds} sekund")
+        else:
+            logger.info(f"   Interval: {self.config.loop_interval_minutes} daqiqa")
         logger.info(f"   AI Model: {self.config.ai_model}")
         logger.info("=" * 60)
 
@@ -1392,10 +1395,12 @@ class TradingBot:
                     if not self._running:
                         break
 
-                    logger.info(f"Barcha juftliklar tekshirildi (sikl {cycle_duration:.2f}s). {self.config.loop_interval_minutes} daqiqa kutilmoqda...")
-
-                    # Kutish (chunked — har 1 soniyada _running tekshirish)
-                    wait_seconds = self.config.loop_interval_minutes * 60
+                    if getattr(self.config, "realtime_enabled", False):
+                        wait_seconds = max(1, int(getattr(self.config, "loop_interval_seconds", 15)))
+                        logger.info(f"Barcha juftliklar tekshirildi (sikl {cycle_duration:.2f}s). REAL-TIME: {wait_seconds} sekund kutilmoqda...")
+                    else:
+                        wait_seconds = max(1, int(self.config.loop_interval_minutes) * 60)
+                        logger.info(f"Barcha juftliklar tekshirildi (sikl {cycle_duration:.2f}s). {self.config.loop_interval_minutes} daqiqa kutilmoqda...")
                     for _ in range(wait_seconds):
                         if not self._running:
                             break

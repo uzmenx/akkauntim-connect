@@ -29,6 +29,8 @@ class BotConfig:
     timeframe_major: str = "H1"
     timeframe_minor: str = "M5"
     loop_interval_minutes: int = 5
+    loop_interval_seconds: int = 15
+    realtime_enabled: bool = False
     risk_level_single_confirmation: float = 1.0
     risk_level_multiple_confirmation: float = 2.0
     ai_enabled: bool = True
@@ -114,6 +116,8 @@ class BotConfig:
                     self.timeframe_major = trading.get("timeframe_major", self.timeframe_major)
                     self.timeframe_minor = trading.get("timeframe_minor", self.timeframe_minor)
                     self.loop_interval_minutes = trading.get("loop_interval_minutes", self.loop_interval_minutes)
+                    self.loop_interval_seconds = trading.get("loop_interval_seconds", self.loop_interval_seconds)
+                    self.realtime_enabled = trading.get("realtime_enabled", self.realtime_enabled)
                     self.risk_level_single_confirmation = trading.get("risk_level_single_confirmation", self.risk_level_single_confirmation)
                     self.risk_level_multiple_confirmation = trading.get("risk_level_multiple_confirmation", self.risk_level_multiple_confirmation)
                     
@@ -148,6 +152,12 @@ class BotConfig:
             
         if "loop_interval_minutes" in data:
             self.loop_interval_minutes = int(data["loop_interval_minutes"])
+
+        if data.get("loop_interval_seconds") is not None:
+            self.loop_interval_seconds = max(1, int(data["loop_interval_seconds"]))
+
+        if "realtime_enabled" in data:
+            self.realtime_enabled = bool(data["realtime_enabled"])
             
         if "ai_enabled" in data:
             self.ai_enabled = bool(data["ai_enabled"])
