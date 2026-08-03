@@ -159,3 +159,26 @@ class BaseStrategyManager:
         except sqlite3.Error as e:
             print(f"[{self.__class__.__name__}] Error in count_records: {e}")
             return 0
+
+    def update_mitigations(self, symbol: str, timeframe: str, current_high: float, current_low: float) -> int:
+        """
+        Jonli narx yoki vaqt tebranishlariga qarab "fresh" zonalarni "stale" ga o'zgartiradi.
+        Barcha child class'lar uchun umumiy vaqtga asoslangan tozalash (48 soat).
+        Maxsus narxga asoslangan mantiqni child class'larda override qilish mumkin.
+        """
+        stale_count = 0
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                query = f"""
+                    UPDATE {self.table_name} 
+                    SET status = 'stale' 
+                    WHERE symbol = ? AND timeframe = ? AND status IN ('active', 'fresh') 
+                    AND created_at < datetime('now', '-2 days')
+                """
+                cursor.execute(query, (symbol, timeframe))
+                conn.commit()
+                stale_count = cursor.rowcount
+        except sqlite3.Error as e:
+            print(f"[{self.__class__.__name__}] Error in update_mitigations: {e}")
+        return stale_count

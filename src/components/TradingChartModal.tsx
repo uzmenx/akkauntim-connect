@@ -6,6 +6,10 @@ import { fmtMoney, fmtNum } from "@/lib/utils";
 import type { Position } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { ZoneRectanglePrimitive, ZoneData } from "./chart-primitives/ZoneRectanglePrimitive";
+import { ConnectedLinePrimitive, LineData } from "./chart-primitives/ConnectedLinePrimitive";
+import { EventMarkerPrimitive, EventMarkerData } from "./chart-primitives/EventMarkerPrimitive";
+
 import { guestMock } from "@/lib/guestMock";
 
 interface TradingChartModalProps {
@@ -16,6 +20,12 @@ interface TradingChartModalProps {
 }
 
 type Timeframe = "M1" | "M5" | "M15" | "H1" | "H4" | "D1";
+
+const getAlpha = (confidence: number | undefined, maxAlpha: number, minAlpha: number) => {
+  if (confidence === undefined || confidence === null) return maxAlpha;
+  const ratio = Math.max(0, Math.min(100, confidence)) / 100;
+  return minAlpha + ratio * (maxAlpha - minAlpha);
+};
 
 const calculatePL = (entry: number, target: number, vol: number, sym: string, currentPrice: number, currentProfit: number) => {
   if (!entry || !target || !vol) return 0;
@@ -39,6 +49,10 @@ const calculatePL = (entry: number, target: number, vol: number, sym: string, cu
 
 export function TradingChartModal({ isOpen, onClose, symbol, position }: TradingChartModalProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
+  const zonePrimitiveRef = useRef<ZoneRectanglePrimitive | null>(null);
+  const linePrimitiveRef = useRef<ConnectedLinePrimitive | null>(null);
+  const eventMarkerRef = useRef<EventMarkerPrimitive | null>(null);
+
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
@@ -47,17 +61,35 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const [showSMC, setShowSMC] = useState(true);
   const [showVolume, setShowVolume] = useState(true);
   const [showFan, setShowFan] = useState(false);
+  const [showHarmonic, setShowHarmonic] = useState(false);
+  const [showWyckoff, setShowWyckoff] = useState(false);
+  const [showSRVolume, setShowSRVolume] = useState(false);
+  const [showAutoPattern, setShowAutoPattern] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isEmpty, setIsEmpty] = useState(false);
   const [candlesData, setCandlesData] = useState<any[]>([]);
   const [smcZonesData, setSmcZonesData] = useState<any[]>([]);
+  const [harmonicData, setHarmonicData] = useState<any[]>([]);
+  const [wyckoffData, setWyckoffData] = useState<any[]>([]);
+  const [srVolumeData, setSrVolumeData] = useState<any[]>([]);
+  const [autoPatternData, setAutoPatternData] = useState<any[]>([]);
 
   const [activeSymbol, setActiveSymbol] = useState(symbol);
   const [activePosition, setActivePosition] = useState<Position | null | undefined>(position);
   const [showSymbolList, setShowSymbolList] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hoveredTooltip, setHoveredTooltip] = useState<{
+    x: number;
+    y: number;
+    strategy: string;
+    signalType: string;
+    confidence: number | null;
+    reasoning?: string;
+    color: string;
+    priceRange?: string;
+  } | null>(null);
 
   const { user } = useAuth();
   const isGuest = user?.id === "guest";
@@ -212,7 +244,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     fetchChartData();
 
     return () => { isMounted = false; };
-  }, [isOpen, activeSymbol, timeframe, showSMC, showFan, fanData]);
+  }, [isOpen, activeSymbol, timeframe, showSMC, showFan, fanData, showHarmonic, showWyckoff, showSRVolume, showAutoPattern]);
 
   useEffect(() => {
     if (!isOpen || !chartContainerRef.current || isEmpty || isLoading || error || candlesData.length === 0) return;
@@ -464,6 +496,321 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     };
   }, [showFan, fanData, candlesData, timeframe]);
 
+
+  // Combined Zones - drawn as an official Series Primitive
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (zonePrimitiveRef.current) {
+      try {
+        series.detachPrimitive(zonePrimitiveRef.current);
+      } catch {}
+      zonePrimitiveRef.current = null;
+    }
+
+    const aggregatedZones: ZoneData[] = [];
+
+    // Add SMC Zones (Purple)
+    if (showSMC && smcZonesData && smcZonesData.length > 0) {
+      smcZonesData.forEach(z => {
+        aggregatedZones.push({
+          top: z.top,
+          bottom: z.bottom,
+          start_time: z.formed_at || z.time,
+          direction: z.direction,
+          color: `rgba(168, 85, 247, ${getAlpha(z.confidence, 0.25, 0.05)})`,
+          borderColor: `rgba(168, 85, 247, ${getAlpha(z.confidence, 0.8, 0.2)})`
+        });
+      });
+    }
+
+    // Add SR Volume Zones (Green for Support, Red for Resistance)
+    if (showSRVolume && srVolumeData && srVolumeData.length > 0) {
+      srVolumeData.forEach(z => {
+        const margin = Number(z.price) * 0.001; // 0.1% margin for thickness
+        const isSupport = z.type.toLowerCase().includes('support') || z.type.toLowerCase().includes('demand');
+        aggregatedZones.push({
+          top: Number(z.price) + margin,
+          bottom: Number(z.price) - margin,
+          start_time: z.formed_at || z.time,
+          direction: isSupport ? 'support' : 'resistance',
+          color: isSupport ? `rgba(16, 185, 129, ${getAlpha(z.confidence, 0.25, 0.05)})` : `rgba(244, 63, 94, ${getAlpha(z.confidence, 0.25, 0.05)})`,
+          borderColor: isSupport ? `rgba(16, 185, 129, ${getAlpha(z.confidence, 0.8, 0.2)})` : `rgba(244, 63, 94, ${getAlpha(z.confidence, 0.8, 0.2)})`
+        });
+      });
+    }
+
+    if (aggregatedZones.length > 0) {
+      const primitive = new ZoneRectanglePrimitive(aggregatedZones);
+      series.attachPrimitive(primitive);
+      zonePrimitiveRef.current = primitive;
+    }
+
+    return () => {
+      if (zonePrimitiveRef.current && candlestickSeriesRef.current) {
+        try {
+          candlestickSeriesRef.current.detachPrimitive(zonePrimitiveRef.current);
+        } catch {}
+      }
+    };
+  }, [showSMC, showSRVolume, smcZonesData, srVolumeData, candlesData]);
+
+  // Wyckoff Events - Event Markers (Blue)
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (eventMarkerRef.current) {
+      try {
+        eventMarkerRef.current.detach();
+      } catch {}
+      eventMarkerRef.current = null;
+    }
+
+    if (showWyckoff && wyckoffData && wyckoffData.length > 0 && candlesData.length > 0) {
+      const events: EventMarkerData[] = wyckoffData.map(w => ({
+        time: w.formed_at || w.time,
+        text: w.phase,
+        type: 'neutral', // use neutral so we can customize color
+        color: `rgba(59, 130, 246, ${getAlpha(w.confidence, 1, 0.3)})`,
+      }));
+
+      eventMarkerRef.current = new EventMarkerPrimitive(series, events, candlesData);
+    }
+
+    return () => {
+      if (eventMarkerRef.current) {
+        try {
+          eventMarkerRef.current.detach();
+        } catch {}
+        eventMarkerRef.current = null;
+      }
+    };
+  }, [showWyckoff, wyckoffData, candlesData]);
+
+  // Connected Lines - Harmonic (Gold) & Auto Patterns (Orange)
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (linePrimitiveRef.current) {
+      try {
+        series.detachPrimitive(linePrimitiveRef.current);
+      } catch {}
+      linePrimitiveRef.current = null;
+    }
+
+    const aggregatedLines: LineData[] = [];
+
+    // Check if auto patterns have lines data in their JSON (Orange)
+    if (showAutoPattern && autoPatternData && autoPatternData.length > 0) {
+      autoPatternData.forEach(a => {
+        if (a.lines && Array.isArray(a.lines)) {
+           a.lines.forEach(l => {
+              aggregatedLines.push({
+                ...l,
+                color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`
+              });
+           });
+        } else if (a.points && Array.isArray(a.points)) {
+           aggregatedLines.push({
+             points: a.points,
+             color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`,
+             lineWidth: 2
+           });
+        }
+      });
+    }
+
+    // Check if harmonic patterns have points/lines (Gold/Yellow)
+    if (showHarmonic && harmonicData && harmonicData.length > 0) {
+      harmonicData.forEach(h => {
+        if (h.points && Array.isArray(h.points)) {
+          aggregatedLines.push({
+             points: h.points,
+             color: `rgba(234, 179, 8, ${getAlpha(h.confidence, 1, 0.3)})`,
+             lineWidth: 2,
+             fillColor: `rgba(234, 179, 8, ${getAlpha(h.confidence, 0.2, 0.05)})`
+          });
+        }
+      });
+    }
+
+    if (aggregatedLines.length > 0) {
+      const primitive = new ConnectedLinePrimitive(aggregatedLines);
+      series.attachPrimitive(primitive);
+      linePrimitiveRef.current = primitive;
+    }
+
+    return () => {
+      if (linePrimitiveRef.current && candlestickSeriesRef.current) {
+        try {
+          candlestickSeriesRef.current.detachPrimitive(linePrimitiveRef.current);
+        } catch {}
+      }
+    };
+  }, [showAutoPattern, showHarmonic, autoPatternData, harmonicData, candlesData]);
+
+
+  // Dynamic detailed tooltip matching crosshair hover on indicators
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const handleCrosshairMove = (param: any) => {
+      if (
+        !param.point ||
+        !param.time ||
+        param.point.x < 0 ||
+        param.point.y < 0
+      ) {
+        setHoveredTooltip(null);
+        return;
+      }
+
+      const series = candlestickSeriesRef.current;
+      if (!series) return;
+      const hoveredPrice = series.coordinateToPrice(param.point.y);
+      if (!hoveredPrice) return;
+
+      const hoverTimeSec = typeof param.time === "number" 
+        ? param.time 
+        : (param.time as any).value || new Date(param.time).getTime() / 1000;
+      
+      const parseTimeToSec = (t: any) => {
+        if (!t) return 0;
+        if (typeof t === "number") {
+          return t > 2000000000 ? Math.floor(t / 1000) : t;
+        }
+        return Math.floor(new Date(t).getTime() / 1000);
+      };
+
+      const matchedIndicators: any[] = [];
+
+      // 1. SMC Zones
+      if (showSMC && smcZonesData && smcZonesData.length > 0) {
+        smcZonesData.forEach(z => {
+          const zTimeSec = parseTimeToSec(z.formed_at || z.time);
+          const isPriceInside = hoveredPrice >= Number(z.bottom) && hoveredPrice <= Number(z.top);
+          if (isPriceInside && hoverTimeSec >= zTimeSec - 3600) {
+            matchedIndicators.push({
+              strategy: "Smart Money Concepts (SMC)",
+              signalType: `${z.zone_type.replace("_", " ").toUpperCase()} (${z.direction.toUpperCase()})`,
+              confidence: z.confidence || null,
+              reasoning: z.reasoning || z.description || "Smart Money demand/supply imbalance detected.",
+              color: "border-purple-500/50 text-purple-400 bg-purple-950/90",
+              priceRange: `${fmtNum(z.bottom, 5)} - ${fmtNum(z.top, 5)}`,
+              dist: Math.abs(hoveredPrice - (Number(z.bottom) + Number(z.top)) / 2)
+            });
+          }
+        });
+      }
+
+      // 2. SR Volume Zones
+      if (showSRVolume && srVolumeData && srVolumeData.length > 0) {
+        srVolumeData.forEach(z => {
+          const zTimeSec = parseTimeToSec(z.formed_at || z.time);
+          const zPrice = Number(z.price);
+          const margin = zPrice * 0.005; // 0.5% tolerance
+          const isPriceClose = Math.abs(hoveredPrice - zPrice) <= margin;
+          if (isPriceClose && hoverTimeSec >= zTimeSec - 3600) {
+            const isSupport = z.type.toLowerCase().includes("support") || z.type.toLowerCase().includes("demand");
+            matchedIndicators.push({
+              strategy: "Support & Resistance (Volume)",
+              signalType: z.type.toUpperCase(),
+              confidence: z.confidence || null,
+              reasoning: z.reasoning || z.description || "Volume-profile based key psychological levels.",
+              color: isSupport 
+                ? "border-emerald-500/50 text-emerald-400 bg-emerald-950/90" 
+                : "border-rose-500/50 text-rose-400 bg-rose-950/90",
+              priceRange: `@ ${fmtNum(zPrice, 5)}`,
+              dist: Math.abs(hoveredPrice - zPrice)
+            });
+          }
+        });
+      }
+
+      // 3. Wyckoff Events
+      if (showWyckoff && wyckoffData && wyckoffData.length > 0) {
+        wyckoffData.forEach(w => {
+          const wTimeSec = parseTimeToSec(w.formed_at || w.time);
+          const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
+          if (Math.abs(hoverTimeSec - wTimeSec) <= stepSeconds * 2.5) {
+            matchedIndicators.push({
+              strategy: "Wyckoff Market Cycles",
+              signalType: `${w.phase} - ${w.signal}`,
+              confidence: w.confidence || null,
+              reasoning: w.reasoning || w.description || "Accumulation/Distribution phase structural transition event.",
+              color: "border-blue-500/50 text-blue-400 bg-blue-950/90",
+              priceRange: `Time: ${new Date(wTimeSec * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+              dist: Math.abs(hoverTimeSec - wTimeSec) / stepSeconds
+            });
+          }
+        });
+      }
+
+      // 4. Auto Patterns
+      if (showAutoPattern && autoPatternData && autoPatternData.length > 0) {
+        autoPatternData.forEach(a => {
+          const aTimeSec = parseTimeToSec(a.formed_at || a.time);
+          const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
+          if (Math.abs(hoverTimeSec - aTimeSec) <= stepSeconds * 2.5) {
+            matchedIndicators.push({
+              strategy: "Auto Pattern Finder",
+              signalType: `${a.pattern_type.toUpperCase()} (${a.signal})`,
+              confidence: a.confidence || null,
+              reasoning: a.reasoning || a.description || "Chart geometry pattern recognition logic triggered.",
+              color: "border-orange-500/50 text-orange-400 bg-orange-950/90",
+              dist: Math.abs(hoverTimeSec - aTimeSec) / stepSeconds
+            });
+          }
+        });
+      }
+
+      // 5. Harmonic Patterns
+      if (showHarmonic && harmonicData && harmonicData.length > 0) {
+        harmonicData.forEach(h => {
+          const hTimeSec = parseTimeToSec(h.formed_at || h.time);
+          const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
+          if (Math.abs(hoverTimeSec - hTimeSec) <= stepSeconds * 2.5) {
+            matchedIndicators.push({
+              strategy: "Harmonic Patterns",
+              signalType: `${h.pattern_type.toUpperCase()} (${h.signal})`,
+              confidence: h.confidence || null,
+              reasoning: h.reasoning || h.description || "Fibonacci ratio coordinate convergence completed.",
+              color: "border-yellow-500/50 text-yellow-400 bg-yellow-950/90",
+              dist: Math.abs(hoverTimeSec - hTimeSec) / stepSeconds
+            });
+          }
+        });
+      }
+
+      if (matchedIndicators.length > 0) {
+        matchedIndicators.sort((a, b) => a.dist - b.dist);
+        const bestMatch = matchedIndicators[0];
+        setHoveredTooltip({
+          x: param.point.x + 15,
+          y: param.point.y + 15,
+          strategy: bestMatch.strategy,
+          signalType: bestMatch.signalType,
+          confidence: bestMatch.confidence,
+          reasoning: bestMatch.reasoning,
+          color: bestMatch.color,
+          priceRange: bestMatch.priceRange
+        });
+      } else {
+        setHoveredTooltip(null);
+      }
+    };
+
+    chart.subscribeCrosshairMove(handleCrosshairMove);
+    return () => {
+      chart.unsubscribeCrosshairMove(handleCrosshairMove);
+    };
+  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe]);
+
+
   if (!isOpen) return null;
 
   return (
@@ -641,6 +988,46 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
               <Layers size={12} /> SMC
             </button>
             <button
+              onClick={() => setShowHarmonic(!showHarmonic)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
+                showHarmonic
+                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"
+                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              <TrendingUp size={12} /> Harmonics
+            </button>
+            <button
+              onClick={() => setShowAutoPattern(!showAutoPattern)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
+                showAutoPattern
+                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              <Target size={12} /> Patterns
+            </button>
+            <button
+              onClick={() => setShowSRVolume(!showSRVolume)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
+                showSRVolume
+                  ? "bg-orange-500/20 text-orange-300 border-orange-500/40"
+                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              <Activity size={12} /> SR Vol
+            </button>
+            <button
+              onClick={() => setShowWyckoff(!showWyckoff)}
+              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
+                showWyckoff
+                  ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
+              }`}
+            >
+              <Activity size={12} /> Wyckoff
+            </button>
+            <button
               onClick={() => setShowVolume(!showVolume)}
               className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
                 showVolume
@@ -673,23 +1060,101 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
           ) : (
             <>
               <div ref={chartContainerRef} className="w-full h-full absolute inset-0 z-0" />
+
+              {/* Floating Detailed Tooltip */}
+              {hoveredTooltip && (
+                <div 
+                  className={`absolute z-30 pointer-events-none rounded-xl border p-2.5 shadow-2xl text-[10px] space-y-1.5 min-w-[180px] max-w-[240px] backdrop-blur-md transition-all duration-75 ${hoveredTooltip.color}`}
+                  style={{ left: `${hoveredTooltip.x}px`, top: `${hoveredTooltip.y}px` }}
+                >
+                  <div className="font-extrabold text-[11px] uppercase tracking-wider text-white">
+                    {hoveredTooltip.strategy}
+                  </div>
+                  <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-1">
+                    <span className="text-white/60">Signal:</span>
+                    <span className="font-extrabold">{hoveredTooltip.signalType}</span>
+                  </div>
+                  {hoveredTooltip.priceRange && (
+                    <div className="flex items-center justify-between gap-2 text-[9px]">
+                      <span className="text-white/40">Range/Price:</span>
+                      <span className="font-medium text-white/80 tabular-nums">{hoveredTooltip.priceRange}</span>
+                    </div>
+                  )}
+                  {hoveredTooltip.confidence !== null && (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-white/60">Confidence:</span>
+                      <span className="font-extrabold flex items-center gap-1.5">
+                        <span className="text-emerald-400">{hoveredTooltip.confidence}%</span>
+                        <div className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-emerald-400" 
+                            style={{ width: `${hoveredTooltip.confidence}%` }}
+                          />
+                        </div>
+                      </span>
+                    </div>
+                  )}
+                  {hoveredTooltip.reasoning && (
+                    <div className="text-[9px] text-white/70 italic leading-relaxed pt-1 border-t border-white/5 font-sans">
+                      "{hoveredTooltip.reasoning}"
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* Overlay SMC Smart Money Info Badge */}
-              {showSMC && smcZonesData.length > 0 && (
+              {(showSMC && smcZonesData.length > 0) || (showHarmonic && harmonicData.length > 0) || (showWyckoff && wyckoffData.length > 0) || (showSRVolume && srVolumeData.length > 0) || (showAutoPattern && autoPatternData.length > 0) ? (
                 <div className="absolute top-3 left-3 z-10 bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-purple-500/30 shadow-lg text-[10px] space-y-1.5 max-w-[200px] max-h-[160px] overflow-y-auto">
                   <div className="flex items-center gap-1.5 font-black text-purple-400 uppercase tracking-wider mb-2 sticky top-0 bg-black/80">
                     <Layers size={12} /> SMC Zones
                   </div>
-                  {smcZonesData.map((zone) => (
+                  {showSMC && smcZonesData.map((zone) => (
                     <div key={zone.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium">{zone.zone_type.replace('_', ' ')}</span>
+                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">{zone.zone_type.replace('_', ' ')} {zone.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{zone.confidence}%</span>}</span>
                       <span className={`font-bold tabular-nums ${zone.direction === 'demand' || zone.direction === 'bullish' ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {zone.direction.toUpperCase()} {fmtNum(Number(zone.top), 5)} - {fmtNum(Number(zone.bottom), 5)}
                       </span>
                     </div>
                   ))}
+                  
+                  {showWyckoff && wyckoffData.map((w) => (
+                    <div key={w.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Wyckoff {w.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{w.confidence}%</span>}</span>
+                      <span className={`font-bold text-blue-400`}>
+                        {w.phase} - {w.signal}
+                      </span>
+                    </div>
+                  ))}
+                  
+                  {showSRVolume && srVolumeData.map((s) => (
+                    <div key={s.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">SR Volume {s.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{s.confidence}%</span>}</span>
+                      <span className={`font-bold ${s.type.toLowerCase().includes("support") || s.type.toLowerCase().includes("demand") ? "text-emerald-400" : "text-rose-400"}`}>
+                        {s.type.toUpperCase()} @ {fmtNum(Number(s.price), 5)}
+                      </span>
+                    </div>
+                  ))}
+                  
+                  {showAutoPattern && autoPatternData.map((a) => (
+                    <div key={a.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Auto Pattern {a.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{a.confidence}%</span>}</span>
+                      <span className={`font-bold text-orange-400`}>
+                        {a.pattern_type.toUpperCase()} - {a.signal}
+                      </span>
+                    </div>
+                  ))}
+                  
+                  {showHarmonic && harmonicData.map((h) => (
+                    <div key={h.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
+                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Harmonic {h.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{h.confidence}%</span>}</span>
+                      <span className={`font-bold text-yellow-400`}>
+                        {h.pattern_type.toUpperCase()} - {h.signal}
+                      </span>
+                    </div>
+                  ))}
+
                 </div>
-              )}
+              ) : null}
             </>
           )}
         </div>

@@ -182,85 +182,42 @@ class TradingBot:
                         "volume": float(row.get('tick_volume', 0.0))
                     })
             
-            strategy_overlays = {
-                "smc": [],
-                "harmonic": [],
-                "wyckoff": [],
-                "sr_volume": [],
-                "auto_patterns": []
-            }
+            from bot.strategy.smc.zones import ZoneManager
+            from bot.strategy.harmonic.manager import HarmonicPatternManager
+            from bot.strategy.wyckoff.manager import WyckoffEventManager
+            from bot.strategy.sr_volume.manager import SRVolumeZoneManager
+            from bot.strategy.auto_patterns.manager import AutoPatternManager
             
-            if strategy_results and isinstance(strategy_results, dict):
-                # 1. SMC
-                smc_data = strategy_results.get("SMC", {})
-                if smc_data and isinstance(smc_data, dict):
-                    ob_dict = smc_data.get('order_blocks', {})
-                    fvg_dict = smc_data.get('fvg', {})
-                    
-                    blocks = ob_dict.get('demand', []) + ob_dict.get('supply', []) if isinstance(ob_dict, dict) else []
-                    fvgs = fvg_dict.get('demand', []) + fvg_dict.get('supply', []) if isinstance(fvg_dict, dict) else []
-                    
-                    for ob in blocks:
-                        strategy_overlays["smc"].append({
-                            "symbol": symbol, "timeframe": timeframe, "zone_type": "order_block",
-                            "direction": ob.get("ob_type", "demand"), "top": float(ob.get("top", 0)),
-                            "bottom": float(ob.get("bottom", 0)), "status": ob.get("status", "fresh"),
-                            "formed_at": str(ob.get("timestamp", datetime.datetime.now().isoformat()))
-                        })
-                    for fvg in fvgs:
-                        strategy_overlays["smc"].append({
-                            "symbol": symbol, "timeframe": timeframe, "zone_type": "fvg",
-                            "direction": fvg.get("type", "demand"), "top": float(fvg.get("top", 0)),
-                            "bottom": float(fvg.get("bottom", 0)), "status": fvg.get("status", "fresh"),
-                            "formed_at": str(fvg.get("timestamp", datetime.datetime.now().isoformat()))
-                        })
-                        
-                # 2. Harmonic (Pattern deb keladi PortfolioManager dan)
-                harmonic_data = strategy_results.get("Pattern", {})
-                if harmonic_data and harmonic_data.get("signal") and harmonic_data.get("signal") != "HOLD":
-                    strategy_overlays["harmonic"].append({
-                        "symbol": symbol, "timeframe": timeframe,
-                        "pattern_type": harmonic_data.get("pattern", "unknown"),
-                        "signal": harmonic_data.get("signal"),
-                        "confidence": harmonic_data.get("confidence", 0),
-                        "entry": harmonic_data.get("entry_zone", []),
-                        "sl": harmonic_data.get("sl", 0),
-                        "tp": harmonic_data.get("tp", [])
-                    })
-                    
-                # 3. Wyckoff
-                wyckoff_data = strategy_results.get("Wyckoff", {})
-                if wyckoff_data and wyckoff_data.get("phase"):
-                    strategy_overlays["wyckoff"].append({
-                        "symbol": symbol, "timeframe": timeframe,
-                        "phase": wyckoff_data.get("phase"),
-                        "signal": wyckoff_data.get("signal", "HOLD"),
-                        "confidence": wyckoff_data.get("confidence", 0)
-                    })
-                    
-                # 4. SR Volume
-                sr_data = strategy_results.get("SR_Volume", {})
-                if sr_data and isinstance(sr_data.get("levels"), list):
-                    for lvl in sr_data.get("levels", []):
-                        strategy_overlays["sr_volume"].append({
-                            "symbol": symbol, "timeframe": timeframe,
-                            "price": float(lvl.get("price", 0)),
-                            "type": lvl.get("type", "unknown"),
-                            "strength": lvl.get("strength", 0)
-                        })
-                        
-                # 5. Auto Patterns
-                auto_data = strategy_results.get("Auto_Pattern", {})
-                if auto_data and auto_data.get("pattern"):
-                    strategy_overlays["auto_patterns"].append({
-                        "symbol": symbol, "timeframe": timeframe,
-                        "pattern_type": auto_data.get("pattern"),
-                        "signal": auto_data.get("signal", "HOLD"),
-                        "confidence": auto_data.get("confidence", 0)
-                    })
-
+            zm = ZoneManager()
+            hm = HarmonicPatternManager()
+            wm = WyckoffEventManager()
+            srm = SRVolumeZoneManager()
+            apm = AutoPatternManager()
+            
+            strategy_overlays = {
+                "smc": zm.get_active_zones(symbol, timeframe),
+                "harmonic": hm.get_active_patterns(symbol, timeframe),
+                "wyckoff": wm.get_active_events(symbol, timeframe),
+                "sr_volume": srm.get_active_zones(symbol, timeframe),
+                "auto_patterns": apm.get_active_patterns(symbol, timeframe)
+            }
             if hasattr(self, 'sync') and hasattr(self.sync, 'sync_chart_data'):
-                self.sync.sync_chart_data(symbol, timeframe, candles_list, strategy_overlays)
+                import hashlib
+                import json
+                
+                overlays_str = json.dumps(strategy_overlays, sort_keys=True)
+                overlays_hash = hashlib.md5(overlays_str.encode('utf-8')).hexdigest()
+                
+                if not hasattr(self, '_last_overlays_hash'):
+                    self._last_overlays_hash = {}
+                if symbol not in self._last_overlays_hash:
+                    self._last_overlays_hash[symbol] = {}
+                    
+                if self._last_overlays_hash[symbol].get(timeframe) == overlays_hash:
+                    self.sync.sync_chart_data(symbol, timeframe, candles_list, None)
+                else:
+                    self._last_overlays_hash[symbol][timeframe] = overlays_hash
+                    self.sync.sync_chart_data(symbol, timeframe, candles_list, strategy_overlays)
         except Exception as e:
             logger.error(f"Chart sync failed for {symbol}: {e}")
 
@@ -456,7 +413,15 @@ class TradingBot:
                 if tf == self.config.timeframe_major and major_strategy_results:
                     strat_res = major_strategy_results
                 else:
-                    strat_res = {"SMC": self._get_smc_data(df)}
+                    smc_res = self._get_smc_data(df)
+                    strat_res = {"SMC": smc_res}
+                    from bot.strategy.smc.zones import ZoneManager
+                    minor_zm = ZoneManager()
+                    minor_zm.save_zones(symbol, tf, smc_res)
+                    # For minor timeframes we also need to mitigate
+                    current_high = float(df.iloc[-1]['high'])
+                    current_low = float(df.iloc[-1]['low'])
+                    minor_zm.update_mitigations(symbol, tf, current_high, current_low)
                 
                 last_time = self.last_synced_time[symbol].get(tf)
                 if last_time:
@@ -548,6 +513,16 @@ class TradingBot:
                 wm.save_events(symbol, tf_major, wyckoff_result)
                 srm.save_zones(symbol, tf_major, sr_volume_result)
                 apm.save_pattern(symbol, tf_major, auto_patterns_result)
+                
+                # Mitigations (Eski / Stale zonalarni tozalash)
+                current_high = float(df_major.iloc[-1]['high'])
+                current_low = float(df_major.iloc[-1]['low'])
+                zm.update_mitigations(symbol, tf_major, current_high, current_low)
+                if hasattr(hm, 'update_mitigations'): hm.update_mitigations(symbol, tf_major, current_high, current_low)
+                if hasattr(wm, 'update_mitigations'): wm.update_mitigations(symbol, tf_major, current_high, current_low)
+                if hasattr(srm, 'update_mitigations'): srm.update_mitigations(symbol, tf_major, current_high, current_low)
+                if hasattr(apm, 'update_mitigations'): apm.update_mitigations(symbol, tf_major, current_high, current_low)
+                
             except Exception as e:
                 logger.error(f"[{symbol}] Strategiya xotirasini saqlashda xatolik: {e}")
         

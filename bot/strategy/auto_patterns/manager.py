@@ -107,3 +107,42 @@ class AutoPatternManager(BaseStrategyManager):
     def get_all_patterns(self, symbol: str, timeframe: str, limit: int = 50) -> List[Dict[str, Any]]:
         raw_patterns = self.get_recent(symbol, timeframe, limit=limit)
         return [self._parse_json_fields(pat) for pat in raw_patterns]
+
+    def update_mitigations(self, symbol: str, timeframe: str, current_high: float, current_low: float) -> int:
+        """
+        Auto Patterns uchun narxga asoslangan invalidatsiya.
+        Agar signal BUY bo'lsa va narx pattern eng past nuqtasidan (pivot) 0.5% tushib ketsa -> invalid
+        Agar signal SELL bo'lsa va narx pattern eng baland nuqtasidan (pivot) 0.5% oshib ketsa -> invalid
+        """
+        mitigated_count = super().update_mitigations(symbol, timeframe, current_high, current_low)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT id, signal, pivots_json FROM {self.table_name} WHERE symbol = ? AND timeframe = ? AND status = 'active'", (symbol, timeframe))
+                fresh = cursor.fetchall()
+                for row in fresh:
+                    is_invalid = False
+                    signal = row["signal"].upper()
+                    
+                    try:
+                        pivots = json.loads(row["pivots_json"]) if row["pivots_json"] else []
+                    except:
+                        pivots = []
+                        
+                    if pivots:
+                        prices = [p["price"] for p in pivots if "price" in p]
+                        if prices:
+                            min_p = min(prices)
+                            max_p = max(prices)
+                            if signal == "BUY" and current_low < min_p * 0.995:
+                                is_invalid = True
+                            elif signal == "SELL" and current_high > max_p * 1.005:
+                                is_invalid = True
+                    
+                    if is_invalid:
+                        cursor.execute(f"UPDATE {self.table_name} SET status = 'stale' WHERE id = ?", (row["id"],))
+                        mitigated_count += 1
+                conn.commit()
+        except sqlite3.Error as e:
+            print(f"Auto Pattern Update Mitigations Error: {e}")
+        return mitigated_count

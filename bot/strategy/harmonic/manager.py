@@ -134,3 +134,30 @@ class HarmonicPatternManager(BaseStrategyManager):
 
     def get_all_patterns(self, symbol: str, timeframe: str, limit: int = 50) -> List[Dict[str, Any]]:
         return self.get_recent(symbol, timeframe, limit=limit)
+
+    def update_mitigations(self, symbol: str, timeframe: str, current_high: float, current_low: float) -> int:
+        """
+        Harmonic patternlar uchun narxga asoslangan invalidatsiya.
+        Bullish: agar current_low < d_price * 0.995 (0.5% pastga) bo'lsa invalid
+        Bearish: agar current_high > d_price * 1.005 (0.5% tepaga) bo'lsa invalid
+        """
+        mitigated_count = super().update_mitigations(symbol, timeframe, current_high, current_low)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT id, direction, d_price FROM {self.table_name} WHERE symbol = ? AND timeframe = ? AND status IN ('active', 'fresh')", (symbol, timeframe))
+                fresh = cursor.fetchall()
+                for row in fresh:
+                    is_invalid = False
+                    if row["direction"].upper() == "BULLISH" and current_low < row["d_price"] * 0.995:
+                        is_invalid = True
+                    elif row["direction"].upper() == "BEARISH" and current_high > row["d_price"] * 1.005:
+                        is_invalid = True
+                    
+                    if is_invalid:
+                        cursor.execute(f"UPDATE {self.table_name} SET status = 'stale' WHERE id = ?", (row["id"],))
+                        mitigated_count += 1
+                conn.commit()
+        except sqlite3.Error as e:
+            print(f"Harmonic Update Mitigations Error: {e}")
+        return mitigated_count

@@ -118,3 +118,31 @@ class WyckoffEventManager(BaseStrategyManager):
 
     def get_all_events(self, symbol: str, timeframe: str, limit: int = 50) -> List[Dict[str, Any]]:
         return self.get_recent(symbol, timeframe, limit=limit)
+
+    def update_mitigations(self, symbol: str, timeframe: str, current_high: float, current_low: float) -> int:
+        """
+        Wyckoff eventlar uchun narxga asoslangan invalidatsiya.
+        Spring / SOS (Bullish): agar current_low < price * 0.995 (0.5% pastga)
+        Upthrust / SOW (Bearish): agar current_high > price * 1.005 (0.5% tepaga)
+        """
+        mitigated_count = super().update_mitigations(symbol, timeframe, current_high, current_low)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT id, event_type, price FROM {self.table_name} WHERE symbol = ? AND timeframe = ? AND status = 'active'", (symbol, timeframe))
+                fresh = cursor.fetchall()
+                for row in fresh:
+                    is_invalid = False
+                    ev = row["event_type"].lower()
+                    if ev in ("spring", "sos", "jac", "buy") and current_low < row["price"] * 0.995:
+                        is_invalid = True
+                    elif ev in ("upthrust", "sow", "utad", "sell") and current_high > row["price"] * 1.005:
+                        is_invalid = True
+                    
+                    if is_invalid:
+                        cursor.execute(f"UPDATE {self.table_name} SET status = 'stale' WHERE id = ?", (row["id"],))
+                        mitigated_count += 1
+                conn.commit()
+        except sqlite3.Error as e:
+            print(f"Wyckoff Update Mitigations Error: {e}")
+        return mitigated_count

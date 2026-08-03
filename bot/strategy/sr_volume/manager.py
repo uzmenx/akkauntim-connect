@@ -109,3 +109,30 @@ class SRVolumeZoneManager(BaseStrategyManager):
 
     def get_all_zones(self, symbol: str, timeframe: str, limit: int = 50) -> List[Dict[str, Any]]:
         return self.get_recent(symbol, timeframe, limit=limit)
+
+    def update_mitigations(self, symbol: str, timeframe: str, current_high: float, current_low: float) -> int:
+        """
+        SR Volume zonalari uchun narxga asoslangan invalidatsiya.
+        Support zone: agar current_low < bottom_price bo'lsa broken
+        Resistance zone: agar current_high > top_price bo'lsa broken
+        """
+        mitigated_count = super().update_mitigations(symbol, timeframe, current_high, current_low)
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT id, zone_type, top_price, bottom_price FROM {self.table_name} WHERE symbol = ? AND timeframe = ? AND status = 'fresh'", (symbol, timeframe))
+                fresh = cursor.fetchall()
+                for row in fresh:
+                    is_invalid = False
+                    if row["zone_type"] == "support" and current_low < row["bottom_price"]:
+                        is_invalid = True
+                    elif row["zone_type"] == "resistance" and current_high > row["top_price"]:
+                        is_invalid = True
+                    
+                    if is_invalid:
+                        cursor.execute(f"UPDATE {self.table_name} SET status = 'stale' WHERE id = ?", (row["id"],))
+                        mitigated_count += 1
+                conn.commit()
+        except sqlite3.Error as e:
+            print(f"SR Volume Update Mitigations Error: {e}")
+        return mitigated_count
