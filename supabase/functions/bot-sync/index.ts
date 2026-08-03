@@ -89,6 +89,15 @@ type Body = {
     status: 'fresh' | 'mitigated' | 'invalidated';
     formed_at: string;
   }>;
+  symbol?: string;
+  timeframe?: string;
+  strategy_overlays?: {
+    smc?: Array<any>;
+    harmonic?: Array<any>;
+    wyckoff?: Array<any>;
+    sr_volume?: Array<any>;
+    auto_patterns?: Array<any>;
+  };
 };
 
 function json(status: number, body: unknown) {
@@ -207,6 +216,42 @@ Deno.serve(async (req) => {
     const rows = body.smc_zones.map(z => ({ ...z, user_id }));
     const { error } = await supabase.from("smc_zones").insert(rows);
     results.smc_zones = error ? { error: error.message } : `ok:${rows.length}`;
+  }
+
+  if (body.strategy_overlays && body.symbol && body.timeframe) {
+    const symbol = body.symbol;
+    const timeframe = body.timeframe;
+    const overlays = body.strategy_overlays;
+    
+    if (overlays.smc && overlays.smc.length > 0) {
+      await supabase.from("smc_zones").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+      const { error } = await supabase.from("smc_zones").insert(overlays.smc.map(z => ({ ...z, user_id })));
+      results.smc_zones_overlay = error ? { error: error.message } : `ok:${overlays.smc.length}`;
+    }
+    
+    if (overlays.harmonic && overlays.harmonic.length > 0) {
+      await supabase.from("harmonic_patterns").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+      const { error } = await supabase.from("harmonic_patterns").insert(overlays.harmonic.map(z => ({ ...z, user_id })));
+      results.harmonic_patterns = error ? { error: error.message } : `ok:${overlays.harmonic.length}`;
+    }
+    
+    if (overlays.wyckoff && overlays.wyckoff.length > 0) {
+      await supabase.from("wyckoff_events").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+      const { error } = await supabase.from("wyckoff_events").insert(overlays.wyckoff.map(z => ({ ...z, user_id })));
+      results.wyckoff_events = error ? { error: error.message } : `ok:${overlays.wyckoff.length}`;
+    }
+    
+    if (overlays.sr_volume && overlays.sr_volume.length > 0) {
+      await supabase.from("sr_volume_zones").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+      const { error } = await supabase.from("sr_volume_zones").insert(overlays.sr_volume.map(z => ({ ...z, user_id })));
+      results.sr_volume_zones = error ? { error: error.message } : `ok:${overlays.sr_volume.length}`;
+    }
+    
+    if (overlays.auto_patterns && overlays.auto_patterns.length > 0) {
+      await supabase.from("auto_patterns").delete().eq("user_id", user_id).eq("symbol", symbol).eq("timeframe", timeframe).eq("status", "fresh");
+      const { error } = await supabase.from("auto_patterns").insert(overlays.auto_patterns.map(z => ({ ...z, user_id })));
+      results.auto_patterns = error ? { error: error.message } : `ok:${overlays.auto_patterns.length}`;
+    }
   }
 
   return json(200, { ok: true, user_id, results, settings });
