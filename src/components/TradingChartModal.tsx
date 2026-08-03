@@ -808,7 +808,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
     };
-  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe]);
+  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe, shadowSignals]);
 
 
   if (!isOpen) return null;
