@@ -37,6 +37,34 @@ class ConnectedLineRenderer extends BasePrimitiveRenderer {
     const timeScale = this.attachedParams.chart.timeScale();
     const series = this.attachedParams.series;
 
+    // Viewport visible time range filtering for optimization
+    const visibleRange = timeScale.getVisibleRange();
+
+    const parseRangeTime = (t: any): number => {
+      if (!t) return 0;
+      if (typeof t === 'number') return t > 2000000000 ? Math.floor(t / 1000) : t;
+      if (typeof t === 'string') return Math.floor(new Date(t).getTime() / 1000);
+      if (t && typeof t === 'object') {
+        if ('year' in t && 'month' in t && 'day' in t) {
+          return Math.floor(new Date(`${t.year}-${t.month}-${t.day}`).getTime() / 1000);
+        }
+        if ('value' in t) return t.value;
+      }
+      return 0;
+    };
+
+    let fromSec = 0;
+    let toSec = Infinity;
+    let margin = 0;
+
+    if (visibleRange) {
+      fromSec = parseRangeTime(visibleRange.from);
+      toSec = parseRangeTime(visibleRange.to);
+      if (fromSec > 0 && toSec > 0) {
+        margin = (toSec - fromSec) * 0.15; // 15% padding
+      }
+    }
+
     const getX = (timeVal: string | number) => {
       let ts: number;
       if (typeof timeVal === 'string') {
@@ -45,18 +73,23 @@ class ConnectedLineRenderer extends BasePrimitiveRenderer {
         ts = timeVal;
       }
       let x = timeScale.timeToCoordinate(ts as Time);
-      if (x !== null) return x;
-
-      // Extrapolate for times not exactly in the timescale (like future points or missing ones)
-      // We will try to convert back and forth if possible, but the best way is usually finding closest logical.
-      // Since lightweight charts can do timeScale.coordinateToLogical / logicalToCoordinate...
-      // Actually we can't easily extrapolate without knowing the exact step or finding nearest point.
-      // Let's just return what timeScale.timeToCoordinate gives us. If it returns null, we can try to find nearest index.
       return x;
     };
 
     for (const line of this.lines) {
       if (!line.points || line.points.length < 2) continue;
+
+      // Filter out entire line pattern if all of its points are completely outside the viewport
+      if (visibleRange && fromSec > 0 && toSec > 0) {
+        let allBefore = true;
+        let allAfter = true;
+        for (const p of line.points) {
+          const pts = parseRangeTime(p.time);
+          if (pts >= (fromSec - margin)) allBefore = false;
+          if (pts <= (toSec + margin)) allAfter = false;
+        }
+        if (allBefore || allAfter) continue;
+      }
 
       const coords: { x: number; y: number }[] = [];
       for (const p of line.points) {

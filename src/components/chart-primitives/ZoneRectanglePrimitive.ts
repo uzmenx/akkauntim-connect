@@ -34,7 +34,45 @@ class ZoneRectangleRenderer extends BasePrimitiveRenderer {
     const timeScale = this.attachedParams.chart.timeScale();
     const series = this.attachedParams.series;
 
+    // Viewport visible time range filtering for optimization
+    const visibleRange = timeScale.getVisibleRange();
+    
+    const parseRangeTime = (t: any): number => {
+      if (!t) return 0;
+      if (typeof t === 'number') return t > 2000000000 ? Math.floor(t / 1000) : t;
+      if (typeof t === 'string') return Math.floor(new Date(t).getTime() / 1000);
+      if (t && typeof t === 'object') {
+        if ('year' in t && 'month' in t && 'day' in t) {
+          return Math.floor(new Date(`${t.year}-${t.month}-${t.day}`).getTime() / 1000);
+        }
+        if ('value' in t) return t.value;
+      }
+      return 0;
+    };
+
+    let fromSec = 0;
+    let toSec = Infinity;
+    let margin = 0;
+
+    if (visibleRange) {
+      fromSec = parseRangeTime(visibleRange.from);
+      toSec = parseRangeTime(visibleRange.to);
+      if (fromSec > 0 && toSec > 0) {
+        margin = (toSec - fromSec) * 0.15; // 15% padding
+      }
+    }
+
     for (const zone of this.zones) {
+      // Direct viewport time-range check before expensive coordinate calculations
+      if (visibleRange && fromSec > 0 && toSec > 0) {
+        const startTs = zone.start_time ? parseRangeTime(zone.start_time) : 0;
+        const endTs = zone.end_time ? parseRangeTime(zone.end_time) : Infinity;
+
+        if (endTs < (fromSec - margin) || startTs > (toSec + margin)) {
+          continue;
+        }
+      }
+
       const isBullish = zone.direction === "bullish" || zone.direction === "demand" || zone.direction === "support";
       
       const fillColor = zone.color || (isBullish ? "rgba(16, 185, 129, 0.15)" : "rgba(244, 63, 94, 0.15)");
