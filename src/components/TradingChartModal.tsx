@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { ZoneRectanglePrimitive, ZoneData } from "./chart-primitives/ZoneRectanglePrimitive";
 import { ConnectedLinePrimitive, LineData } from "./chart-primitives/ConnectedLinePrimitive";
 import { EventMarkerPrimitive, EventMarkerData } from "./chart-primitives/EventMarkerPrimitive";
+import { ShadowSignalMarkers, ShadowSignalRow } from "./chart-primitives/ShadowSignalMarkers";
+
 
 import { guestMock } from "@/lib/guestMock";
 
@@ -52,6 +54,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const zonePrimitiveRef = useRef<ZoneRectanglePrimitive | null>(null);
   const linePrimitiveRef = useRef<ConnectedLinePrimitive | null>(null);
   const eventMarkerRef = useRef<EventMarkerPrimitive | null>(null);
+  const shadowMarkersRef = useRef<ShadowSignalMarkers | null>(null);
+
 
   const chartRef = useRef<IChartApi | null>(null);
   const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -75,6 +79,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   const [wyckoffData, setWyckoffData] = useState<any[]>([]);
   const [srVolumeData, setSrVolumeData] = useState<any[]>([]);
   const [autoPatternData, setAutoPatternData] = useState<any[]>([]);
+  const [shadowSignals, setShadowSignals] = useState<ShadowSignalRow[]>([]);
+
 
   const [activeSymbol, setActiveSymbol] = useState(symbol);
   const [activePosition, setActivePosition] = useState<Position | null | undefined>(position);
@@ -589,6 +595,75 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     };
   }, [showWyckoff, wyckoffData, candlesData]);
 
+  // ---- Shadow signallari: yuklash + realtime (faqat vizual kuzatuv) ----
+  const shadowTimeframe = timeframe === "M1" ? "1min"
+    : timeframe === "M5" ? "5min"
+    : timeframe === "M15" ? "15min"
+    : timeframe === "H1" ? "1h"
+    : timeframe === "H4" ? "4h" : "1day";
+
+  useEffect(() => {
+    if (!isOpen || !activeSymbol || isGuest) return;
+    let isMounted = true;
+
+    const load = async () => {
+      const { data } = await supabase
+        .from("shadow_signals")
+        .select("id, symbol, timeframe, candle_time, signal, score, features, shadow_outcomes(was_correct)")
+        .eq("symbol", activeSymbol)
+        .eq("timeframe", shadowTimeframe)
+        .order("candle_time", { ascending: false })
+        .limit(300);
+
+      if (!isMounted) return;
+      const rows: ShadowSignalRow[] = (data ?? []).map((r: any) => ({
+        id: r.id,
+        symbol: r.symbol,
+        timeframe: r.timeframe,
+        candle_time: r.candle_time,
+        signal: r.signal,
+        score: r.score,
+        features: r.features,
+        was_correct: r.shadow_outcomes?.[0]?.was_correct ?? null,
+      }));
+      setShadowSignals(rows);
+    };
+
+    load();
+
+    const channel = supabase
+      .channel(`shadow_chart_${activeSymbol}_${shadowTimeframe}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_signals" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "shadow_outcomes" }, () => load())
+      .subscribe();
+
+    return () => {
+      isMounted = false;
+      supabase.removeChannel(channel);
+    };
+  }, [isOpen, activeSymbol, shadowTimeframe, isGuest]);
+
+  // Shadow markerlarini chizish (setMarkers — chart qayta chizilmaydi)
+  useEffect(() => {
+    const series = candlestickSeriesRef.current;
+    if (!series) return;
+
+    if (!shadowMarkersRef.current) {
+      shadowMarkersRef.current = new ShadowSignalMarkers(series);
+    }
+    shadowMarkersRef.current.update(shadowSignals, candlesData.map((c) => Number(c.time)));
+  }, [shadowSignals, candlesData]);
+
+  useEffect(() => {
+    return () => {
+      if (shadowMarkersRef.current) {
+        try { shadowMarkersRef.current.detach(); } catch {}
+        shadowMarkersRef.current = null;
+      }
+    };
+  }, [isOpen]);
+
+
   // Connected Lines - Harmonic (Gold) & Auto Patterns (Orange)
   useEffect(() => {
     const series = candlestickSeriesRef.current;
@@ -607,7 +682,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     if (showAutoPattern && autoPatternData && autoPatternData.length > 0) {
       autoPatternData.forEach(a => {
         if (a.lines && Array.isArray(a.lines)) {
-           a.lines.forEach(l => {
+           a.lines.forEach((l: any) => {
               aggregatedLines.push({
                 ...l,
                 color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`
@@ -786,7 +861,34 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
         });
       }
 
+      // 6. Shadow signallari (faqat kuzatuv, order bilan bog'liq emas)
+      if (shadowSignals && shadowSignals.length > 0) {
+        const stepSeconds = timeframe === "M1" ? 60 : timeframe === "M5" ? 300 : timeframe === "M15" ? 900 : timeframe === "H1" ? 3600 : timeframe === "H4" ? 14400 : 86400;
+        shadowSignals.forEach((s) => {
+          if (s.signal !== "BUY" && s.signal !== "SELL") return;
+          const sTimeSec = parseTimeToSec(s.candle_time);
+          if (Math.abs(hoverTimeSec - sTimeSec) <= stepSeconds * 1.5) {
+            const f = (s.features || {}) as any;
+            const status = s.was_correct === null || s.was_correct === undefined
+              ? "kutilmoqda"
+              : s.was_correct ? "TO'G'RI ✓" : "XATO ✗";
+            matchedIndicators.push({
+              strategy: "Shadow Edge (statistik)",
+              signalType: `${s.signal} · ${status}`,
+              confidence: null,
+              reasoning: `score ${Number(s.score).toFixed(2)} | trend ${f.trend ?? "-"} | momentum ${f.momentum_3 ?? "-"} | volatility ${f.atr_pct ?? "-"} | RSI ${f.rsi14 ?? "-"}`,
+              color: s.signal === "BUY"
+                ? "border-emerald-500/50 text-emerald-300 bg-emerald-950/90"
+                : "border-rose-500/50 text-rose-300 bg-rose-950/90",
+              priceRange: new Date(sTimeSec * 1000).toLocaleString(),
+              dist: Math.abs(hoverTimeSec - sTimeSec) / stepSeconds,
+            });
+          }
+        });
+      }
+
       if (matchedIndicators.length > 0) {
+
         matchedIndicators.sort((a, b) => a.dist - b.dist);
         const bestMatch = matchedIndicators[0];
         setHoveredTooltip({
@@ -808,7 +910,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     return () => {
       chart.unsubscribeCrosshairMove(handleCrosshairMove);
     };
-  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe]);
+  }, [showSMC, showSRVolume, showWyckoff, showAutoPattern, showHarmonic, smcZonesData, srVolumeData, wyckoffData, autoPatternData, harmonicData, candlesData, timeframe, shadowSignals]);
 
 
   if (!isOpen) return null;
