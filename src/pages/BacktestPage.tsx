@@ -112,7 +112,7 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
         spread_pips: parseFloat(spreadPips) || 1.5,
         slippage_pips: parseFloat(slippagePips) || 0.8,
         status: "pending"
-      });
+      } as any);
       
       if (error) {
         console.error("Vazifa qo'shishda xatolik:", error);
