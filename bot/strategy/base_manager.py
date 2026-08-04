@@ -7,6 +7,7 @@ and lifecycle management (get_active, get_recent, mark_stale, clear_old_records)
 """
 
 import sqlite3
+from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 

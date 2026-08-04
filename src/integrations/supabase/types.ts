@@ -104,6 +104,45 @@ export type Database = {
         }
         Relationships: []
       }
+      auto_patterns: {
+        Row: {
+          confidence: number | null
+          formed_at: string
+          id: string
+          pattern_type: string
+          signal: string
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          formed_at?: string
+          id?: string
+          pattern_type: string
+          signal: string
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          formed_at?: string
+          id?: string
+          pattern_type?: string
+          signal?: string
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       backtest_jobs: {
         Row: {
           created_at: string
@@ -144,6 +183,7 @@ export type Database = {
           created_at: string
           id: string
           loop_interval_minutes: number | null
+          loop_interval_seconds: number
           max_daily_loss: number
           max_lot_size: number
           min_confidence: number
@@ -157,6 +197,7 @@ export type Database = {
           prompt_strategy: string | null
           prompt_temporary: string | null
           prompt_temporary_expires_at: string | null
+          realtime_enabled: boolean
           risk_level_multiple_confirmation: number
           risk_level_single_confirmation: number
           risk_per_trade: number
@@ -177,6 +218,7 @@ export type Database = {
           created_at?: string
           id?: string
           loop_interval_minutes?: number | null
+          loop_interval_seconds?: number
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
@@ -190,6 +232,7 @@ export type Database = {
           prompt_strategy?: string | null
           prompt_temporary?: string | null
           prompt_temporary_expires_at?: string | null
+          realtime_enabled?: boolean
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
@@ -210,6 +253,7 @@ export type Database = {
           created_at?: string
           id?: string
           loop_interval_minutes?: number | null
+          loop_interval_seconds?: number
           max_daily_loss?: number
           max_lot_size?: number
           min_confidence?: number
@@ -223,6 +267,7 @@ export type Database = {
           prompt_strategy?: string | null
           prompt_temporary?: string | null
           prompt_temporary_expires_at?: string | null
+          realtime_enabled?: boolean
           risk_level_multiple_confirmation?: number
           risk_level_single_confirmation?: number
           risk_per_trade?: number
@@ -326,6 +371,54 @@ export type Database = {
           timeframe?: string
           user_id?: string
           volume?: number | null
+        }
+        Relationships: []
+      }
+      harmonic_patterns: {
+        Row: {
+          confidence: number | null
+          entry_zone: Json | null
+          formed_at: string
+          id: string
+          pattern_type: string
+          signal: string
+          sl: number | null
+          status: string
+          symbol: string
+          timeframe: string
+          tp_zones: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          entry_zone?: Json | null
+          formed_at?: string
+          id?: string
+          pattern_type: string
+          signal: string
+          sl?: number | null
+          status?: string
+          symbol: string
+          timeframe: string
+          tp_zones?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          entry_zone?: Json | null
+          formed_at?: string
+          id?: string
+          pattern_type?: string
+          signal?: string
+          sl?: number | null
+          status?: string
+          symbol?: string
+          timeframe?: string
+          tp_zones?: Json | null
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -610,6 +703,45 @@ export type Database = {
         }
         Relationships: []
       }
+      sr_volume_zones: {
+        Row: {
+          formed_at: string
+          id: string
+          price: number
+          status: string
+          strength: number | null
+          symbol: string
+          timeframe: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          formed_at?: string
+          id?: string
+          price: number
+          status?: string
+          strength?: number | null
+          symbol: string
+          timeframe: string
+          type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          formed_at?: string
+          id?: string
+          price?: number
+          status?: string
+          strength?: number | null
+          symbol?: string
+          timeframe?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       strategy_insights: {
         Row: {
           created_at: string | null
@@ -781,6 +913,45 @@ export type Database = {
           ticket?: number
           user_id?: string
           volume?: number
+        }
+        Relationships: []
+      }
+      wyckoff_events: {
+        Row: {
+          confidence: number | null
+          formed_at: string
+          id: string
+          phase: string
+          signal: string
+          status: string
+          symbol: string
+          timeframe: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          formed_at?: string
+          id?: string
+          phase: string
+          signal: string
+          status?: string
+          symbol: string
+          timeframe: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number | null
+          formed_at?: string
+          id?: string
+          phase?: string
+          signal?: string
+          status?: string
+          symbol?: string
+          timeframe?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

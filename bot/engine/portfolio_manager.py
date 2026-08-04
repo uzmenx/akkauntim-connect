@@ -31,9 +31,9 @@ class PortfolioManager:
     
     # Qaysi strategiya qaysi rejimda faol va ishonchli ishlashini belgilovchi xarita
     REGIME_STRATEGY_MAP = {
-        "TREND": ["SMC", "Wyckoff", "Pattern"],
-        "RANGE": ["SR_Volume", "Pattern", "Wyckoff"],
-        "VOLATILE": ["News", "Auto_Pattern", "Pattern"],
+        "TREND": ["SMC", "Wyckoff", "Pattern", "Swift"],
+        "RANGE": ["SR_Volume", "Pattern", "Wyckoff", "Swift"],
+        "VOLATILE": ["News", "Auto_Pattern", "Pattern", "Swift"],
         "BLACK_SWAN": [], # Barcha strategiyalar to'xtatiladi, faqat himoya
         "UNKNOWN": ["SMC", "News"]
     }
@@ -319,3 +319,26 @@ class AutoPatternStrategy(Strategy):
         current_price = context.get("current_price")
         result = self.bot._get_auto_patterns_analysis(df, current_price)
         return result or {"signal": "HOLD", "confidence": 0}
+
+
+class SwiftStrategy(Strategy):
+    """11-strategiya: SWIFT ALGO (Pine Script v5 -> Python konvertatsiyasi)."""
+
+    def __init__(self, main_bot):
+        super().__init__("Swift", getattr(main_bot.config, "strategy_weight_swift", 55))
+        self.bot = main_bot
+
+    def analyze(self, df: pd.DataFrame, context: Dict[str, Any] = None) -> Dict[str, Any]:
+        try:
+            from bot.strategy.swift.engine import analyze_swift, to_voting_signal as swift_voting
+            base_minutes = 15
+            if context:
+                base_minutes = int(context.get("base_minutes", 15) or 15)
+            result = analyze_swift(df, base_minutes=base_minutes)
+            sig_data = swift_voting(result)
+            result["signal"] = sig_data.get("signal", "HOLD")
+            result["confidence"] = sig_data.get("confidence", 0)
+            return result
+        except Exception as e:
+            logger.error(f"Swift tahlil xatosi: {e}")
+            return {"signal": "HOLD", "confidence": 0}
