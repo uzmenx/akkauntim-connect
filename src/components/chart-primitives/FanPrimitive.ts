@@ -1,4 +1,6 @@
 import {
+  IPrimitivePaneRenderer,
+  Logical,
   SeriesAttachedParameter,
   Time
 } from "lightweight-charts";
@@ -60,7 +62,7 @@ class FanRenderer extends BasePrimitiveRenderer {
       // Here we assume stepSeconds is the candle interval.
       const logicalSteps = timeDiff / stepSeconds;
       const logicalIdx = lastCandleLogical + logicalSteps;
-      return timeScale.logicalToCoordinate(logicalIdx);
+      return timeScale.logicalToCoordinate(logicalIdx as Logical);
     };
 
     const initX = getX(lastCandleTime);
