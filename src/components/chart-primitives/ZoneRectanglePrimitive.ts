@@ -139,7 +139,7 @@ class ZoneRectanglePaneView extends BasePrimitivePaneView {
   }
   
   zOrder(): "normal" | "bottom" | "top" {
-    return "bottom"; // Draw behind the candles
+    return "normal"; // Draw on the normal pane layer to ensure visibility
   }
 }
 

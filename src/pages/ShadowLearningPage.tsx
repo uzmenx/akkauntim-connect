@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Brain, UploadCloud, BookOpen, Activity, Target, ShieldAlert, Loader2, Sparkles, CheckCircle2, Lightbulb, BarChart3, Zap } from "lucide-react";
+import pubgLoader from "@/assets/pubg-loader.svg";
 import { cn, timeAgo } from "@/lib/utils";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Icon } from "@iconify/react";
@@ -987,7 +988,7 @@ export function ShadowLearningPage() {
             </h2>
 
             {blackbox.isLoading ? (
-               <div className="flex justify-center py-6"><Loader2 className="animate-spin text-emerald-400" size={24} /></div>
+               <div className="flex justify-center py-6"><img src={pubgLoader} className="w-32 h-32 opacity-80" alt="Yuklanmoqda..." /></div>
             ) : blackbox.data ? (
               <>
                 {/* RL Agent Progress (Qora Quti Simulyatori) */}

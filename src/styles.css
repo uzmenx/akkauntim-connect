@@ -31,10 +31,8 @@ body, #root {
 }
 
 html, body, #root {
-  background: linear-gradient(180deg,
-    var(--color-bg-deep) 0%,
-    var(--color-bg) 40%,
-    var(--color-bg-soft) 100%) no-repeat fixed;
+  background: linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)), url('/nature_bg.jpg') no-repeat center center fixed;
+  background-size: cover;
   color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -66,3 +64,10 @@ html, body, #root {
 }
 
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* Hide lightweight-charts / TradingView watermark logos */
+div[class*="tv-logo"],
+div[class*="tradingview-logo"],
+a[href*="tradingview.com"] {
+  display: none !important;
+}

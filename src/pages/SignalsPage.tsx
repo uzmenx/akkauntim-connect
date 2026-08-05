@@ -9,6 +9,7 @@ import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
 import { PaywallModal } from "@/components/PaywallModal";
 import { TradingChartModal } from "@/components/TradingChartModal";
+import pubgLoader from "@/assets/pubg-loader.svg";
 
 export function SignalsPage() {
   const { user } = useAuth();
@@ -43,7 +44,7 @@ export function SignalsPage() {
   });
 
   if (loadingSignals || loadingPending) {
-    return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
+    return <img src={pubgLoader} className="mx-auto my-10 w-32 h-32 opacity-80" alt="Yuklanmoqda..." />;
   }
 
   const hasSignals = signals && signals.length > 0;

@@ -379,13 +379,12 @@ export function DashboardPage() {
 
 
 
-              {/* 2.5 Monitoring & Diagnostics */}
               <Link 
                 to="/monitoring" 
                 className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95 shrink-0 relative"
                 title="System Monitoring & Diagnostika"
               >
-                <Activity size={11} />
+                <Icon icon="twemoji:heart-suit" width="12" height="12" />
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               </Link>
 
@@ -419,7 +418,7 @@ export function DashboardPage() {
                 className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-amber-400 hover:text-amber-300 transition-colors cursor-pointer active:scale-95 shrink-0"
                 title="Tariflar / Premium"
               >
-                <Crown size={11} className="fill-amber-400/10" />
+                <Icon icon="noto:crown" width="12" height="12" />
               </Link>
 
             </div>
@@ -527,9 +526,9 @@ export function DashboardPage() {
                 </svg>
 
                 {/* Inner Balance & Status Info */}
-                <div className="text-center z-10 flex flex-col items-center justify-center p-1 select-none pointer-events-none gap-0.5">
+                <div className="text-center z-10 flex flex-col items-center justify-center p-0.5 select-none pointer-events-none gap-0">
                   {/* Market Sentiment Mini Badge */}
-                  <div className="flex items-center justify-center gap-1 bg-white/5 px-2 py-0.5 rounded-full border border-white/5 backdrop-blur-md">
+                  <div className="flex items-center justify-center gap-0.5">
                     {sentiment > 55 ? (
                       <TrendingUp size={9} className="text-emerald-400 shrink-0" strokeWidth={2.5} />
                     ) : sentiment < 45 ? (
@@ -546,7 +545,7 @@ export function DashboardPage() {
                   </div>
                   
                   {/* Balance Value */}
-                  <h1 className="text-[14px] min-[340px]:text-[16px] min-[375px]:text-[18px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/80 tracking-tight tabular-nums drop-shadow-md leading-none py-1">
+                  <h1 className="text-[14px] min-[340px]:text-[16px] min-[375px]:text-[18px] font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/80 tracking-tight tabular-nums drop-shadow-md leading-none py-0.5">
                     {equity != null ? (
                       new Intl.NumberFormat("en-US", {
                         style: "currency",
@@ -559,17 +558,17 @@ export function DashboardPage() {
                   {/* Status Badge */}
                   <div className="flex items-center justify-center">
                     {!running ? (
-                      <span className="text-rose-400 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase">
+                      <span className="text-rose-400 flex items-center gap-0.5 font-black text-[7px] tracking-wider uppercase">
                         <span className="w-1 h-1 rounded-full bg-rose-400" />
                         STOP
                       </span>
                     ) : aiEnabled ? (
-                      <span className="text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase animate-pulse">
+                      <span className="text-cyan-400 flex items-center gap-0.5 font-black text-[7px] tracking-wider uppercase animate-pulse">
                         <Bot size={8} className="text-cyan-400" />
                         AI FAOL
                       </span>
                     ) : (
-                      <span className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full flex items-center gap-1 font-black text-[7px] tracking-wider uppercase">
+                      <span className="text-emerald-400 flex items-center gap-0.5 font-black text-[7px] tracking-wider uppercase">
                         <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
                         FAOL
                       </span>

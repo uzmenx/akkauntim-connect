@@ -8,7 +8,7 @@ BaseStrategyManager klassidan vorislik olgan.
 
 import sqlite3
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from bot.strategy.base_manager import BaseStrategyManager
 
@@ -76,7 +76,7 @@ class AutoPatternManager(BaseStrategyManager):
                 ''', (
                     symbol, timeframe, pattern_name, signal, confidence,
                     res_slope, sup_slope, pivots_json, pattern_points_json,
-                    datetime.utcnow().isoformat()
+                    datetime.now(timezone.utc).isoformat()
                 ))
                 if cursor.rowcount > 0:
                     inserted_count += cursor.rowcount

@@ -23,15 +23,31 @@ class NewsDetector:
         self.events = []
         self._last_in_memory_fetch = 0.0
 
+    _global_last_attempt = 0.0
+    _global_backoff_duration = 300  # 5 minutes backoff on failure
+
     def fetch_calendar(self, force_refresh=False):
         """Fetches the latest economic calendar events for this week with in-memory & atomic disk caching"""
         now = time.time()
         
-        # 0. In-memory kesh tekshiruvi (xotiradan tezkor qaytarish, diskka murojaat qilmasdan)
+        # 0. Global Backoff (Prevent API spamming across instances if it recently failed)
+        if not force_refresh and (now - NewsDetector._global_last_attempt < NewsDetector._global_backoff_duration):
+            # API is in backoff period, fallback to cache immediately
+            if os.path.exists(self.cache_file):
+                try:
+                    with open(self.cache_file, 'r', encoding='utf-8') as f:
+                        self.events = json.load(f)
+                    self._last_in_memory_fetch = now
+                    return True
+                except:
+                    pass
+            return False
+
+        # 1. In-memory kesh tekshiruvi (xotiradan tezkor qaytarish, diskka murojaat qilmasdan)
         if self.events and not force_refresh and (now - self._last_in_memory_fetch < self.cache_duration):
             return True
 
-        # 1. Kesh faylni tekshiramiz
+        # 2. Kesh faylni tekshiramiz
         if os.path.exists(self.cache_file) and not force_refresh:
             file_age = now - os.path.getmtime(self.cache_file)
             if file_age < self.cache_duration:
@@ -43,7 +59,8 @@ class NewsDetector:
                 except Exception as e:
                     print(f"Error reading news cache: {e}")
         
-        # 2. Agar kesh eski bo'lsa yoki yo'q bo'lsa API dan tortamiz
+        # 3. Agar kesh eski bo'lsa yoki yo'q bo'lsa API dan tortamiz
+        NewsDetector._global_last_attempt = now
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -55,7 +72,7 @@ class NewsDetector:
             self.events = data
             self._last_in_memory_fetch = now
             
-            # 3. Atomik kesh yozish (tmp fayl orqali race condition va buzilishlarni oldini olish)
+            # 4. Atomik kesh yozish (tmp fayl orqali race condition va buzilishlarni oldini olish)
             try:
                 tmp_cache = self.cache_file + ".tmp"
                 with open(tmp_cache, 'w', encoding='utf-8') as f:
@@ -66,16 +83,18 @@ class NewsDetector:
                 
             return True
         except Exception as e:
-            print(f"Error fetching news calendar: {e}")
-            # Agar API 429 xatolik bersa (limitga tushsa), lekin eski kesh bo'lsa
+            # Agar API xatolik bersa (limitga tushsa), lekin eski kesh bo'lsa
             if os.path.exists(self.cache_file):
+                # Touch the file to update mtime and prevent disk checks triggering API again for a while
                 try:
+                    os.utime(self.cache_file, None)
                     with open(self.cache_file, 'r', encoding='utf-8') as f:
                         self.events = json.load(f)
                     self._last_in_memory_fetch = now
                     return True
                 except:
                     pass
+            print(f"Error fetching news calendar: {e}")
             return False
 
     def get_news_history(self, hours_back=24):

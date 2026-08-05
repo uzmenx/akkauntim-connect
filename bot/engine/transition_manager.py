@@ -180,6 +180,10 @@ class TransitionManager:
 
     def _shadow_decision(self, **kwargs) -> Dict[str, Any]:
         """Lokal Shadow AI orqali qaror olish"""
+        if not getattr(self.config, 'allow_shadow_trading', True):
+            logger.warning("Shadow AI qabul qildi, biroq config.allow_shadow_trading=False bo'lgani uchun HOLD qaytarilmoqda.")
+            return self._get_safe_hold(kwargs.get('symbol', 'UNKNOWN'), kwargs.get('current_price', 0.0))
+            
         try:
             result = self.shadow_engine.decide(**kwargs)
             if result:

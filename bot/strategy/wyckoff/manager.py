@@ -7,7 +7,7 @@ BaseStrategyManager klassidan vorislik olgan.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from bot.strategy.base_manager import BaseStrategyManager
 
@@ -77,7 +77,7 @@ class WyckoffEventManager(BaseStrategyManager):
                     ''', (
                         symbol, timeframe, phase, event_type,
                         ev_bar_idx, ev_time, ev_price, level_broken,
-                        range_top, range_bottom, momentum_sign, datetime.utcnow().isoformat()
+                        range_top, range_bottom, momentum_sign, datetime.now(timezone.utc).isoformat()
                     ))
                     if cursor.rowcount > 0:
                         inserted_count += cursor.rowcount
@@ -102,7 +102,7 @@ class WyckoffEventManager(BaseStrategyManager):
                     ''', (
                         symbol, timeframe, phase, mom_type,
                         m_bar_idx, m_time, m_price, None,
-                        range_top, range_bottom, momentum_sign, datetime.utcnow().isoformat()
+                        range_top, range_bottom, momentum_sign, datetime.now(timezone.utc).isoformat()
                     ))
                     if cursor.rowcount > 0:
                         inserted_count += cursor.rowcount

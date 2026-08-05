@@ -228,7 +228,7 @@ class TradingBot:
             import datetime
             candles_list = []
             if df is not None and not df.empty:
-                for idx, row in df.tail(300).iterrows():
+                for idx, row in df.tail(1000).iterrows():
                     candles_list.append({
                         "symbol": symbol,
                         "timeframe": timeframe,
@@ -492,7 +492,7 @@ class TradingBot:
             
         for tf in timeframes:
             try:
-                df = self._fetch_data(symbol, tf, 300)
+                df = self._fetch_data(symbol, tf, 1000)
                 if df is None or df.empty:
                     continue
                     
@@ -724,6 +724,54 @@ class TradingBot:
             except Exception as e:
                 logger.debug(f"RL agent action olishda xatolik: {e}")
                 rl_action = "HOLD"
+
+        # RL Agent Action (Jonli qaror)
+        with self.profiler.track("3.2_rl_agent_action"):
+            try:
+                position_status = 0.0
+                unrealized_profit_ratio = 0.0
+                if open_positions:
+                    for p in open_positions:
+                        position_status = 1.0 if p.type == self.mt5.ORDER_TYPE_BUY else -1.0
+                        unrealized_profit_ratio = (p.profit / balance) if balance > 0 else 0.0
+                        break
+                        
+                obs_data = [
+                    (balance / 1000.0) if balance > 0 else 1.0,
+                    float(df_major.iloc[-1]['open']),
+                    float(df_major.iloc[-1]['high']),
+                    float(df_major.iloc[-1]['low']),
+                    float(df_major.iloc[-1]['close']),
+                    float(df_major.iloc[-1]['tick_volume']),
+                    position_status,
+                    unrealized_profit_ratio
+                ]
+                rl_action = self.rl_agent.predict_action(obs_data)
+                if rl_action != "HOLD":
+                    logger.info(f"[{symbol}] 🤖 RL Agent Signali (Live Shadow): {rl_action}")
+            except Exception as e:
+                logger.debug(f"RL agent action olishda xatolik: {e}")
+                rl_action = "HOLD"
+
+        # --- SHADOW MERGER TRACKING ---
+        with self.profiler.track("3.3_shadow_merger_tracker"):
+            try:
+                shadow_stats = self.merger_tracker.get_shadow_lstm_stats(symbol)
+                self.merger_tracker.record_signals(
+                    symbol=symbol,
+                    timeframe=self.config.timeframe_major,
+                    voting_direction=portfolio_result.get("signal", "HOLD"),
+                    voting_confidence=1.0,
+                    lstm_direction=dl_prediction.get("prediction", "HOLD"),
+                    lstm_confidence=dl_prediction.get("confidence", 0) / 100.0,
+                    shadow_win_rate=shadow_stats["win_rate"],
+                    shadow_trade_count=shadow_stats["trade_count"],
+                rl_direction=rl_action,
+                    rl_direction=rl_action
+                )
+            except Exception as e:
+                logger.error(f"[{symbol}] Shadow Merger Tracker xatosi: {e}")
+        # ------------------------------
 
         # --- SHADOW MERGER TRACKING ---
         with self.profiler.track("3.3_shadow_merger_tracker"):
@@ -995,6 +1043,10 @@ class TradingBot:
         sl_pips = sl_price_diff / pip_divisor
         tp_pips = abs(entry_price - tp_price) / pip_divisor if tp_price else 100 * tp_mult
         risk_pct = ai_decision.get("risk_pct")
+
+        is_shadow_trade = (ai_decision.get("_source") == "shadow_ai" or ai_decision.get("_transition_mode") == "shadow")
+        if is_shadow_trade:
+            risk_pct = getattr(self.config, 'shadow_risk_per_trade', 0.01)
 
         # Signalni "BUY", "SELL", "BUY_LIMIT", "SELL_LIMIT", "BUY_STOP", "SELL_STOP" ga aylantirish
         order_signal = final_decision
@@ -1279,7 +1331,7 @@ class TradingBot:
                     # Juftliklarni aniqlash (Dam olish kuni vs Ish kuni)
                     with self.profiler.track("0.2_symbol_discovery"):
                         import datetime
-                        is_weekend = datetime.datetime.utcnow().weekday() >= 5
+                        is_weekend = datetime.datetime.now(datetime.timezone.utc).weekday() >= 5
                         
                         if is_weekend:
                             all_symbols = self.mt5.get_crypto_symbols()

@@ -37,25 +37,16 @@ class SystemMonitoringEngine:
     def get_voting_engine_telemetry(self, symbol: str = "EURUSD") -> Dict[str, Any]:
         """Voting Engine holatini va 7 ta strategiyaning so'nggi ovozlarini beradi."""
         start_time = time.time()
-        strategies = {
-            "SMC": {"name": "Smart Money Concepts", "weight": 60, "signal": "BUY", "confidence": 78, "active": True},
-            "Pattern": {"name": "Harmonic Patterns", "weight": 60, "signal": "BUY", "confidence": 65, "active": True},
-            "News": {"name": "News Breakout & Fundamental", "weight": 60, "signal": "NEUTRAL", "confidence": 0, "active": True},
-            "Wyckoff": {"name": "Wyckoff Schematic Accumulation", "weight": 50, "signal": "BUY", "confidence": 72, "active": True},
-            "SR_Volume": {"name": "Support/Resistance & Volume Profile", "weight": 50, "signal": "SELL", "confidence": 45, "active": True},
-            "Auto_Pattern": {"name": "Auto Chart Patterns & ZigZag", "weight": 50, "signal": "BUY", "confidence": 80, "active": True},
-            "Kill_Zones": {"name": "ICT Kill Zones Risk Multiplier", "weight": 50, "signal": "ACTIVE_ZONE", "confidence": 100, "active": True},
-        }
-
-        # Decisions log sqlite3 dan so'nggi ovozlarni o'qish
-        last_vote_signal = "BUY"
-        last_vote_confidence = 0.75
-        agreed_strategies = ["SMC", "Pattern", "Wyckoff", "Auto_Pattern"]
-        conflict_count = 1
+        
+        last_vote_signal = "NEUTRAL"
+        last_vote_confidence = 0.50
+        agreed_strategies = []
+        active_strategies_list = []
+        conflict_count = 0
 
         try:
             if os.path.exists(self.decisions_db):
-                conn = sqlite3.connect(self.decisions_db, timeout=5)
+                conn = sqlite3.connect(self.decisions_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 c.execute(
                     "SELECT context_json, final_decision, risk_pct FROM ai_decisions WHERE pair=? ORDER BY id DESC LIMIT 1",
@@ -63,27 +54,44 @@ class SystemMonitoringEngine:
                 )
                 row = c.fetchone()
                 conn.close()
+                
                 if row:
-                    last_vote_signal = row[1] or "BUY"
-                    last_vote_confidence = float(row[2] or 0.02) / 0.02 * 0.75
+                    last_vote_signal = row[1] or "NEUTRAL"
+                    try:
+                        risk = float(row[2]) if row[2] else 0.01
+                        last_vote_confidence = min(1.0, risk / 0.02 * 0.8) 
+                    except ValueError:
+                        last_vote_confidence = 0.50
+
                     if row[0]:
                         try:
                             ctx = json.loads(row[0])
-                            vote_res = ctx.get("voting_result", {})
-                            if vote_res:
-                                agreed_strategies = vote_res.get("agreed_strategies", agreed_strategies)
+                            active_strategies_list = ctx.get("active_strategies", [])
+                            agreed_strategies = active_strategies_list
                         except Exception:
                             pass
         except Exception as e:
             logger.warning(f"Voting telemetry DB read error: {e}")
 
+        strategies = {}
+        all_possible = ["SMC", "Pattern", "News", "Wyckoff", "SR_Volume", "Auto_Pattern", "Kill_Zones"]
+        for s in all_possible:
+            is_active = s in active_strategies_list
+            strategies[s] = {
+                "name": s,
+                "weight": 60 if is_active else 0,
+                "signal": last_vote_signal if is_active else "NEUTRAL",
+                "confidence": round(last_vote_confidence * 100, 1) if is_active else 0,
+                "active": is_active
+            }
+
         calc_latency_ms = round((time.time() - start_time) * 1000, 2)
 
         return {
             "component": "Voting Engine",
-            "status": ComponentStatus.HEALTHY,
+            "status": ComponentStatus.HEALTHY if active_strategies_list else ComponentStatus.WARNING,
             "symbol": symbol,
-            "active_strategies_count": 7,
+            "active_strategies_count": len(active_strategies_list),
             "agreed_strategies": agreed_strategies,
             "agreed_count": len(agreed_strategies),
             "conflict_count": conflict_count,
@@ -94,91 +102,34 @@ class SystemMonitoringEngine:
             "latency_ms": max(0.4, calc_latency_ms),
         }
 
-    def get_lstm_engine_telemetry(self, symbol: str = "EURUSD") -> Dict[str, Any]:
-        """LSTM Predictor, PyTorch framework va Normalizatsiya statusini beradi."""
-        start_time = time.time()
-        pytorch_available = False
-        device = "cpu"
-        model_loaded = False
-        is_ensemble = True
-        ensemble_size = 3
-        scaler_calibrated = True
-        input_features_count = 12
-        prediction = "UP"
-        confidence = 74.5
-        attention_active = False
-        attention_weights = [0.05, 0.08, 0.12, 0.09, 0.15, 0.11, 0.07, 0.18, 0.10, 0.05]
-
-        try:
-            import torch
-            pytorch_available = True
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        except ImportError:
-            pytorch_available = False
-
-        try:
-            from bot.learning.predictor import PredictorEngine
-            predictor = PredictorEngine(symbol=symbol)
-            model_loaded = predictor.is_trained
-            is_ensemble = predictor.use_ensemble
-            ensemble_size = predictor.ensemble_size
-            scaler_calibrated = predictor.scaler is not None
-            
-            # Dummy test inference for real latency and prediction monitoring
-            dummy_candles = [{"open": 1.0850, "high": 1.0860, "low": 1.0845, "close": 1.0855, "tick_volume": 120} for _ in range(20)]
-            pred_res = predictor.predict(dummy_candles)
-            if pred_res:
-                prediction = pred_res.get("prediction", "UP")
-                confidence = float(pred_res.get("confidence", 74.5))
-                if "attention_weights" in pred_res:
-                    attention_active = True
-                    attention_weights = pred_res["attention_weights"]
-        except Exception as e:
-            logger.warning(f"LSTM telemetry prediction error: {e}")
-
-        calc_latency_ms = round((time.time() - start_time) * 1000, 2)
-
-        return {
-            "component": "LSTM Neural Net Predictor",
-            "status": ComponentStatus.HEALTHY if model_loaded or is_ensemble else ComponentStatus.WARNING,
-            "pytorch_available": pytorch_available,
-            "execution_device": device,
-            "model_trained": model_loaded,
-            "is_ensemble": is_ensemble,
-            "ensemble_size": ensemble_size,
-            "input_features_count": input_features_count,
-            "scaler_type": "InstitutionalFeatureScaler (12 features)",
-            "scaler_calibrated": scaler_calibrated,
-            "prediction": prediction,
-            "confidence": round(confidence, 1),
-            "probabilities": {
-                "HOLD": round(max(0, 100 - confidence - 15), 1),
-                "UP": round(confidence if prediction == "UP" else 15.0, 1),
-                "DOWN": round(confidence if prediction == "DOWN" else 10.0, 1)
-            },
-            "attention_mechanism": {
-                "active": attention_active,
-                "attention_weights": attention_weights,
-                "most_focused_candle_idx": int(attention_weights.index(max(attention_weights))) if attention_weights else 7
-            },
-            "latency_ms": max(1.2, calc_latency_ms)
-        }
-
     def get_ppo_agent_telemetry(self, symbol: str = "EURUSD") -> Dict[str, Any]:
         """PPO Reinforcement Learning Agent va Shadow Edge statistikasini beradi."""
         start_time = time.time()
         agent_loaded = True
         shadow_mode = True
-        trade_count = 42
-        win_rate = 0.619  # 61.9%
-        policy_action = "BUY"
-        action_probabilities = {"BUY": 0.65, "SELL": 0.15, "HOLD": 0.20}
-        wilson_lower_bound = 0.472  # Wilson 95% CI lower bound
+        trade_count = 0
+        win_rate = 0.50
+        policy_action = "HOLD"
+        action_probabilities = {"BUY": 0.33, "SELL": 0.33, "HOLD": 0.34}
+        wilson_lower_bound = 0.0
         risk_multiplier = 1.0
 
         try:
+            if os.path.exists(self.decisions_db):
+                conn = sqlite3.connect(self.decisions_db, timeout=30.0, check_same_thread=False)
+                c = conn.cursor()
+                c.execute("SELECT context_json FROM ai_decisions WHERE pair=? ORDER BY id DESC LIMIT 1", (symbol,))
+                row = c.fetchone()
+                conn.close()
+                if row and row[0]:
+                    ctx = json.loads(row[0])
+                    policy_action = ctx.get("rl_action", "HOLD")
+        except Exception as e:
+            logger.warning(f"PPO agent action read error: {e}")
+
+        try:
             if os.path.exists(self.learning_db):
-                conn = sqlite3.connect(self.learning_db, timeout=5)
+                conn = sqlite3.connect(self.learning_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 c.execute("SELECT COUNT(*) FROM shadow_trade_history WHERE symbol=?", (symbol,))
                 tot = c.fetchone()[0]
@@ -192,7 +143,12 @@ class SystemMonitoringEngine:
             logger.warning(f"PPO agent telemetry DB error: {e}")
 
         from bot.prediction.signal_merger import wilson_lower_bound as calc_wilson
-        wilson_lb = calc_wilson(win_rate, trade_count, confidence=0.95)
+        wilson_lb = calc_wilson(win_rate, max(trade_count, 1), confidence=0.95)
+
+        if policy_action == "BUY":
+            action_probabilities = {"BUY": 0.60, "SELL": 0.20, "HOLD": 0.20}
+        elif policy_action == "SELL":
+            action_probabilities = {"BUY": 0.20, "SELL": 0.60, "HOLD": 0.20}
 
         calc_latency_ms = round((time.time() - start_time) * 1000, 2)
 
@@ -281,7 +237,7 @@ class SystemMonitoringEngine:
 
         try:
             if os.path.exists(self.decisions_db):
-                conn = sqlite3.connect(self.decisions_db, timeout=5)
+                conn = sqlite3.connect(self.decisions_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 c.execute(
                     "SELECT final_decision, context_json FROM ai_decisions WHERE pair=? ORDER BY id DESC LIMIT 10",
@@ -346,7 +302,7 @@ class SystemMonitoringEngine:
 
         try:
             if os.path.exists(self.learning_db):
-                conn = sqlite3.connect(self.learning_db, timeout=5)
+                conn = sqlite3.connect(self.learning_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 # Recent window (last 15 trades)
                 c.execute(
@@ -443,29 +399,6 @@ class SystemMonitoringEngine:
                 "action": "Batch hajmini va PyTorch CUDA drayverini tekshiring."
             })
 
-        # 5. Model Training & Scaler Check
-        if not lstm.get("model_trained"):
-            anomalies.append({
-                "id": "ANOMALY_MODEL_03",
-                "severity": "INFO",
-                "component": "LSTM Predictor",
-                "code": "MODEL_UNINITIALIZED",
-                "message": "LSTM modeli hali to'liq train qilinmagan. Fallback heuristic rejim ishlamoqda.",
-                "timestamp": datetime.now().isoformat(),
-                "action": "Shadow collector ma'lumot yig'ishini va incremental train bosqichini kuting."
-            })
-
-        # 6. Market Spread / Slippage Risk Check
-        anomalies.append({
-            "id": "ANOMALY_SPREAD_04",
-            "severity": "INFO",
-            "component": "Execution / Market Feed",
-            "code": "OPTIMAL_FEED_LATENCY",
-            "message": "MT5 / Exchange narx kotirovkasi barqaror. Feed gap topilmadi.",
-            "timestamp": datetime.now().isoformat(),
-            "action": "Bajarilmoqda."
-        })
-
         return anomalies
 
     def get_full_telemetry_report(self, symbol: str = "EURUSD") -> Dict[str, Any]:
@@ -510,7 +443,7 @@ class SystemMonitoringEngine:
         logs = []
         try:
             if os.path.exists(self.decisions_db):
-                conn = sqlite3.connect(self.decisions_db, timeout=5)
+                conn = sqlite3.connect(self.decisions_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 c.execute(
                     "SELECT timestamp, pair, timeframe, final_decision, risk_pct, context_json, ai_response FROM ai_decisions ORDER BY id DESC LIMIT ?",
@@ -535,54 +468,12 @@ class SystemMonitoringEngine:
         except Exception as e:
             logger.warning(f"Diagnostic log read error: {e}")
 
-        # Static fallback entries if logs empty
-        if not logs:
-            now = datetime.now().isoformat()
-            logs = [
-                {
-                    "timestamp": now,
-                    "symbol": "EURUSD",
-                    "timeframe": "M5",
-                    "level": "INFO",
-                    "component": "Voting Engine",
-                    "event": "7 ta strategiya tahlili yakunlandi (4 BUY, 1 SELL, 2 NEUTRAL).",
-                    "details": {"agreed_strategies": ["SMC", "Pattern", "Wyckoff", "Auto_Pattern"]}
-                },
-                {
-                    "timestamp": now,
-                    "symbol": "EURUSD",
-                    "timeframe": "M5",
-                    "level": "INFO",
-                    "component": "LSTM Predictor",
-                    "event": "Neyron tarmog'i batch bashorat qildi: UP (Ishonch: 74.5%).",
-                    "details": {"inference_latency_ms": 3.4, "device": "cpu"}
-                },
-                {
-                    "timestamp": now,
-                    "symbol": "EURUSD",
-                    "timeframe": "M5",
-                    "level": "INFO",
-                    "component": "PPO Agent",
-                    "event": "Shadow learning Edge tekshirildi (Win rate: 61.9%, Wilson CI LB: 0.472).",
-                    "details": {"risk_multiplier": 1.0}
-                },
-                {
-                    "timestamp": now,
-                    "symbol": "EURUSD",
-                    "timeframe": "M5",
-                    "level": "INFO",
-                    "component": "Signal Merger",
-                    "event": "Vaznli birlashtirish bajarildi -> BUY (Combined Confidence: 82.5%).",
-                    "details": {"agreement": True, "conflict_weight": 0.0}
-                }
-            ]
-
         # Apply filters
         if level_filter and level_filter != "ALL":
             logs = [l for l in logs if l["level"] == level_filter]
 
         if component_filter and component_filter != "ALL":
-            logs = [l for l in logs if component_filter.lower() in l["component"].lower()]
+            logs = [l for l in logs if component_filter.lower() in l.get("component", "").lower()]
 
         return logs
 
@@ -804,7 +695,7 @@ class SystemMonitoringEngine:
         real_decision_data = None
         if os.path.exists(self.decisions_db):
             try:
-                conn = sqlite3.connect(self.decisions_db, timeout=5)
+                conn = sqlite3.connect(self.decisions_db, timeout=30.0, check_same_thread=False)
                 c = conn.cursor()
                 if decision_id:
                     c.execute("SELECT id, pair, final_decision, lot_size, sl_pips, tp_pips, context_json, timestamp FROM ai_decisions WHERE id=?", (decision_id,))

@@ -6,6 +6,7 @@ import { guestMock } from "@/lib/guestMock";
 import { fmtMoney, cn } from "@/lib/utils";
 import type { TradeHistory } from "@/lib/types";
 import { Loader2, Activity, CalendarDays, Grid3X3, AlertTriangle, ChevronLeft, ChevronRight, Bot } from "lucide-react";
+import pubgLoader from "@/assets/pubg-loader.svg";
 
 type TimeFrame = "24h" | "7d" | "30d" | "all";
 
@@ -193,7 +194,7 @@ export function AnalyticsView() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-10"><Loader2 className="animate-spin text-blue-400" size={32} /></div>
+        <div className="flex justify-center py-10"><img src={pubgLoader} className="w-32 h-32 opacity-80" alt="Yuklanmoqda..." /></div>
       ) : filteredData.length === 0 ? (
         <div className="bg-[#10192e]/40 border border-white/5 rounded-2xl py-8 text-center text-white/40 text-xs italic">Ushbu davr uchun savdolar yo'q.</div>
       ) : (

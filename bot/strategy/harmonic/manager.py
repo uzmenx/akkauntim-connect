@@ -7,7 +7,7 @@ BaseStrategyManager klassidan vorislik olgan.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from bot.strategy.base_manager import BaseStrategyManager
 
@@ -92,7 +92,7 @@ class HarmonicPatternManager(BaseStrategyManager):
                         b_info.get("price"), b_info.get("time"), b_info.get("bar_index"),
                         c_info.get("price"), c_info.get("time"), c_info.get("bar_index"),
                         d_info.get("price"), d_info.get("time"), d_info.get("bar_index"),
-                        bars_since_d, datetime.utcnow().isoformat()
+                        bars_since_d, datetime.now(timezone.utc).isoformat()
                     ))
                     if cursor.rowcount > 0:
                         inserted_count += cursor.rowcount
@@ -118,7 +118,7 @@ class HarmonicPatternManager(BaseStrategyManager):
                     ''', (
                         symbol, timeframe, p_name, direction,
                         d_price, d_time, d_bar_index,
-                        datetime.utcnow().isoformat()
+                        datetime.now(timezone.utc).isoformat()
                     ))
                     if cursor.rowcount > 0:
                         inserted_count += cursor.rowcount

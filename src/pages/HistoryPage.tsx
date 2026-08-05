@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/Card";
 import { fmtMoney, fmtNum, timeAgo, fmtDateShort } from "@/lib/utils";
 import type { TradeHistory } from "@/lib/types";
 import { Loader2, Bot } from "lucide-react";
+import pubgLoader from "@/assets/pubg-loader.svg";
 import { EmptyLine } from "./DashboardPage";
 import { useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -51,7 +52,9 @@ export function HistoryPage() {
       </Card>
 
       {isLoading ? (
-        <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />
+        <div className="flex justify-center w-full py-10">
+          <img src={pubgLoader} className="mx-auto w-32 h-32 opacity-80" alt="Yuklanmoqda..." />
+        </div>
       ) : !data?.length ? (
         <Card>
           <EmptyLine text="Hali yopilgan savdo yo'q." />

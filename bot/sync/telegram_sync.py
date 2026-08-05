@@ -1,5 +1,6 @@
 import logging
 import requests
+import time
 from bot.config import BotConfig
 
 logger = logging.getLogger(__name__)
@@ -8,12 +9,24 @@ class TelegramSync:
     def __init__(self, config: BotConfig):
         self.config = config
         self.enabled = bool(self.config.telegram_bot_token and self.config.telegram_chat_id)
+        self._sent_messages = {}
         if not self.enabled:
             logger.info("Telegram notification is disabled (missing token or chat_id).")
 
     def send_message(self, text: str):
         if not self.enabled:
             return
+
+        # Deduplication: Bir xil xabarni 1 soat davomida takror yubormaslik
+        current_time = time.time()
+        # Xotirani tozalash
+        self._sent_messages = {k: v for k, v in self._sent_messages.items() if current_time - v < 3600}
+        
+        if text in self._sent_messages:
+            logger.info("Telegram xabari takrorlanganligi sababli yuborilmadi (spam filter).")
+            return
+            
+        self._sent_messages[text] = current_time
 
         url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
         payload = {
@@ -34,15 +47,18 @@ class TelegramSync:
         if not self.enabled:
             return
 
-        url = f"https://api.telegram.org/bot{self.config.telegram_bot_token}/sendMessage"
-        
         # Emoji qoidalari
-        if signal.upper() == "BUY":
-            signal_emoji = "🟢 BUY"
-        elif signal.upper() == "SELL":
-            signal_emoji = "🔴 SELL"
+        if "BUY" in signal.upper():
+            signal_emoji = "🟢 " + signal.upper()
+        elif "SELL" in signal.upper():
+            signal_emoji = "🔴 " + signal.upper()
         else:
             signal_emoji = f"⚪ {signal}"
+
+        if isinstance(sl, float):
+            sl = round(sl, 2)
+        if isinstance(tp, float):
+            tp = round(tp, 2)
 
         # Xabar matnini tayyorlash
         text = (
@@ -53,14 +69,10 @@ class TelegramSync:
             f"🛡 <b>Stop Loss:</b> {sl} pips\n"
             f"💰 <b>Take Profit:</b> {tp} pips\n\n"
             f"📝 <b>Sabab:</b>\n"
-            f"<i>{reasoning}</i>"
+            f"<i>{reasoning[:300]}</i>"
         )
 
-        payload = {
-            "chat_id": self.config.telegram_chat_id,
-            "text": text,
-            "parse_mode": "HTML"
-        }
+        self.send_message(text)
 
     def send_model_drift_alert(self, symbol: str, drift_info: dict):
         if not self.enabled:
@@ -96,4 +108,3 @@ class TelegramSync:
         )
 
         self.send_message(text)
-

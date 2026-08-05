@@ -3,6 +3,7 @@ import { FeatureCard } from "@/components/backtest/FeatureCard";
 import { TestResultsCard, TestResultProps } from "@/components/backtest/TestResultsCard";
 import { BacktestCompareModal } from "@/components/backtest/BacktestCompareModal";
 import { Play, Activity, BarChart3, Clock, DollarSign, History, Cpu, Zap, Loader2, Timer, AlertCircle, Scale, ShieldCheck } from "lucide-react";
+import pubgLoader from "@/assets/pubg-loader.svg";
 import { supabase } from "@/integrations/supabase/client";
 
 export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
@@ -325,7 +326,7 @@ export function BacktestPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
           <div className="bg-[#0f172a]/90 backdrop-blur-xl border border-blue-500/30 p-6 rounded-2xl shadow-xl shadow-blue-500/10">
             <div className="flex flex-col items-center justify-center text-center space-y-4">
               <div className="relative w-20 h-20 flex items-center justify-center">
-                <Loader2 className="w-12 h-12 text-blue-500 animate-spin absolute" />
+                <img src={pubgLoader} className="w-20 h-20 absolute opacity-80" alt="Loader" />
                 <span className="text-xs font-bold text-white relative">{Math.floor(simulatedProgress)}%</span>
               </div>
               

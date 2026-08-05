@@ -40,8 +40,21 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 8080,
+    proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
     watch: {
       ignored: [
+        "**/node_modules/**",
+        "**/.venv/**",
+        "**/chroma_db/**",
+        "**/__pycache__/**",
+        "**/.pytest_cache/**",
+        "**/public/data/**",
         "**/*.db",
         "**/*.db-*",
         "**/*.sqlite",

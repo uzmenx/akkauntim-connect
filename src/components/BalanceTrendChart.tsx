@@ -42,6 +42,12 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
     const firstTrade = sorted[0];
     const startTimeDate = firstTrade.opened_at ? new Date(firstTrade.opened_at) : new Date(new Date(firstTrade.closed_at).getTime() - 60000 * 60);
     
+    // Choose chunk size dynamically based on trade count to downsample and smooth the chart
+    let chunkSize = 1;
+    if (sorted.length > 500) chunkSize = 30;
+    else if (sorted.length > 200) chunkSize = 10;
+    else if (sorted.length > 50) chunkSize = 5;
+
     const dataPoints = [];
     dataPoints.push({
       time: startTimeDate.getTime(),
@@ -49,12 +55,28 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
     });
 
     let runningBalance = startBalance;
-    for (const trade of sorted) {
-      runningBalance += Number(trade.profit ?? 0);
-      dataPoints.push({
-        time: new Date(trade.closed_at).getTime(),
-        balance: runningBalance
-      });
+    if (chunkSize > 1) {
+      for (let i = 0; i < sorted.length; i += chunkSize) {
+        const chunk = sorted.slice(i, i + chunkSize);
+        let sumTime = 0;
+        for (const trade of chunk) {
+          runningBalance += Number(trade.profit ?? 0);
+          sumTime += new Date(trade.closed_at).getTime();
+        }
+        const avgTime = Math.round(sumTime / chunk.length);
+        dataPoints.push({
+          time: avgTime,
+          balance: runningBalance
+        });
+      }
+    } else {
+      for (const trade of sorted) {
+        runningBalance += Number(trade.profit ?? 0);
+        dataPoints.push({
+          time: new Date(trade.closed_at).getTime(),
+          balance: runningBalance
+        });
+      }
     }
 
     const endBalance = runningBalance; // Should equal currentBalance
@@ -197,7 +219,7 @@ export function BalanceTrendChart({ history, currentBalance, stats }: BalanceTre
       onTouchStart={onTouchMove}
       onTouchMove={onTouchMove}
       onTouchEnd={onMouseLeave}
-      className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-gradient-to-br from-[#10192e]/90 to-[#041a5a]/20 rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
+      className="w-full h-full flex flex-col justify-center px-3 sm:px-4 bg-[#11131a]/85 backdrop-blur-lg rounded-[24px] border border-white/10 relative overflow-hidden group shadow-lg cursor-crosshair select-none"
     >
       {stats && (
         <div className="absolute bottom-2 left-2 right-2 min-[360px]:left-3.5 min-[360px]:right-3.5 z-10 flex items-center justify-between pointer-events-none">

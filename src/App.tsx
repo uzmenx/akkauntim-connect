@@ -18,6 +18,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import pubgLoader from "@/assets/pubg-loader.svg";
 
 const titles: Record<string, string> = {
   "/": "Dashboard",
@@ -82,7 +83,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="grid min-h-full place-items-center">
-        <Loader2 className="animate-spin text-brand-soft" size={28} />
+        <img src={pubgLoader} className="w-40 h-40 opacity-80" alt="Yuklanmoqda..." />
       </div>
     );
   }

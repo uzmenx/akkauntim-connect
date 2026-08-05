@@ -244,15 +244,15 @@ class OrderManager:
                 "deviation": self._symbol_deviation(symbol),
                 "magic": self.magic_number,
                 "comment": "AI forex bot",
-                "type_filling": self._get_filling_mode(symbol),
+                "type_filling": 2 if action == self.mt5.TRADE_ACTION_PENDING else self._get_filling_mode(symbol),
             }
-            if pending_ttl is not None:
-                request["type_time"] = self.mt5.ORDER_TIME_SPECIFIED
-                request["expiration"] = pending_ttl
-            else:
-                request["type_time"] = self.mt5.ORDER_TIME_GTC
+            # Ko'p brokerlar ORDER_TIME_SPECIFIED ni qo'llab-quvvatlamaydi va 10030/10013 xato beradi.
+            # Shuning uchun barcha pending orderlar uchun GTC ishlatamiz.
+            request["type_time"] = self.mt5.ORDER_TIME_GTC
 
-            if getattr(self.config, "shadow_mode", False):
+            if is_virtual is None:
+                is_virtual = getattr(self.config, "shadow_mode", False)
+            if is_virtual:
                 import time
                 class DummyResult:
                     def __init__(self, retcode, ticket):
@@ -895,7 +895,7 @@ class OrderManager:
                         "magic": self.magic_number,
                         "comment": "Virtual SL Closed",
                         "type_time": self.mt5.ORDER_TIME_GTC,
-                        "type_filling": self._get_filling_mode(symbol),
+                        "type_filling": 2 if action == self.mt5.TRADE_ACTION_PENDING else self._get_filling_mode(symbol),
                     }
                     result = self.mt5.order_send(request)
                     if result is None or result.retcode != self.mt5.TRADE_RETCODE_DONE:

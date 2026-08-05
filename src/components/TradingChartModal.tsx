@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { get, set } from "idb-keyval";
 import { createChart, ColorType, LineStyle, IChartApi, ISeriesApi, CandlestickSeries, HistogramSeries, LineSeries } from "lightweight-charts";
 import { X, TrendingUp, TrendingDown, Layers, Activity, Eye, RefreshCw, BarChart2, ShieldAlert, Target, Loader2, ChevronDown, Search, ArrowLeft } from "lucide-react";
+import pubgLoader from "@/assets/pubg-loader.svg";
 import { useQuery } from "@tanstack/react-query";
 import { fmtMoney, fmtNum } from "@/lib/utils";
 import type { Position } from "@/lib/types";
@@ -99,6 +100,70 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     color: string;
     priceRange?: string;
   } | null>(null);
+
+  const lastVisibleRangeRef = useRef<any>(null);
+  const candlesDataRef = useRef<any[]>([]);
+  const isFetchingMoreRef = useRef(false);
+  const hasMoreHistoryRef = useRef(true);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+
+  // Sync ref with state
+  useEffect(() => {
+    candlesDataRef.current = candlesData;
+  }, [candlesData]);
+
+  // Reset pagination state when symbol or timeframe changes
+  useEffect(() => {
+    hasMoreHistoryRef.current = true;
+    setHasMoreHistory(true);
+    lastVisibleRangeRef.current = null;
+  }, [activeSymbol, timeframe]);
+
+  const loadMoreCandles = async () => {
+    if (isFetchingMoreRef.current || !hasMoreHistoryRef.current || candlesDataRef.current.length === 0) return;
+    isFetchingMoreRef.current = true;
+    setIsFetchingMore(true);
+
+    try {
+      const oldestCandle = candlesDataRef.current[0];
+      const oldestTimeISO = new Date(oldestCandle.time * 1000).toISOString();
+
+      const { data: olderCandles, error: fetchErr } = await supabase
+        .from("candles")
+        .select("*")
+        .eq("symbol", activeSymbol)
+        .eq("timeframe", timeframe)
+        .lt("time", oldestTimeISO)
+        .order("time", { ascending: false })
+        .limit(500);
+
+      if (fetchErr) throw fetchErr;
+
+      if (!olderCandles || olderCandles.length === 0) {
+        hasMoreHistoryRef.current = false;
+        setHasMoreHistory(false);
+        return;
+      }
+
+      const formattedOlder = olderCandles.reverse().map((c: any) => ({
+        time: Math.floor(new Date(c.time).getTime() / 1000),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        volume: c.volume ? Number(c.volume) : 0,
+      }));
+
+      // Prepend older candles to the state
+      setCandlesData(prev => [...formattedOlder, ...prev]);
+    } catch (err) {
+      console.error("Failed to load older candles:", err);
+    } finally {
+      isFetchingMoreRef.current = false;
+      setIsFetchingMore(false);
+    }
+  };
 
   const { user } = useAuth();
   const isGuest = user?.id === "guest";
@@ -208,7 +273,13 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
         // 1. Avval IndexedDB keshdan o'qiymiz (oflayn tezkor yuklanish)
         const cached = await get(cacheKey).catch(() => null);
         if (cached && isMounted) {
-          if (cached.candles?.length > 0) setCandlesData(cached.candles);
+          if (cached.candles?.length > 0) {
+            const formattedCachedCandles = cached.candles.map((c: any) => ({
+              ...c,
+              time: typeof c.time === 'number' ? c.time : Math.floor(new Date(c.time).getTime() / 1000)
+            }));
+            setCandlesData(formattedCachedCandles);
+          }
           // MUHIM: Toggle holatidan qat'iy nazar BARCHA strategiya datalarini state ga yozamiz.
           // Aks holda foydalanuvchi SMC tugmasini bosganda data bo'sh bo'ladi.
           if (cached.smc) setSmcZonesData(cached.smc);
@@ -231,7 +302,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
           { data: sr },
           { data: ap }
         ] = await Promise.all([
-          supabase.from("candles").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).order("time", { ascending: false }).limit(300),
+          supabase.from("candles").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).order("time", { ascending: false }).limit(1000),
           supabase.from("smc_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
           (supabase as any).from("harmonic_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
           (supabase as any).from("wyckoff_events").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
@@ -257,21 +328,21 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
 
         if (isMounted) {
           setCandlesData(formattedCandles);
-          setSmcZonesData(zones || []);
-          setHarmonicData(harmonics || []);
-          setWyckoffData(wyckoffs || []);
-          setSrVolumeData(sr || []);
-          setAutoPatternData(ap || []);
+          setSmcZonesData(zones && zones.length > 0 ? zones : (cached?.smc || []));
+          setHarmonicData(harmonics && harmonics.length > 0 ? harmonics : (cached?.harmonic || []));
+          setWyckoffData(wyckoffs && wyckoffs.length > 0 ? wyckoffs : (cached?.wyckoff || []));
+          setSrVolumeData(sr && sr.length > 0 ? sr : (cached?.srVolume || []));
+          setAutoPatternData(ap && ap.length > 0 ? ap : (cached?.autoPattern || []));
         }
         
         // Keshga saqlash
         await set(cacheKey, {
           candles: formattedCandles,
-          smc: zones || [],
-          harmonic: harmonics || [],
-          wyckoff: wyckoffs || [],
-          srVolume: sr || [],
-          autoPattern: ap || []
+          smc: zones && zones.length > 0 ? zones : (cached?.smc || []),
+          harmonic: harmonics && harmonics.length > 0 ? harmonics : (cached?.harmonic || []),
+          wyckoff: wyckoffs && wyckoffs.length > 0 ? wyckoffs : (cached?.wyckoff || []),
+          srVolume: sr && sr.length > 0 ? sr : (cached?.srVolume || []),
+          autoPattern: ap && ap.length > 0 ? ap : (cached?.autoPattern || [])
         }).catch(() => null);
 
       } catch (err: any) {
@@ -282,7 +353,16 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
            if (res.ok) {
               const localData = await res.json();
               if (localData.candles && isMounted) {
-                 setCandlesData(localData.candles);
+                 const formattedLocalCandles = localData.candles.map((c: any) => ({
+                   ...c,
+                   time: parseTimeToSec(c.time),
+                   open: Number(c.open),
+                   high: Number(c.high),
+                   low: Number(c.low),
+                   close: Number(c.close),
+                   volume: c.volume ? Number(c.volume) : 0,
+                 }));
+                 setCandlesData(formattedLocalCandles);
                  setSmcZonesData(localData.strategy_overlays?.smc || []);
                  setHarmonicData(localData.strategy_overlays?.harmonic || []);
                  setWyckoffData(localData.strategy_overlays?.wyckoff || []);
@@ -290,7 +370,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
                  setAutoPatternData(localData.strategy_overlays?.auto_patterns || []);
                  
                  await set(cacheKey, {
-                    candles: localData.candles,
+                    candles: formattedLocalCandles,
                     smc: localData.strategy_overlays?.smc || [],
                     harmonic: localData.strategy_overlays?.harmonic || [],
                     wyckoff: localData.strategy_overlays?.wyckoff || [],
@@ -353,6 +433,28 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     });
 
     chartRef.current = chart;
+
+    // Restore visible time range if exists to prevent scroll reset
+    if (lastVisibleRangeRef.current) {
+      try {
+        chart.timeScale().setVisibleRange(lastVisibleRangeRef.current);
+      } catch (e) {}
+    }
+
+    // Subscribe to visible range changes to save position
+    chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
+      if (range) {
+        lastVisibleRangeRef.current = range;
+      }
+    });
+
+    // Subscribe to logical range changes to lazy load older candles when scrolled to the left
+    chart.timeScale().subscribeVisibleLogicalRangeChange((logicalRange) => {
+      if (!logicalRange) return;
+      if (logicalRange.from < 10) {
+        loadMoreCandles();
+      }
+    });
 
     let candlestickSeries: ISeriesApi<"Candlestick">;
     let precision = 5;
@@ -617,11 +719,12 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     // Add SR Volume Zones (Green for Support, Red for Resistance)
     if (showSRVolume && srVolumeData && srVolumeData.length > 0) {
       srVolumeData.forEach(z => {
-        const margin = Number(z.price) * 0.001; // 0.1% margin for thickness
-        const isSupport = (z.type || '').toLowerCase().includes('support') || (z.type || '').toLowerCase().includes('demand');
+        const price = z.price || (z.top_price && z.bottom_price ? (Number(z.top_price) + Number(z.bottom_price)) / 2 : 0);
+        const margin = Number(price) * 0.001; // 0.1% margin for thickness
+        const isSupport = (z.zone_type || z.type || '').toLowerCase().includes('support') || (z.zone_type || z.type || '').toLowerCase().includes('demand');
         aggregatedZones.push({
-          top: Number(z.price) + margin,
-          bottom: Number(z.price) - margin,
+          top: z.top_price ? Number(z.top_price) : (Number(price) + margin),
+          bottom: z.bottom_price ? Number(z.bottom_price) : (Number(price) - margin),
           start_time: z.formed_at || z.time,
           direction: isSupport ? 'support' : 'resistance',
           color: isSupport ? `rgba(16, 185, 129, ${getAlpha(z.confidence, 0.25, 0.05)})` : `rgba(244, 63, 94, ${getAlpha(z.confidence, 0.25, 0.05)})`,
@@ -960,8 +1063,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className="flex flex-col w-full max-w-5xl h-[95vh] bg-[#090d16] border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 pt-[max(env(safe-area-inset-top),0.5rem)] pb-[max(env(safe-area-inset-bottom),0.5rem)] sm:p-4 animate-in fade-in duration-200">
+      <div className="flex flex-col w-full max-w-5xl h-full max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-16px)] sm:h-[90vh] bg-[#090d16] border border-white/10 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-white/10 bg-[#0d1424]">
           <div className="flex items-center gap-1 sm:gap-2">
@@ -1110,87 +1213,14 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
             ))}
           </div>
 
-          {/* Indicator Toggles */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFan(!showFan)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showFan
-                  ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-lg shadow-amber-500/20"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-              title="Monte Carlo Fan Simulator"
-            >
-              <Activity size={12} /> MC {isLoadingFan && <Loader2 size={10} className="animate-spin" />}
-            </button>
-            <button
-              onClick={() => setShowSMC(!showSMC)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showSMC
-                  ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <Layers size={12} /> SMC
-            </button>
-            <button
-              onClick={() => setShowHarmonic(!showHarmonic)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showHarmonic
-                  ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <TrendingUp size={12} /> Harmonics
-            </button>
-            <button
-              onClick={() => setShowAutoPattern(!showAutoPattern)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showAutoPattern
-                  ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <Target size={12} /> Patterns
-            </button>
-            <button
-              onClick={() => setShowSRVolume(!showSRVolume)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showSRVolume
-                  ? "bg-orange-500/20 text-orange-300 border-orange-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <Activity size={12} /> SR Vol
-            </button>
-            <button
-              onClick={() => setShowWyckoff(!showWyckoff)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showWyckoff
-                  ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <Activity size={12} /> Wyckoff
-            </button>
-            <button
-              onClick={() => setShowVolume(!showVolume)}
-              className={`flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-xl border transition-all ${
-                showVolume
-                  ? "bg-sky-500/20 text-sky-300 border-sky-500/40"
-                  : "bg-white/5 text-white/40 border-white/5 hover:text-white"
-              }`}
-            >
-              <BarChart2 size={12} /> Vol
-            </button>
-          </div>
+
         </div>
 
         {/* Main Chart Area */}
         <div className="relative flex-1 w-full bg-[#090d16] overflow-hidden flex items-center justify-center">
           {isLoading ? (
             <div className="flex flex-col items-center gap-3 text-white/50 z-20">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+              <img src={pubgLoader} className="w-32 h-32 opacity-80" alt="Yuklanmoqda..." />
               <span className="text-[10px] font-bold uppercase tracking-wider">Ma'lumotlar yuklanmoqda...</span>
             </div>
           ) : error ? (
@@ -1248,59 +1278,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
                 </div>
               )}
               
-              {/* Overlay SMC Smart Money Info Badge */}
-              {(showSMC && smcZonesData.length > 0) || (showHarmonic && harmonicData.length > 0) || (showWyckoff && wyckoffData.length > 0) || (showSRVolume && srVolumeData.length > 0) || (showAutoPattern && autoPatternData.length > 0) ? (
-                <div className="absolute top-3 left-3 z-10 bg-black/80 backdrop-blur-md px-3 py-2 rounded-xl border border-purple-500/30 shadow-lg text-[10px] space-y-1.5 max-w-[200px] max-h-[160px] overflow-y-auto">
-                  <div className="flex items-center gap-1.5 font-black text-purple-400 uppercase tracking-wider mb-2 sticky top-0 bg-black/80">
-                    <Layers size={12} /> SMC Zones
-                  </div>
-                  {showSMC && smcZonesData.map((zone) => (
-                    <div key={zone.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">{zone.zone_type.replace('_', ' ')} {zone.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{zone.confidence}%</span>}</span>
-                      <span className={`font-bold tabular-nums ${zone.direction === 'demand' || zone.direction === 'bullish' ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {zone.direction.toUpperCase()} {fmtNum(Number(zone.top), 5)} - {fmtNum(Number(zone.bottom), 5)}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {showWyckoff && wyckoffData.map((w) => (
-                    <div key={w.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Wyckoff {w.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{w.confidence}%</span>}</span>
-                      <span className={`font-bold text-blue-400`}>
-                        {w.phase} - {w.signal}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {showSRVolume && srVolumeData.map((s) => (
-                    <div key={s.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">SR Volume {s.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{s.confidence}%</span>}</span>
-                      <span className={`font-bold ${(s.type || "").toLowerCase().includes("support") || (s.type || "").toLowerCase().includes("demand") ? "text-emerald-400" : "text-rose-400"}`}>
-                        {(s.type || "").toUpperCase()} @ {fmtNum(Number(s.price), 5)}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {showAutoPattern && autoPatternData.map((a) => (
-                    <div key={a.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Auto Pattern {a.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{a.confidence}%</span>}</span>
-                      <span className={`font-bold text-orange-400`}>
-                        {a.pattern_type.toUpperCase()} - {a.signal}
-                      </span>
-                    </div>
-                  ))}
-                  
-                  {showHarmonic && harmonicData.map((h) => (
-                    <div key={h.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
-                      <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">Harmonic {h.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{h.confidence}%</span>}</span>
-                      <span className={`font-bold text-yellow-400`}>
-                        {h.pattern_type.toUpperCase()} - {h.signal}
-                      </span>
-                    </div>
-                  ))}
 
-                </div>
-              ) : null}
             </>
           )}
         </div>

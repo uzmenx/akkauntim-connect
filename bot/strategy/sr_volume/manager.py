@@ -7,7 +7,7 @@ BaseStrategyManager klassidan vorislik olgan.
 """
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
 from bot.strategy.base_manager import BaseStrategyManager
 
@@ -69,7 +69,7 @@ class SRVolumeZoneManager(BaseStrategyManager):
                             ) VALUES (?, ?, 'support', ?, ?, ?, ?, ?, ?, 'fresh', ?)
                         ''', (
                             symbol, timeframe, top_p, bot_p,
-                            b_idx, e_time, signal, confidence, datetime.utcnow().isoformat()
+                            b_idx, e_time, signal, confidence, datetime.now(timezone.utc).isoformat()
                         ))
                         if cursor.rowcount > 0:
                             inserted_count += cursor.rowcount
@@ -93,7 +93,7 @@ class SRVolumeZoneManager(BaseStrategyManager):
                             ) VALUES (?, ?, 'resistance', ?, ?, ?, ?, ?, ?, 'fresh', ?)
                         ''', (
                             symbol, timeframe, top_p, bot_p,
-                            b_idx, e_time, signal, confidence, datetime.utcnow().isoformat()
+                            b_idx, e_time, signal, confidence, datetime.now(timezone.utc).isoformat()
                         ))
                         if cursor.rowcount > 0:
                             inserted_count += cursor.rowcount

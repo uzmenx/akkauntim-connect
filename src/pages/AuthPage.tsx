@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Bot, Loader2, KeyRound, Server, User, UserCheck, Eye, EyeOff } from "lucide-react";
 import { mt5LoginToEmail, useAuth } from "@/hooks/useAuth";
+import logo from "@/assets/icon.jpg";
 
 type Mode = "signin" | "signup";
 
@@ -104,7 +105,7 @@ export function AuthPage() {
 
       <div className="mb-4 sm:mb-8 flex flex-col items-center gap-2 sm:gap-3 text-center">
         <div className="h-14 w-14 sm:h-20 sm:w-20 overflow-hidden rounded-[18px] sm:rounded-[24px] bg-gradient-to-br from-cyan-400 via-blue-600 to-indigo-800 p-[1.5px] shadow-[0_12px_35px_rgba(34,211,238,0.4),inset_0_2px_10px_rgba(255,255,255,0.4)] border border-white/20 flex items-center justify-center">
-          <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover rounded-[16px] sm:rounded-[22px]" />
+          <img src={logo} alt="Logo" className="w-full h-full object-cover rounded-[16px] sm:rounded-[22px]" />
         </div>
         <h1 className="text-xl sm:text-3xl font-black tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-white via-cyan-100 to-blue-200 drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           Akcume Trading AI

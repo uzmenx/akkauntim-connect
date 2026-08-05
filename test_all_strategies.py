@@ -4,7 +4,7 @@ import random
 import logging
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Add workspace root to python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -16,7 +16,7 @@ def generate_realistic_candles(symbol: str, timeframe: str, num_candles=300):
     """
     Kandel malumotlarini generatsiya qiladi (Trend + Wave + Noise).
     """
-    now = datetime.utcnow().replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     
     tf_minutes = 15
     if timeframe == 'M1': tf_minutes = 1

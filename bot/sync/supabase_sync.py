@@ -13,6 +13,7 @@ import MetaTrader5 as mt5
 import sqlite3
 import json
 import os
+from bot.utils.resilience import with_exponential_backoff, CircuitBreaker
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class SupabaseSync:
         self.mt5_login = str(config.mt5_login)
         self.last_sync_time = datetime.datetime(2000, 1, 1)
         self._last_reported_cost = 0.0
+        self._circuit_breaker = CircuitBreaker(failure_threshold=3, recovery_timeout=60)
 
     def _post(self, payload: dict) -> Optional[dict]:
         """Supabase Edge Function ga POST yuboradi."""
@@ -32,16 +34,24 @@ class SupabaseSync:
             logger.warning("supabase_sync: SUPABASE_URL / BOT_SYNC_SECRET / MT5_LOGIN kerak")
             return None
         payload = {"mt5_login": self.mt5_login, **payload}
-        try:
+        def _do_request():
             r = requests.post(
                 self.endpoint, json=payload,
                 headers={"x-bot-secret": self.bot_sync_secret, "Content-Type": "application/json"},
                 timeout=15,
             )
+            if r.status_code >= 500:
+                r.raise_for_status()
             if r.status_code >= 300:
                 logger.error(f"bot-sync {r.status_code}: {r.text}")
                 return None
             return r.json()
+
+        try:
+            # Wrap with exponential backoff and circuit breaker
+            return self._circuit_breaker.call(
+                lambda: with_exponential_backoff(_do_request, max_retries=2, base_delay=2.0)
+            )
         except Exception as e:
             logger.error(f"bot-sync POST xatolik: {e}")
             return None

@@ -83,6 +83,14 @@ class BotConfig:
     shadow_production_min_f1: float = 45.0
     shadow_production_min_samples: int = 500
 
+    # Shadow AI Autonomous Trading parameters
+    allow_shadow_trading: bool = True
+    shadow_risk_per_trade: float = 0.01
+    shadow_max_trades_per_day: int = 1000000
+
+    realtime_enabled: bool = False
+    loop_interval_seconds: int = 15
+
     @classmethod
     def load(cls, env_path: str = ".env", config_path: str = "config.json") -> "BotConfig":
         config = cls()
@@ -122,6 +130,8 @@ class BotConfig:
                     self.timeframe_major = trading.get("timeframe_major", self.timeframe_major)
                     self.timeframe_minor = trading.get("timeframe_minor", self.timeframe_minor)
                     self.loop_interval_minutes = trading.get("loop_interval_minutes", self.loop_interval_minutes)
+                    self.realtime_enabled = trading.get("realtime_enabled", self.realtime_enabled)
+                    self.loop_interval_seconds = trading.get("loop_interval_seconds", self.loop_interval_seconds)
                     self.risk_level_single_confirmation = trading.get("risk_level_single_confirmation", self.risk_level_single_confirmation)
                     self.risk_level_multiple_confirmation = trading.get("risk_level_multiple_confirmation", self.risk_level_multiple_confirmation)
                     
@@ -152,6 +162,10 @@ class BotConfig:
                     self.shadow_model_dir = shadow.get("model_dir", self.shadow_model_dir)
                     self.shadow_production_min_f1 = shadow.get("production_min_f1", self.shadow_production_min_f1)
                     self.shadow_production_min_samples = shadow.get("production_min_samples", self.shadow_production_min_samples)
+
+                    self.allow_shadow_trading = shadow.get("allow_shadow_trading", self.allow_shadow_trading)
+                    self.shadow_risk_per_trade = shadow.get("risk_per_trade", self.shadow_risk_per_trade)
+                    self.shadow_max_trades_per_day = shadow.get("max_trades_per_day", self.shadow_max_trades_per_day)
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
@@ -256,7 +270,19 @@ class BotConfig:
             self.shadow_min_confidence = float(data["shadow_min_confidence"])
         if "shadow_min_agreement_sources" in data:
             self.shadow_min_agreement_sources = int(data["shadow_min_agreement_sources"])
+
+        if "allow_shadow_trading" in data:
+            self.allow_shadow_trading = bool(data["allow_shadow_trading"])
+        if "shadow_risk_per_trade" in data:
+            self.shadow_risk_per_trade = float(data["shadow_risk_per_trade"])
+        if "shadow_max_trades_per_day" in data:
+            self.shadow_max_trades_per_day = int(data["shadow_max_trades_per_day"])
             
+        if "realtime_enabled" in data:
+            self.realtime_enabled = bool(data["realtime_enabled"])
+        if "loop_interval_seconds" in data:
+            self.loop_interval_seconds = int(data["loop_interval_seconds"])
+
         if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
             identity = data.get("prompt_identity", "")
             strategy = data.get("prompt_strategy", "")

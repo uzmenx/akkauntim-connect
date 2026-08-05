@@ -9,6 +9,8 @@ import { useAuth } from "@/hooks/useAuth";
 import type { BotSettings, BotStatus } from "@/lib/types";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { BacktestPage } from "./BacktestPage";
+import { EmptyLine } from "./DashboardPage";
+import pubgLoader from "@/assets/pubg-loader.svg";
 
 const MAJOR_TIMEFRAME_OPTIONS = [
   { value: "D1", label: "D1 (1 kun)" },
@@ -153,6 +155,8 @@ export function SettingsPage() {
         timeframe_major: "H1",
         timeframe_minor: "M5",
         loop_interval_minutes: 5,
+        realtime_enabled: false,
+        loop_interval_seconds: 15,
         ai_enabled: true,
         ai_model: "kimi-k3",
         shadow_mode: true,
@@ -194,6 +198,8 @@ export function SettingsPage() {
         timeframe_major: form.timeframe_major ?? "H1",
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
+        realtime_enabled: form.realtime_enabled ?? false,
+        loop_interval_seconds: Number(form.loop_interval_seconds ?? 15),
         ai_enabled: form.ai_enabled ?? true,
         shadow_mode: form.shadow_mode ?? true,
         ai_model: form.ai_model ?? "auto",
@@ -222,6 +228,8 @@ export function SettingsPage() {
         timeframe_major: form.timeframe_major ?? "H1",
         timeframe_minor: form.timeframe_minor ?? "M5",
         loop_interval_minutes: Number(form.loop_interval_minutes ?? 5),
+        realtime_enabled: form.realtime_enabled ?? false,
+        loop_interval_seconds: Number(form.loop_interval_seconds ?? 15),
         ai_enabled: form.ai_enabled ?? true,
         shadow_mode: form.shadow_mode ?? true,
         ai_model: form.ai_model ?? "auto",
@@ -328,7 +336,11 @@ export function SettingsPage() {
     };
   }, [user, qc]);
 
-  if (isLoading || statusQuery.isLoading) return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
+  if (isLoading || statusQuery.isLoading) return (
+    <div className="flex justify-center w-full py-10">
+      <img src={pubgLoader} className="mx-auto w-32 h-32 opacity-80" alt="Yuklanmoqda..." />
+    </div>
+  );
 
   return (
     <div className="space-y-4 pb-10">
@@ -403,14 +415,37 @@ export function SettingsPage() {
                 options={MINOR_TIMEFRAME_OPTIONS}
               />
             </div>
-            <div className="col-span-2">
-              <Slider
-                label="Bozorni tahlil qilish tezligi (Daqiqa)"
-                value={Number(form.loop_interval_minutes ?? 5)}
-                min={1} max={240} step={1}
-                format={(v) => `Har ${v} daqiqada`}
-                onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
+            <div className="col-span-2 flex items-center justify-between py-2 border-b border-white/5">
+              <div>
+                <label className="block text-xs font-bold text-fg-muted uppercase tracking-wider">Real-time Rejim</label>
+                <span className="text-[10px] text-white/40">Bot soniyali intervallar bilan real vaqtda ishlaydi</span>
+              </div>
+              <input 
+                type="checkbox"
+                checked={!!form.realtime_enabled}
+                onChange={(e) => setForm((f) => ({ ...f, realtime_enabled: e.target.checked }))}
+                className="w-4 h-4 rounded border-white/10 text-blue-600 bg-black/40 focus:ring-blue-500/20"
               />
+            </div>
+            
+            <div className="col-span-2">
+              {form.realtime_enabled ? (
+                <Slider
+                  label="Tahlil tezligi (Soniya)"
+                  value={Number(form.loop_interval_seconds ?? 15)}
+                  min={1} max={60} step={1}
+                  format={(v) => `Har ${v} soniyada`}
+                  onChange={(v) => setForm((f) => ({ ...f, loop_interval_seconds: v }))}
+                />
+              ) : (
+                <Slider
+                  label="Tahlil tezligi (Daqiqa)"
+                  value={Number(form.loop_interval_minutes ?? 5)}
+                  min={1} max={240} step={1}
+                  format={(v) => `Har ${v} daqiqada`}
+                  onChange={(v) => setForm((f) => ({ ...f, loop_interval_minutes: v }))}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -548,14 +583,7 @@ export function SettingsPage() {
         </div>
       </Card>
 
-      {/* 4. Test Markazi (Backtest) */}
-      <Card className="glass p-5">
-        <div className="flex items-center gap-2 mb-4 text-pink-500">
-          <FlaskConical size={18} />
-          <h3 className="font-bold text-sm tracking-wide uppercase">Test Markazi (Backtest)</h3>
-        </div>
-        <BacktestPage isEmbedded={true} />
-      </Card>
+
 
 
       {/* Save Button */}

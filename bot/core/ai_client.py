@@ -39,6 +39,8 @@ class AIClient:
         self._model_cooldown_until: Dict[str, float] = {}
         # Dedup timestamp so get_simple_response doesn't spam Telegram once per symbol
         self._last_simple_response_alert = 0.0
+        # AI modellar ishlamayotganligi haqidagi ogohlantirish telegramga kunda ko'pi bilan 1 marta borishi uchun
+        self._last_all_models_failed_alert = 0.0
 
     def _is_model_cooling_down(self, model: str) -> bool:
         return time.time() < self._model_cooldown_until.get(model, 0)
@@ -274,7 +276,9 @@ class AIClient:
                     self.logger.warning(f"Rate limit on {model}: {e}")
                     last_exception = e
                     if attempt < retries:
-                        time.sleep(4)  # Wait longer for rate limits
+                        backoff = min(4.0 * (2 ** attempt), 60.0)
+                        self.logger.info(f"Exponential backoff: waiting {backoff}s before retry")
+                        time.sleep(backoff)
                 except anthropic.NotFoundError as e:
                     # Model mavjud emas, darhol keyingi modelga o'tish (qayta urinmasdan)
                     self.logger.warning(f"Model {model} topilmadi (404). Keyingi modelga o'tilmoqda...")
@@ -298,7 +302,9 @@ class AIClient:
                     self.logger.warning(f"Model {model} bilan ulanishda xato: {e}")
                     last_exception = e
                     if attempt < retries:
-                        time.sleep(2)
+                        backoff = min(2.0 * (2 ** attempt), 60.0)
+                        self.logger.info(f"Exponential backoff: waiting {backoff}s before retry")
+                        time.sleep(backoff)
                 
         self.logger.error(f"Hech qaysi AI modeli ishlamadi. Oxirgi xato: {last_exception}")
         
@@ -333,21 +339,28 @@ class AIClient:
         
         self.logger.critical(msg)
         
-        telegram = getattr(self, "telegram", None)
-        if telegram:
-            try:
-                telegram.send_message(f"🚨 AI MODELLAR ISHLAMAYAPTI ({', '.join(models_tried)})\nXato: {last_exception}")
-            except Exception as e:
-                self.logger.error(f"Telegram alert xatosi: {e}")
+        now = time.time()
+        # Bir kunda (86400 soniyada) ko'pi bilan 1 marta yuborish
+        if now - self._last_all_models_failed_alert >= 86400:
+            telegram = getattr(self, "telegram", None)
+            if telegram:
+                try:
+                    telegram.send_message(f"🚨 AI MODELLAR ISHLAMAYAPTI ({', '.join(models_tried)})\nXato: {last_exception}")
+                    self._last_all_models_failed_alert = now
+                except Exception as e:
+                    self.logger.error(f"Telegram alert xatosi: {e}")
+        else:
+            self.logger.info("AI MODELLAR ISHLAMAYAPTI xabari Telegramga kunda faqat bir marta yuborilishi cheklovi tufayli yuborilmadi.")
                 
         sync = getattr(self, "sync", None)
         if sync:
             try:
-                sync.insert("ai_signals", {
-                    "symbol": "SYSTEM",
-                    "signal": "AI_OFFLINE",
-                    "reasoning": f"{msg}: {last_exception}"
-                })
+                sync.log_ai_signal(
+                    symbol="SYSTEM",
+                    signal="AI_OFFLINE",
+                    confidence=0,
+                    reasoning=f"{msg}: {last_exception}"
+                )
             except Exception as e:
                 self.logger.error(f"Supabase alert xatosi: {e}")
 
@@ -454,7 +467,10 @@ class AIClient:
                 except anthropic.RateLimitError as e:
                     self.logger.warning(f"Rate limit for {model}: {e}")
                     last_exception = e
-                    time.sleep(3)
+                    if attempt < retries - 1:
+                        backoff = min(3.0 * (2 ** attempt), 60.0)
+                        self.logger.info(f"Exponential backoff: waiting {backoff}s before retry")
+                        time.sleep(backoff)
                 except PermanentAPIError as e:
                     # Hisob darajasidagi xato (masalan kredit tugagan) — qayta
                     # urinish foyda bermaydi. Modelni cooldown'ga qo'yamiz va
@@ -472,7 +488,9 @@ class AIClient:
                     if "not_found_error" in err_str or "No endpoints found" in err_str or "404" in err_str:
                         break
                     if attempt < retries - 1:
-                        time.sleep(2)
+                        backoff = min(2.0 * (2 ** attempt), 60.0)
+                        self.logger.info(f"Exponential backoff: waiting {backoff}s before retry")
+                        time.sleep(backoff)
 
         if any_model_attempted:
             self.logger.error(f"Hech qaysi AI modeli oddiy javob bera olmadi. Oxirgi xato: {last_exception}")

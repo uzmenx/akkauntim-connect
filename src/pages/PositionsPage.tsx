@@ -9,6 +9,7 @@ import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
 import { guestMock } from "@/lib/guestMock";
 import { TradingChartModal } from "@/components/TradingChartModal";
+import pubgLoader from "@/assets/pubg-loader.svg";
 
 export function PositionsPage() {
   const { user } = useAuth();
@@ -28,7 +29,11 @@ export function PositionsPage() {
   });
 
   if (isLoading) {
-    return <Loader2 className="mx-auto my-10 animate-spin text-brand-soft" size={22} />;
+    return (
+      <div className="flex justify-center w-full py-10">
+        <img src={pubgLoader} className="mx-auto w-32 h-32 opacity-80" alt="Yuklanmoqda..." />
+      </div>
+    );
   }
 
   if (!data?.length) {

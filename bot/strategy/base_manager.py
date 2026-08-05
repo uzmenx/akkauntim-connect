@@ -9,7 +9,7 @@ and lifecycle management (get_active, get_recent, mark_stale, clear_old_records)
 import sqlite3
 from contextlib import contextmanager
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 class BaseStrategyManager:
     """
@@ -136,7 +136,7 @@ class BaseStrategyManager:
         Deletes records created earlier than the specified number of days.
         """
         deleted_count = 0
-        cutoff_date = (datetime.utcnow() - timedelta(days=days)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         try:
             with self.get_connection() as conn:
                 cursor = conn.cursor()

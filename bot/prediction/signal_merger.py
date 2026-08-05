@@ -34,6 +34,22 @@ def wilson_lower_bound(win_rate: float, n: int, confidence: float = 0.95) -> flo
     return max(0.0, lower_bound)
 
 
+def _load_dynamic_weights() -> dict:
+    """
+    merger_weights.json faylidan dinamik optimizatsiya qilingan og'irliklarni yuklaydi.
+    """
+    try:
+        root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        weights_path = os.path.join(root_dir, "merger_weights.json")
+        if os.path.exists(weights_path):
+            with open(weights_path, 'r') as f:
+                data = json.load(f)
+                return data.get("symbol_weights", {})
+    except Exception:
+        pass
+    return {}
+
+
 def compute_lstm_weight(symbol: str, timeframe: str, shadow_win_rate: float, actual_trades: int,
                         default_max_weight: float = 0.60) -> float:
     """

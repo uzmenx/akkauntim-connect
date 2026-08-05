@@ -55,97 +55,9 @@ export function MonitoringPage() {
   const { data: whyChainAudit } = useQuery({
     queryKey: ["audit_why_chain", activeSymbol],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/monitoring/audit-why-chain?symbol=${activeSymbol}`);
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn("WHY chain endpoint fallback", e);
-      }
-      return {
-        audit_version: "v2.0-INSPECTABLE-TRANSPARENT",
-        decision_id: "DEC-2026-0802-9984",
-        symbol: activeSymbol,
-        timestamp: new Date().toISOString(),
-        final_action: "BUY",
-        final_lot_size: 0.05,
-        stop_loss_pips: 18,
-        take_profit_pips: 36,
-        total_confidence_score_pct: 82.4,
-        why_chain_steps: [
-          {
-            step: 1,
-            title: "7-Strategy Voting Ensemble Breakdown",
-            description: "Yetti klassik texnik va indikator strategiyalari ovozlari va og'irliklari",
-            details: {
-              votes: [
-                { strategy: "OrderBlock_SmartMoney", vote: "BUY", confidence: 0.88, wilson_lb_weight: 0.22, contribution: +0.1936 },
-                { strategy: "ICT_FairValueGap", vote: "BUY", confidence: 0.82, wilson_lb_weight: 0.18, contribution: +0.1476 },
-                { strategy: "EMA_MultiTimeframe", vote: "BUY", confidence: 0.75, wilson_lb_weight: 0.15, contribution: +0.1125 },
-                { strategy: "RSI_Divergence", vote: "NEUTRAL", confidence: 0.50, wilson_lb_weight: 0.10, contribution: 0.0000 },
-                { strategy: "MACD_Histogram", vote: "BUY", confidence: 0.70, wilson_lb_weight: 0.12, contribution: +0.0840 },
-                { strategy: "VolumeProfile_POC", vote: "BUY", confidence: 0.79, wilson_lb_weight: 0.13, contribution: +0.1027 },
-                { strategy: "LiquiditySweep", vote: "NEUTRAL", confidence: 0.50, wilson_lb_weight: 0.10, contribution: 0.0000 }
-              ],
-              voting_score: +0.6404,
-              consensus_percentage: 71.4
-            }
-          },
-          {
-            step: 2,
-            title: "PyTorch LSTM Sequential Feature Importance",
-            description: "Vaqt qatormi (Time-series) neyron tarmog'ida eng yuqori e'tibor qaratilgan 5 ta xususiyat",
-            details: {
-              lstm_prediction: "BUY",
-              raw_probability: 0.814,
-              top_features: [
-                { feature: "OrderBlock_Sweep_Distance", importance_score: 0.34, impact: "BULLISH_SUPPORT" },
-                { feature: "M15_FVG_Imbalance_Ratio", importance_score: 0.28, impact: "BULLISH_GAP_FILL" },
-                { feature: "H1_Trend_Slope", importance_score: 0.18, impact: "UPTREND_CONFIRMATION" },
-                { feature: "Spread_Cost_Slippage", importance_score: 0.12, impact: "LOW_EXECUTION_COST" },
-                { feature: "Volume_Delta_Cluster", importance_score: 0.08, impact: "BUY_PRESSURE" }
-              ]
-            }
-          },
-          {
-            step: 3,
-            title: "PPO Reinforcement Learning Policy Matrix",
-            description: "Mukofotni maksimallashtiruvchi RL agentining Action log-prob va xatarlar balansi",
-            details: {
-              action_selected: "BUY_0.05_LOT",
-              policy_log_prob: -0.182,
-              estimated_state_value: +2.45,
-              reward_penalty_checks: {
-                drawdown_risk_penalty: 0.0,
-                spread_penalty: -0.02,
-                sharpe_bonus: +0.35
-              }
-            }
-          },
-          {
-            step: 4,
-            title: "Signal Merger & Veto Verification Guard",
-            description: "Xatarlarni cheklovchi rad etish (Veto) va ziddiyatlarni hal qilish filtrlari",
-            details: {
-              conflict_detected: false,
-              veto_triggered: false,
-              spread_filter: "PASS (0.8 pips <= 2.5 pips max)",
-              news_filter: "PASS (High-impact news 45 minute away)",
-              margin_health_filter: "PASS (Equity Margin Level > 850%)"
-            }
-          },
-          {
-            step: 5,
-            title: "Final Mathematical Derivation Formula",
-            description: "Barcha modullar sintezi va oxirgi qaror formulasi izohi",
-            details: {
-              formula: "WScore = (VotingScore * 0.40) + (LSTMProb * 0.35) + (PPOValue * 0.25) - VetoPenalty",
-              math_eval: "(0.6404 * 0.40) + (0.8140 * 0.35) + (0.9800 * 0.25) - 0.0 = 0.785 = 78.5% confidence",
-              decision_threshold: "BUY threshold >= 0.65 (Passed with +13.5% margin)",
-              conclusion: "Barcha 4 modul bir ovozdan BUY yo'nalishini qo'llab-quvvatladi. Qora quti elementlari mavjud emas."
-            }
-          }
-        ]
-      };
+      const res = await fetch(`/api/monitoring/audit-why-chain?symbol=${activeSymbol}`);
+      if (!res.ok) throw new Error("Failed to fetch WHY chain audit");
+      return await res.json();
     },
     refetchInterval: 5000
   });
@@ -154,49 +66,9 @@ export function MonitoringPage() {
   const { data: abTestReport } = useQuery({
     queryKey: ["ab_test_shadow_report", activeSymbol],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/monitoring/ab-test-shadow?symbol=${activeSymbol}`);
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn("A/B test endpoint fallback", e);
-      }
-      return {
-        symbol: activeSymbol,
-        ab_test_status: "ACTIVE_SHADOW_RUNNING",
-        execution_mode: "SHADOW_OBSERVATION_ZERO_RISK",
-        evaluated_at: new Date().toISOString(),
-        sample_size_ticks: 4820,
-        sample_size_trades: 84,
-        model_a_production: {
-          name: "Model A (Active Production)",
-          version: "v1.2.0-baseline",
-          trade_execution_enabled: true,
-          win_rate_pct: 64.2,
-          total_profit_usd: 1420.50,
-          sharpe_ratio: 1.52,
-          max_drawdown_pct: 3.8,
-          avg_latency_ms: 3.1
-        },
-        model_b_candidate: {
-          name: "Model B (Challenger Candidate)",
-          version: "v1.3.0-shadow-experimental",
-          trade_execution_enabled: false,
-          win_rate_pct: 70.4,
-          total_simulated_profit_usd: 1890.20,
-          sharpe_ratio: 1.94,
-          max_drawdown_pct: 2.4,
-          avg_latency_ms: 3.4
-        },
-        divergence_metrics: {
-          signal_disagreement_pct: 18.5,
-          candidate_outperformance_pct: 6.2,
-          simulated_alpha_gain_usd: 469.70,
-          p_value_statistical_significance: 0.021,
-          is_statistically_significant: true
-        },
-        recommendation: "PROMOTE_MODEL_B_TO_PRODUCTION",
-        promotion_ready: true
-      };
+      const res = await fetch(`/api/monitoring/ab-test-shadow?symbol=${activeSymbol}`);
+      if (!res.ok) throw new Error("Failed to fetch A/B test shadow report");
+      return await res.json();
     },
     refetchInterval: 5000
   });
@@ -205,46 +77,9 @@ export function MonitoringPage() {
   const { data: trainReport } = useQuery({
     queryKey: ["train_comparison_report", activeSymbol],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/monitoring/train-comparison?symbol=${activeSymbol}`);
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn("Train comparison endpoint fallback", e);
-      }
-      return {
-        symbol: activeSymbol,
-        evaluated_at: new Date().toISOString(),
-        previous_version: {
-          version: "v1.2.0-checkpoint",
-          trained_at: "2026-08-01T14:30:00",
-          val_loss: 0.0421,
-          directional_accuracy_pct: 62.4,
-          inference_latency_ms: 4.1,
-          sharpe_ratio: 1.45,
-          wilson_ci_lb: 0.468,
-          status: "ARCHIVED_BASELINE"
-        },
-        current_version: {
-          version: "v1.3.0-active",
-          trained_at: new Date().toISOString(),
-          val_loss: 0.0315,
-          directional_accuracy_pct: 68.2,
-          inference_latency_ms: 3.2,
-          sharpe_ratio: 1.82,
-          wilson_ci_lb: 0.512,
-          status: "DEPLOYED_ACTIVE"
-        },
-        version_delta: {
-          val_loss_improvement_pct: 25.18,
-          accuracy_gain_pct: 5.8,
-          latency_reduction_ms: 0.9,
-          sharpe_delta: 0.37,
-          wilson_lb_delta: 0.044,
-          overall_evaluation: "IMPROVED"
-        },
-        retrain_trigger_reason: "Automated Concept Drift Safeguard / Daily Cycle",
-        deployment_decision: "PROMOTED_TO_PRODUCTION"
-      };
+      const res = await fetch(`/api/monitoring/train-comparison?symbol=${activeSymbol}`);
+      if (!res.ok) throw new Error("Failed to fetch train comparison report");
+      return await res.json();
     },
     refetchInterval: 10000
   });
@@ -253,244 +88,31 @@ export function MonitoringPage() {
   const { data: errorAggregation } = useQuery({
     queryKey: ["error_aggregation_report"],
     queryFn: async () => {
-      try {
-        const res = await fetch("/api/monitoring/error-aggregation");
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn("Error aggregation endpoint fallback", e);
-      }
-      return {
-        total_faults_count: 32,
-        timeframe: "Last 24 Hours",
-        most_frequent_fault: "MT5 Gateway Connection Drop",
-        system_resilience_score_pct: 94.2,
-        error_categories: [
-          {
-            category: "MT5 Gateway Connection Drop",
-            code: "ERR_MT5_DISCONNECT",
-            count: 14,
-            percentage: 43.8,
-            severity: "WARNING",
-            last_seen: new Date().toISOString(),
-            primary_cause: "Broker WebSocket heart-beat timeout / Socket reconnecting",
-            remediation: "Socket auto-reconnect backoff logic va ping intervalini 5s ga sozlang."
-          },
-          {
-            category: "LLM API Rate-Limit / Timeout",
-            code: "ERR_LLM_API_TIMEOUT",
-            count: 9,
-            percentage: 28.1,
-            severity: "WARNING",
-            last_seen: new Date().toISOString(),
-            primary_cause: "Gemini / OpenAI API response delay > 8000ms",
-            remediation: "Fallback local Voting Engine signalidan foydalanildi (Zero latency loss)."
-          },
-          {
-            category: "SQLite DB Lock Timeout",
-            code: "ERR_DB_LOCKED",
-            count: 5,
-            percentage: 15.6,
-            severity: "INFO",
-            last_seen: new Date().toISOString(),
-            primary_cause: "Parallel shadow collector write lock contention",
-            remediation: "WAL mode (Write-Ahead Logging) va 5000ms busy_timeout o'rnatildi."
-          },
-          {
-            category: "Feature NaN / Scaler Mismatch",
-            code: "ERR_FEATURE_SCALER_NAN",
-            count: 3,
-            percentage: 9.4,
-            severity: "INFO",
-            last_seen: new Date().toISOString(),
-            primary_cause: "Zero tick volume during low liquidity market hour",
-            remediation: "Forward-fill (ffill) median imputation ishga tushirildi."
-          }
-        ]
-      };
+      const res = await fetch("/api/monitoring/error-aggregation");
+      if (!res.ok) throw new Error("Failed to fetch error aggregation report");
+      return await res.json();
     },
     refetchInterval: 10000
   });
 
-  // Fetch Full Telemetry Status from Backend API / Fallback Mock
-  const { data: telemetry, isLoading, isRefetching, refetch } = useQuery({
+  // Fetch Full Telemetry Status from Backend API
+  const { data: telemetry, isLoading, isError, isRefetching, refetch } = useQuery({
     queryKey: ["monitoring_status", activeSymbol],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/monitoring/status?symbol=${activeSymbol}`);
-        if (res.ok) {
-          return await res.json();
-        }
-      } catch (e) {
-        console.warn("Backend API monitoring unavailable, using fallback client telemetry", e);
-      }
-
-      // Mock Fallback Telemetry Data
-      return {
-        timestamp: new Date().toISOString(),
-        system_status: "HEALTHY",
-        total_execution_latency_ms: 5.7,
-        active_symbol: activeSymbol,
-        voting_engine: {
-          component: "Voting Engine",
-          status: "HEALTHY",
-          symbol: activeSymbol,
-          active_strategies_count: 7,
-          agreed_strategies: ["SMC", "Pattern", "Wyckoff", "Auto_Pattern"],
-          agreed_count: 4,
-          conflict_count: 1,
-          final_direction: "BUY",
-          confidence: 0.78,
-          single_strategy_allowed: false,
-          strategy_matrix: {
-            SMC: { name: "Smart Money Concepts", weight: 60, signal: "BUY", confidence: 78, active: true },
-            Pattern: { name: "Harmonic Patterns", weight: 60, signal: "BUY", confidence: 65, active: true },
-            News: { name: "News Breakout & Fundamental", weight: 60, signal: "NEUTRAL", confidence: 0, active: true },
-            Wyckoff: { name: "Wyckoff Schematic", weight: 50, signal: "BUY", confidence: 72, active: true },
-            SR_Volume: { name: "Support/Resistance & Volume", weight: 50, signal: "SELL", confidence: 45, active: true },
-            Auto_Pattern: { name: "Auto Chart Patterns", weight: 50, signal: "BUY", confidence: 80, active: true },
-            Kill_Zones: { name: "ICT Kill Zones Risk Multiplier", weight: 50, signal: "ACTIVE_ZONE", confidence: 100, active: true },
-          },
-          latency_ms: 0.8
-        },
-        lstm_predictor: {
-          component: "LSTM Neural Net Predictor",
-          status: "HEALTHY",
-          pytorch_available: true,
-          execution_device: "cpu",
-          model_trained: true,
-          is_ensemble: true,
-          ensemble_size: 3,
-          input_features_count: 12,
-          scaler_type: "InstitutionalFeatureScaler (12 features)",
-          scaler_calibrated: true,
-          prediction: "UP",
-          confidence: 76.2,
-          probabilities: { HOLD: 8.8, UP: 76.2, DOWN: 15.0 },
-          attention_mechanism: {
-            active: true,
-            attention_weights: [0.04, 0.06, 0.10, 0.08, 0.15, 0.12, 0.09, 0.22, 0.09, 0.05],
-            most_focused_candle_idx: 7
-          },
-          latency_ms: 3.2
-        },
-        ppo_agent: {
-          component: "PPO Reinforcement Learning Agent",
-          status: "HEALTHY",
-          agent_loaded: true,
-          shadow_mode: true,
-          total_shadow_trades: 48,
-          shadow_win_rate_pct: 62.5,
-          wilson_ci_95_lower_bound: 0.485,
-          has_statistical_edge: true,
-          policy_action: "BUY",
-          action_probabilities: { BUY: 0.68, SELL: 0.12, HOLD: 0.20 },
-          risk_multiplier: 1.0,
-          latency_ms: 0.9
-        },
-        signal_merger: {
-          component: "Signal Merger Engine",
-          status: "HEALTHY",
-          symbol: activeSymbol,
-          timeframe: "M5",
-          voting_input: { direction: "BUY", confidence: 0.78, weight: 1.0 },
-          lstm_input: { direction: "UP", confidence: 76.2, calculated_weight: 0.58, formula: "Wilson CI Lower Bound Multiplier" },
-          ppo_input: { direction: "BUY", confidence: 0.85, calculated_weight: 0.25 },
-          agreement: true,
-          weighted_score: 0.72,
-          conflict_weight: 0.0,
-          veto_triggered: false,
-          veto_reason: null,
-          final_direction: "BUY",
-          final_confidence: 0.84,
-          audit_trail: {
-            scores: { weighted_score: 0.72, conflict_weight: 0.0 },
-            weights: { voting_weight: 1.0, lstm_weight: 0.58, stat_weight: 0.25 }
-          },
-          latency_ms: 0.8
-        },
-        active_anomalies_count: 0,
-        anomalies: [
-          {
-            id: "ANOMALY_01",
-            severity: "INFO",
-            component: "Signal Merger",
-            code: "HIGH_CONFIDENCE_AGREEMENT",
-            message: "Voting, LSTM va PPO komponentlari to'liq kelishdi (Agreed = True, Combined Conf = 84%).",
-            timestamp: new Date().toISOString(),
-            action: "Kutilayotgan order parametri tasdiqlandi."
-          }
-        ],
-        summary: {
-          final_signal: "BUY",
-          confidence_pct: 84.0,
-          agreement: true,
-          veto_triggered: false
-        }
-      };
+      const res = await fetch(`/api/monitoring/status?symbol=${activeSymbol}`);
+      if (!res.ok) throw new Error("Failed to fetch telemetry status");
+      return await res.json();
     },
     refetchInterval: 5000
   });
 
-  // Fetch Diagnostic Logs from API / Mock
+  // Fetch Diagnostic Logs from API
   const { data: logsData } = useQuery({
     queryKey: ["monitoring_logs", logFilterLevel, logFilterComp],
     queryFn: async () => {
-      try {
-        const res = await fetch(`/api/monitoring/logs?limit=40&level=${logFilterLevel}&component=${logFilterComp}`);
-        if (res.ok) return await res.json();
-      } catch (e) {
-        console.warn("Logs API fallback used");
-      }
-
-      const mockLogs: LogEntry[] = [
-        {
-          timestamp: new Date(Date.now() - 1000 * 30).toISOString(),
-          symbol: activeSymbol,
-          timeframe: "M5",
-          level: "INFO",
-          component: "Signal Merger",
-          event: "Weighted Merge Decision: BUY (Confidence: 84.0%, Agreement: True)",
-          details: { voting_weight: 1.0, lstm_weight: 0.58, stat_weight: 0.25 }
-        },
-        {
-          timestamp: new Date(Date.now() - 1000 * 60).toISOString(),
-          symbol: activeSymbol,
-          timeframe: "M5",
-          level: "INFO",
-          component: "LSTM Predictor",
-          event: "LSTM Inference Complete: UP (76.2% Conf) via 3-Model Ensemble",
-          details: { latency_ms: 3.2, device: "cpu", attention_peak_idx: 7 }
-        },
-        {
-          timestamp: new Date(Date.now() - 1000 * 90).toISOString(),
-          symbol: activeSymbol,
-          timeframe: "M5",
-          level: "INFO",
-          component: "Voting Engine",
-          event: "7 Strategies Evaluated: 4 BUY, 1 SELL, 2 NEUTRAL. Winner: BUY",
-          details: { agreed: ["SMC", "Pattern", "Wyckoff", "Auto_Pattern"] }
-        },
-        {
-          timestamp: new Date(Date.now() - 1000 * 180).toISOString(),
-          symbol: activeSymbol,
-          timeframe: "M5",
-          level: "INFO",
-          component: "PPO Agent",
-          event: "Shadow Edge Verified: 62.5% Win Rate over 48 Trades. Wilson CI LB = 0.485",
-          details: { risk_multiplier: 1.0 }
-        },
-        {
-          timestamp: new Date(Date.now() - 1000 * 300).toISOString(),
-          symbol: activeSymbol,
-          timeframe: "M5",
-          level: "WARN",
-          component: "Signal Merger",
-          event: "Minor Strategy Disagreement: SR_Volume recommended SELL while SMC recommended BUY",
-          details: { conflict_weight: 0.12, veto_triggered: false }
-        }
-      ];
-
-      return { total_count: mockLogs.length, logs: mockLogs };
+      const res = await fetch(`/api/monitoring/logs?limit=40&level=${logFilterLevel}&component=${logFilterComp}`);
+      if (!res.ok) throw new Error("Failed to fetch diagnostic logs");
+      return await res.json();
     },
     refetchInterval: 7000
   });
