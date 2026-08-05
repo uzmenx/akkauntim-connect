@@ -766,26 +766,6 @@ class TradingBot:
                     lstm_confidence=dl_prediction.get("confidence", 0) / 100.0,
                     shadow_win_rate=shadow_stats["win_rate"],
                     shadow_trade_count=shadow_stats["trade_count"],
-                rl_direction=rl_action,
-                    rl_direction=rl_action
-                )
-            except Exception as e:
-                logger.error(f"[{symbol}] Shadow Merger Tracker xatosi: {e}")
-        # ------------------------------
-
-        # --- SHADOW MERGER TRACKING ---
-        with self.profiler.track("3.3_shadow_merger_tracker"):
-            try:
-                shadow_stats = self.merger_tracker.get_shadow_lstm_stats(symbol)
-                self.merger_tracker.record_signals(
-                    symbol=symbol,
-                    timeframe=self.config.timeframe_major,
-                    voting_direction=portfolio_result.get("signal", "HOLD"),
-                    voting_confidence=1.0,
-                    lstm_direction=dl_prediction.get("prediction", "HOLD"),
-                    lstm_confidence=dl_prediction.get("confidence", 0) / 100.0,
-                    shadow_win_rate=shadow_stats["win_rate"],
-                    shadow_trade_count=shadow_stats["trade_count"],
                     rl_direction=rl_action
                 )
             except Exception as e:
