@@ -221,9 +221,9 @@ export function NotesPage() {
   const filteredNotes = notes.filter((note) => {
     const matchesCat = selectedCategory === "All" || note.category === selectedCategory;
     const matchesQuery =
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+      (note.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (note.content || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (note.tags || []).some((t) => (t || "").toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesCat && matchesQuery;
   });
 

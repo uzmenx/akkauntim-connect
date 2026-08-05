@@ -131,7 +131,7 @@ export function SignalsPage() {
 }
 
 function PendingCard({ p, isGuest, onUnlock, onOpenChart }: { p: PendingOrder; isGuest: boolean; onUnlock: () => void; onOpenChart?: () => void }) {
-  const isBuy = p.type.toLowerCase().includes("buy");
+  const isBuy = (p.type || "").toLowerCase().includes("buy");
   const badge = isBuy ? "bg-success/20 text-success" : "bg-danger/20 text-danger";
   
   return (

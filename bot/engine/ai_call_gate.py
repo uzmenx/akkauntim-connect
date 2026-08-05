@@ -18,7 +18,7 @@ MAX_WAIT_MINUTES = 45
 # deb hisoblab, gate'ni foydasiz qiladi — shuning uchun ATR asosida
 # emas, oddiy nisbiy chegara ishlatiladi (keyingi bosqichda ATR bilan
 # yaxshilash mumkin, lekin MVP uchun bu yetarli).
-BOS_PRICE_CHANGE_THRESHOLD = 0.00005
+BOS_PRICE_CHANGE_PCT = 0.0005  # 0.05% nisbiy o'zgarish
 
 
 def should_call_ai(
@@ -61,7 +61,8 @@ def should_call_ai(
     bos_changed = False
     last_bos = gate_state.get("last_bos_price")
     if current_bos_price is not None and last_bos is not None:
-        if abs(current_bos_price - last_bos) >= BOS_PRICE_CHANGE_THRESHOLD:
+        ref_price = max(abs(current_bos_price), abs(last_bos), 1e-10)
+        if abs(current_bos_price - last_bos) / ref_price >= BOS_PRICE_CHANGE_PCT:
             bos_changed = True
     elif (current_bos_price is None) != (last_bos is None):
         # Biri bor, biri yo'q — bu ham o'zgarish hisoblanadi (masalan,

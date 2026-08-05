@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import pandas as pd
+import threading
 from typing import Optional, Dict, Any
 
 from bot.config import BotConfig
@@ -62,6 +63,7 @@ class TradingBot:
         self.config = config
         self._running = False
         self.last_synced_time = {}
+        self._sync_lock = threading.Lock()
 
         # Core
         self.mt5 = MT5Client(config)
@@ -80,7 +82,7 @@ class TradingBot:
         self.rl_agent = RLAgentRunner()
 
         # Multi-Strategy Portfolio
-        from bot.engine.portfolio_manager import PortfolioManager, SMCStrategy, PatternStrategy, NewsStrategy, WyckoffStrategy, SRVolumeStrategy, AutoPatternStrategy
+        from bot.engine.portfolio_manager import PortfolioManager, SMCStrategy, PatternStrategy, NewsStrategy, WyckoffStrategy, SRVolumeStrategy, AutoPatternStrategy, SwiftStrategy
         self.portfolio_manager = PortfolioManager(self.config)
         self.portfolio_manager.register_strategy(SMCStrategy(self))
         self.portfolio_manager.register_strategy(PatternStrategy(self))
@@ -88,6 +90,7 @@ class TradingBot:
         self.portfolio_manager.register_strategy(WyckoffStrategy(self))
         self.portfolio_manager.register_strategy(SRVolumeStrategy(self))
         self.portfolio_manager.register_strategy(AutoPatternStrategy(self))
+        self.portfolio_manager.register_strategy(SwiftStrategy(self))
 
         # Execution
         self.risk = RiskManager(self.mt5, config, self.state)
@@ -120,6 +123,22 @@ class TradingBot:
         # Deep Learning Predictor (LSTM)
         self.predictor = PredictorEngine()
         self.merger_tracker = ShadowMergerTracker()
+        
+        # Shadow AI Autonomous Mode Components
+        from bot.engine.shadow_decision_engine import ShadowDecisionEngine
+        from bot.engine.transition_manager import TransitionManager
+        self.shadow_engine = ShadowDecisionEngine(
+            predictor=self.predictor,
+            rl_agent=self.rl_agent,
+            config=self.config,
+            merger_tracker=self.merger_tracker
+        )
+        self.transition_manager = TransitionManager(
+            config=self.config,
+            ai_client=self.ai,
+            shadow_engine=self.shadow_engine,
+            predictor=self.predictor
+        )
         
         # Reviewer ichidagi ai_memory ni ham cloud ga ulaymiz
         self.reviewer.ai_memory.sync_client = self.sync
@@ -155,6 +174,29 @@ class TradingBot:
         """Graceful shutdown — Ctrl+C bilan to'xtash."""
         logger.info("Shutdown signali qabul qilindi. Bot to'xtayapti...")
         self._running = False
+
+    def _get_pip_divisor(self, symbol: str) -> float:
+        """MT5 symbol_info orqali to'g'ri pip divisor ni hisoblash."""
+        try:
+            symbol_info = self.mt5.symbol_info(symbol)
+            if symbol_info:
+                digits = symbol_info.digits
+                point = symbol_info.point
+                if digits in [5, 3]:
+                    return point * 10
+                elif digits == 2:
+                    return point * 10
+                elif digits in [1, 0]:
+                    return point
+                elif digits == 4:
+                    return point
+                elif digits >= 6:
+                    return point * 10
+        except Exception as e:
+            logger.debug(f"[{symbol}] _get_pip_divisor xatolik: {e}")
+            
+        # Fallback to the old behavior if symbol_info is unavailable
+        return 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
 
     def _get_smc_data(self, df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """SMC Structure tahlili."""
@@ -211,6 +253,32 @@ class TradingBot:
                 "sr_volume": srm.get_active_zones(symbol, timeframe),
                 "auto_patterns": apm.get_active_patterns(symbol, timeframe)
             }
+            
+            # --- Offline Publisher: Local JSON ga saqlash ---
+            try:
+                import os
+                import json
+                
+                # public/data papkasi yo'lini aniqlash (bot papkasi ichida turibdi, loyiha root-i kerak)
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                data_dir = os.path.join(base_dir, "public", "data")
+                os.makedirs(data_dir, exist_ok=True)
+                
+                chart_data_payload = {
+                    "symbol": symbol,
+                    "timeframe": timeframe,
+                    "candles": candles_list,
+                    "strategy_overlays": strategy_overlays or {}
+                }
+                
+                file_path = os.path.join(data_dir, f"chart_{symbol}_{timeframe}.json")
+                with open(file_path, "w", encoding="utf-8") as f:
+                    json.dump(chart_data_payload, f)
+                    
+            except Exception as io_err:
+                logger.error(f"Local JSON save error for {symbol}: {io_err}")
+            # ------------------------------------------------
+
             if hasattr(self, 'sync') and hasattr(self.sync, 'sync_chart_data'):
                 import hashlib
                 import json
@@ -220,13 +288,20 @@ class TradingBot:
                 
                 if not hasattr(self, '_last_overlays_hash'):
                     self._last_overlays_hash = {}
-                if symbol not in self._last_overlays_hash:
-                    self._last_overlays_hash[symbol] = {}
-                    
-                if self._last_overlays_hash[symbol].get(timeframe) == overlays_hash:
+                
+                with self._sync_lock:
+                    if symbol not in self._last_overlays_hash:
+                        self._last_overlays_hash[symbol] = {}
+                        
+                    if self._last_overlays_hash[symbol].get(timeframe) == overlays_hash:
+                        should_sync = False
+                    else:
+                        self._last_overlays_hash[symbol][timeframe] = overlays_hash
+                        should_sync = True
+                
+                if not should_sync:
                     self.sync.sync_chart_data(symbol, timeframe, candles_list, None)
                 else:
-                    self._last_overlays_hash[symbol][timeframe] = overlays_hash
                     self.sync.sync_chart_data(symbol, timeframe, candles_list, strategy_overlays)
         except Exception as e:
             logger.error(f"Chart sync failed for {symbol}: {e}")
@@ -410,9 +485,10 @@ class TradingBot:
     def _sync_all_timeframes(self, symbol: str, major_strategy_results: Dict[str, Any] = None, base_context: Dict[str, Any] = None):
         """Barcha taymfreymlarni aqlli filtrlash bilan Supabase ga yuklash"""
         timeframes = ["M1", "M5", "M15", "H1", "H4", "D1"]
-        if symbol not in getattr(self, 'last_synced_time', {}):
-            self.last_synced_time = getattr(self, 'last_synced_time', {})
-            self.last_synced_time[symbol] = {}
+        with self._sync_lock:
+            if symbol not in getattr(self, 'last_synced_time', {}):
+                self.last_synced_time = getattr(self, 'last_synced_time', {})
+                self.last_synced_time[symbol] = {}
             
         for tf in timeframes:
             try:
@@ -461,7 +537,8 @@ class TradingBot:
                     if hasattr(minor_srm, 'update_mitigations'): minor_srm.update_mitigations(symbol, tf, current_high, current_low)
                     if hasattr(minor_apm, 'update_mitigations'): minor_apm.update_mitigations(symbol, tf, current_high, current_low)
                 
-                last_time = self.last_synced_time[symbol].get(tf)
+                with self._sync_lock:
+                    last_time = self.last_synced_time[symbol].get(tf)
                 if last_time:
                     df_new = df[df['time'] > last_time]
                 else:
@@ -470,7 +547,8 @@ class TradingBot:
                 if not df_new.empty or strat_res:
                     self._sync_chart(symbol, tf, df_new, strat_res)
                     
-                self.last_synced_time[symbol][tf] = df['time'].max()
+                with self._sync_lock:
+                    self.last_synced_time[symbol][tf] = df['time'].max()
             except Exception as e:
                 logger.error(f"[{symbol}] {tf} ni sinxronlashda xatolik: {e}")
 
@@ -793,100 +871,27 @@ class TradingBot:
                         f"Oldingi qaror: {gate_state.get('last_ai_decision', 'HOLD') if gate_state else 'HOLD'}")
             return
             
-        if not getattr(self.config, "ai_enabled", True):
-            logger.warning(f"[{symbol}] ⚙️ AI-siz rejim faol! Faqat algoritmik qaror chiqariladi.")
-        else:
-            logger.info(f"[{symbol}] AI chaqirilmoqda ({gate_reason})")
-    
-            with self.profiler.track("3.7_ai_decision_api_call"):
+        with self.profiler.track("3.7_ai_decision_transition_manager"):
+            logger.info(f"[{symbol}] TransitionManager orqali qaror olinmoqda ({self.transition_manager.mode.value})")
+            
+            prompt_tuple = None
+            if self.transition_manager.mode.value in ["api", "hybrid"]:
                 prompt = self.prompt_builder.build_trading_prompt(context, symbol, current_price)
-                logger.info(f"[{symbol}] AI Agent ga bozor tahlili yuborilmoqda...")
-                ai_decision = self.ai.get_decision(prompt)
+                system_prompt = getattr(self.config, "ai_system_prompt", "")
+                prompt_tuple = (system_prompt, prompt)
                 
-            if not ai_decision:
-                logger.error(f"[{symbol}] AI javob bermadi! AI-siz algoritmik rejimga o'tilmoqda.")
-
-        if not ai_decision:
-            # Smart Fallback to pure algorithmic decision based on voting_result
-            final_signal = voting_result.get("signal", "HOLD")
-            confidence = voting_result.get("score", 0)
-            reasoning = f"⚙️ [AI-siz Rejim] Sof algoritmik xulosa (Ball: {confidence}). "
-            
-            pip_div = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
-            
-            entry_price = current_price
-            sl_price = None
-            tp_price = None
-            
-            if final_signal in ["BUY", "SELL"]:
-                try:
-                    from bot.engine.confluence import compute_atr, _extract_fresh_zones
-                    atr = compute_atr(df_major)
-                    if atr <= 0:
-                        atr = 15 * pip_div
-                        
-                    smc_for_fallback = smc_result if smc_result else smc_context
-                    direction = "demand" if final_signal == "BUY" else "supply"
-                    
-                    zones = _extract_fresh_zones(smc_for_fallback, direction, current_price, atr, max_distance_atr=3.0)
-                    
-                    if zones:
-                        best_zone = zones[0]  # Eng yaqin zona
-                        zone_top = best_zone["top"]
-                        zone_bottom = best_zone["bottom"]
-                        zone_dist = best_zone["distance_atr"]
-                        
-                        if zone_dist > 0.5:
-                            # Narx uzoqda bo'lsa LIMIT order
-                            final_signal = "LIMIT_BUY" if final_signal == "BUY" else "LIMIT_SELL"
-                            entry_price = zone_top if final_signal == "LIMIT_BUY" else zone_bottom
-                            reasoning += f"Narx uzoqda ({zone_dist:.1f} ATR). {entry_price:.5f} dagi {best_zone['type'].upper()} ga LIMIT qo'yildi. "
-                        else:
-                            # Narx yaqin bo'lsa Market order
-                            reasoning += f"Narx joriy {best_zone['type'].upper()} ichida. Market order. "
-                            entry_price = current_price
-                            
-                        # SL zonasini himoyalash
-                        if final_signal in ["BUY", "LIMIT_BUY"]:
-                            sl_price = zone_bottom - (atr * 0.5)
-                        else:
-                            sl_price = zone_top + (atr * 0.5)
-                    else:
-                        # Zonalar topilmasa, ATR asosida SL
-                        reasoning += "Yaqin SMC topilmadi. ATR asosida kirish. "
-                        entry_price = current_price
-                        if final_signal == "BUY":
-                            sl_price = current_price - (atr * 1.5)
-                        else:
-                            sl_price = current_price + (atr * 1.5)
-                    
-                    # TP = 1:2 RRR
-                    sl_diff = abs(entry_price - sl_price)
-                    if final_signal in ["BUY", "LIMIT_BUY"]:
-                        tp_price = entry_price + (sl_diff * 2.0)
-                    else:
-                        tp_price = entry_price - (sl_diff * 2.0)
-                        
-                except Exception as e:
-                    logger.error(f"Smart Fallback error: {e}")
-                    entry_price = current_price
-                    default_sl_pips = getattr(self.config, "default_sl_pips", 30)
-                    if final_signal == "BUY":
-                        sl_price = current_price - (default_sl_pips * pip_div)
-                        tp_price = current_price + ((default_sl_pips * 2) * pip_div)
-                    elif final_signal == "SELL":
-                        sl_price = current_price + (default_sl_pips * pip_div)
-                        tp_price = current_price - ((default_sl_pips * 2) * pip_div)
-            
-            ai_decision = {
-                "decision": final_signal,
-                "confidence": confidence,
-                "reasoning": reasoning,
-                "risk_pct": self.config.risk_per_trade,
-                "entry_price": entry_price,
-                "stop_loss": sl_price,
-                "take_profit": tp_price
-            }
+            ai_decision = self.transition_manager.get_decision(
+                recent_candles=df_major.to_dict('records') if not df_major.empty else [],
+                obs_data=obs_data,
+                voting_result=voting_result,
+                smc_context=smc_result if smc_result else smc_context,
+                df_major=df_major,
+                current_price=current_price,
+                symbol=symbol,
+                timeframe=self.config.timeframe_major,
+                prompt_data=prompt_tuple,
+                context=context
+            )
 
         final_decision = ai_decision.get("decision", "HOLD")
         reasoning_text = ai_decision.get("reasoning", "")
@@ -952,7 +957,7 @@ class TradingBot:
                 logger.warning(f"Supabase sync xatolik (HOLD signal): {e}")
             return
             
-        pip_divisor = 0.1 if ("XAU" in symbol or "GOLD" in symbol) else (0.01 if "JPY" in symbol else 0.0001)
+        pip_divisor = self._get_pip_divisor(symbol)
         
         entry_price = ai_decision.get("entry_price")
         if entry_price is None:
@@ -1013,10 +1018,11 @@ class TradingBot:
                         order_signal = "SELL_STOP"
                 logger.info(f"[{symbol}] AI '{final_decision}' degandi, lekin narx uzoqligi sababli '{order_signal}' ga avtomatik o'zgartirildi.")
             
+        risk_signal = order_signal.split("_")[0] if "_" in order_signal else order_signal
         with self.profiler.track("4.1_risk_validation"):
             approved, msg, lot = self.risk.validate_trade(
                 symbol=symbol,
-                signal=order_signal if "LIMIT" not in order_signal else order_signal.split("_")[0],
+                signal=risk_signal,
                 confidence=80, # AI o'zi qaror qilyapti
                 stop_loss_price_diff=sl_price_diff,
                 risk_pct=risk_pct

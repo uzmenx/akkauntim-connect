@@ -2,6 +2,10 @@
 title AI Trading Bot - Auto Restart Loop
 cd /d %~dp0
 
+if exist .venv\Scripts\activate.bat (
+    call .venv\Scripts\activate.bat
+)
+
 :loop
 echo ===================================================
 echo [%date% %time%] Bot ishga tushirilmoqda...

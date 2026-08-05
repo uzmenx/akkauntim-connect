@@ -92,12 +92,8 @@ class ZoneRectangleRenderer extends BasePrimitiveRenderer {
       let endX = mediaSize.width;
 
       const getX = (timeVal: string | number) => {
-        let ts: number;
-        if (typeof timeVal === 'string') {
-          ts = new Date(timeVal).getTime() / 1000;
-        } else {
-          ts = timeVal;
-        }
+        const ts = parseRangeTime(timeVal);
+        if (!ts || isNaN(ts)) return null;
         return timeScale.timeToCoordinate(ts as Time);
       };
 

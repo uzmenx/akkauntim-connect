@@ -18,14 +18,14 @@ def aggregate_signals(
     Yetti strategiyaning natijalarini oladi va umumiy risk/signal hisoblaydi.
     Kutilayotgan format: {"signal": "BUY"|"SELL"|"HOLD", "confidence": 0-100}
     """
-    conf_smc = getattr(config, "strategy_weight_smc", 60)
-    conf_pattern = getattr(config, "strategy_weight_pattern", 60)
-    conf_news = getattr(config, "strategy_weight_news", 60)
-    conf_wyckoff = getattr(config, "strategy_weight_wyckoff", 50)
-    conf_sr_volume = getattr(config, "strategy_weight_sr_volume", 50)
-    conf_auto_pattern = getattr(config, "strategy_weight_auto_pattern", 50)
-    conf_kill_zones = getattr(config, "strategy_weight_kill_zones", 50)
-    allow_single = getattr(config, "allow_single_strategy_trade", False)
+    conf_smc = getattr(config, "strategy_weight_smc", 40)
+    conf_pattern = getattr(config, "strategy_weight_pattern", 40)
+    conf_news = getattr(config, "strategy_weight_news", 40)
+    conf_wyckoff = getattr(config, "strategy_weight_wyckoff", 40)
+    conf_sr_volume = getattr(config, "strategy_weight_sr_volume", 40)
+    conf_auto_pattern = getattr(config, "strategy_weight_auto_pattern", 40)
+    conf_kill_zones = getattr(config, "strategy_weight_kill_zones", 40)
+    allow_single = getattr(config, "allow_single_strategy_trade", True)
     
     smc_data = smc_data or {}
     pattern_data = pattern_data or {}

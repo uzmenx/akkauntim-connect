@@ -967,17 +967,9 @@ class LiquidityDetector:
 
 def analyze_market_structure(
     df: pd.DataFrame,
-    config: Optional[dict] = None,
+    config: dict = None,
 ) -> dict:
     """
-    Bozor strukturasini to'liq tahlil qiladi va JSON-mos dict qaytaradi.
-
-    Bu funksiya barcha detektorlarni tartib bilan ishga tushiradi:
-      1. SMCStructure → Pivot/ZigZag/BoS/ChoCh
-      2. OrderBlockDetector → OB'lar
-      3. FVGDetector → FVG'lar
-      4. LiquidityDetector → Likvidlik darajalari
-
     Parameters:
       df : pd.DataFrame
           Columns = [timestamp, open, high, low, close, volume]
@@ -986,7 +978,7 @@ def analyze_market_structure(
           Parametrlar (DEFAULT_CONFIG ga merge qilinadi).
 
     Returns:
-      dict — quyidagi formatda:
+      dict - quyidagi formatda:
       {
         "current_price": float,
         "trend": {"external": "Up Trend"|"Down Trend"|"No Trend",

@@ -499,7 +499,9 @@ export function MonitoringPage() {
   const filteredLogs = logsList.filter(l => {
     if (logSearch) {
       const q = logSearch.toLowerCase();
-      return l.event.toLowerCase().includes(q) || l.component.toLowerCase().includes(q) || l.level.toLowerCase().includes(q);
+      return (l.event || "").toLowerCase().includes(q) || 
+             (l.component || "").toLowerCase().includes(q) || 
+             (l.level || "").toLowerCase().includes(q);
     }
     return true;
   });

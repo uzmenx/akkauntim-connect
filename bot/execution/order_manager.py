@@ -520,10 +520,16 @@ class OrderManager:
             return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli pending order rad etildi", None
 
         point = symbol_info.point
-        pip_size = point * 10
         digits = symbol_info.digits
+        if digits in (3, 5):
+            pip_size = point * 10
+        elif digits == 2:
+            pip_size = point * 10
+        else:
+            pip_size = point
 
-        stop_level_pips = symbol_info.trade_stops_level / 10.0
+        pip_mul = pip_size / point if point > 0 else 10
+        stop_level_pips = symbol_info.trade_stops_level / pip_mul if pip_mul > 0 else 0
         if stop_loss_pips < stop_level_pips:
             stop_loss_pips = stop_level_pips
         if take_profit_pips < stop_level_pips:
@@ -561,7 +567,7 @@ class OrderManager:
             "price": price,
             "sl": broker_sl,
             "tp": tp,
-            "deviation": 20,
+            "deviation": self._symbol_deviation(symbol),
             "magic": magic,
             "comment": comment,
             "type_filling": self._get_filling_mode(symbol),
@@ -663,6 +669,16 @@ class OrderManager:
                 elif order_type == self.mt5.ORDER_TYPE_SELL_LIMIT:
                     if tick.bid >= sl:
                         logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
+                        self.delete_pending_order(ticket)
+                elif order_type == self.mt5.ORDER_TYPE_BUY_STOP:
+                    # BUY_STOP: narx uning SL ga yetsa, setup bekor bo'ladi
+                    if tick.bid <= sl:
+                        logger.info(f"[{symbol}] Buy Stop #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
+                        self.delete_pending_order(ticket)
+                elif order_type == self.mt5.ORDER_TYPE_SELL_STOP:
+                    # SELL_STOP: narx uning SL ga yetsa, setup bekor bo'ladi
+                    if tick.ask >= sl:
+                        logger.info(f"[{symbol}] Sell Stop #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 
     def manage_virtual_shadow_trades(self) -> list:

@@ -13,21 +13,22 @@ class BacktestDataLoader:
         Agar MT5 ishlamayotgan bo'lsa, dummy (soxta) ma'lumot qaytaradi.
         """
         if not mt5.initialize():
-            print("MT5 bilan ulanib bo'lmadi, dummy ma'lumot yaratilmoqda...")
-            return self._generate_dummy_data(date_from, date_to)
+            raise RuntimeError("MT5 bilan ulanib bo'lmadi.")
 
         rates = mt5.copy_rates_range(symbol, timeframe, date_from, date_to)
         
         if rates is None or len(rates) == 0:
-            print(f"{symbol} bo'yicha ma'lumot topilmadi, dummy ma'lumot yaratilmoqda...")
-            return self._generate_dummy_data(date_from, date_to)
+            raise RuntimeError(f"{symbol} bo'yicha ma'lumot topilmadi.")
             
         df = pd.DataFrame(rates)
         df['time'] = pd.to_datetime(df['time'], unit='s')
         return df
         
     def _generate_dummy_data(self, start: datetime, end: datetime) -> pd.DataFrame:
-        """Testing uchun tasodifiy (tebranuvchan) dummy ma'lumotlar."""
+        """
+        WARNING: Faqat test uchun ishlatilishi kerak.
+        Tasodifiy (tebranuvchan) dummy ma'lumotlar yaratadi.
+        """
         import random
         import math
         

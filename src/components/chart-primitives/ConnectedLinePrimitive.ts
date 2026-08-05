@@ -66,14 +66,9 @@ class ConnectedLineRenderer extends BasePrimitiveRenderer {
     }
 
     const getX = (timeVal: string | number) => {
-      let ts: number;
-      if (typeof timeVal === 'string') {
-        ts = new Date(timeVal).getTime() / 1000;
-      } else {
-        ts = timeVal;
-      }
-      let x = timeScale.timeToCoordinate(ts as Time);
-      return x;
+      const ts = parseRangeTime(timeVal);
+      if (!ts || isNaN(ts)) return null;
+      return timeScale.timeToCoordinate(ts as Time);
     };
 
     for (const line of this.lines) {

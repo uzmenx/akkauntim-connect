@@ -43,48 +43,70 @@ export function OfflineSyncManager() {
 
       for (const symbol of SYMBOLS_TO_SYNC) {
         for (const tf of TIMEFRAMES_TO_SYNC) {
-           if (!navigator.onLine) {
-              setSyncState("offline");
-              return;
-           }
+           // Hatto oflayn bo'lsa ham localhost ishlashi mumkin, 
+           // shuning uchun darhol return qilmaymiz, balki faqat Supabase ni chetlab o'tamiz.
+           const isOnline = navigator.onLine;
 
            try {
               const cacheKey = `chartData_${symbol}_${tf}`;
+              let localData: any = null;
               
-              const [
-                { data: candles },
-                { data: smc },
-                { data: harmonic },
-                { data: wyckoff },
-                { data: srVolume },
-                { data: autoPattern }
-              ] = await Promise.all([
-                supabase.from("candles").select("*").eq("symbol", symbol).eq("timeframe", tf).order("time", { ascending: false }).limit(300),
-                supabase.from("smc_zones").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
-                (supabase as any).from("harmonic_patterns").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
-                (supabase as any).from("wyckoff_events").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
-                (supabase as any).from("sr_volume_zones").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
-                (supabase as any).from("auto_patterns").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh")
-              ]);
+              // 1. Oflayn yechim: Eng so'nggi mahalliy JSON ni o'qish (Tezkor kesh)
+              try {
+                  const res = await fetch(`/data/chart_${symbol}_${tf}.json`);
+                  if (res.ok) {
+                      localData = await res.json();
+                  }
+              } catch (e) {
+                  // ignore
+              }
 
-              if (candles && candles.length > 0) {
-                 const formattedCandles = [...candles].reverse().map((c: any) => ({
-                    time: Math.floor(new Date(c.time).getTime() / 1000),
-                    open: Number(c.open),
-                    high: Number(c.high),
-                    low: Number(c.low),
-                    close: Number(c.close),
-                    volume: c.volume ? Number(c.volume) : 0,
-                  }));
-
+              if (localData && localData.candles) {
                   await set(cacheKey, {
-                    candles: formattedCandles,
-                    smc: smc || [],
-                    harmonic: harmonic || [],
-                    wyckoff: wyckoff || [],
-                    srVolume: srVolume || [],
-                    autoPattern: autoPattern || []
+                    candles: localData.candles,
+                    smc: localData.strategy_overlays?.smc || [],
+                    harmonic: localData.strategy_overlays?.harmonic || [],
+                    wyckoff: localData.strategy_overlays?.wyckoff || [],
+                    srVolume: localData.strategy_overlays?.sr_volume || [],
+                    autoPattern: localData.strategy_overlays?.auto_patterns || []
                   }).catch(() => null);
+              } else if (isOnline) {
+                  // 2. Agar mahalliy fayl yo'q bo'lsa va onlayn bo'lsak Supabase dan tortamiz
+                  const [
+                    { data: candles },
+                    { data: smc },
+                    { data: harmonic },
+                    { data: wyckoff },
+                    { data: srVolume },
+                    { data: autoPattern }
+                  ] = await Promise.all([
+                    supabase.from("candles").select("*").eq("symbol", symbol).eq("timeframe", tf).order("time", { ascending: false }).limit(300),
+                    supabase.from("smc_zones").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
+                    (supabase as any).from("harmonic_patterns").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
+                    (supabase as any).from("wyckoff_events").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
+                    (supabase as any).from("sr_volume_zones").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh"),
+                    (supabase as any).from("auto_patterns").select("*").eq("symbol", symbol).eq("timeframe", tf).eq("status", "fresh")
+                  ]);
+
+                  if (candles && candles.length > 0) {
+                     const formattedCandles = [...candles].reverse().map((c: any) => ({
+                        time: Math.floor(new Date(c.time).getTime() / 1000),
+                        open: Number(c.open),
+                        high: Number(c.high),
+                        low: Number(c.low),
+                        close: Number(c.close),
+                        volume: c.volume ? Number(c.volume) : 0,
+                      }));
+
+                      await set(cacheKey, {
+                        candles: formattedCandles,
+                        smc: smc || [],
+                        harmonic: harmonic || [],
+                        wyckoff: wyckoff || [],
+                        srVolume: srVolume || [],
+                        autoPattern: autoPattern || []
+                      }).catch(() => null);
+                  }
               }
            } catch (e) {
               // Ignore individual sync errors

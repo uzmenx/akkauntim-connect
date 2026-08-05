@@ -892,7 +892,7 @@ function PositionRow({ p, onClick }: { p: Position; onClick?: () => void }) {
 }
 
 function PendingRow({ o, onClick }: { o: PendingOrder; onClick?: () => void }) {
-  const isBuy = o.type.toLowerCase().startsWith("buy");
+  const isBuy = (o.type || "").toLowerCase().startsWith("buy");
   return (
     <div
       onClick={onClick}

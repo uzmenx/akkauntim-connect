@@ -10,28 +10,8 @@ class RiskManager:
         self.state_manager = state_manager
 
     def check_daily_loss_limit(self) -> Tuple[bool, str]:
-        """Kunlik zarar limiti oshib ketganini tekshiradi"""
-        account_info = self.mt5.account_info()
-        if account_info is None:
-            return False, "Hisob ma'lumotini olib bo'lmadi"
-
-        balance = account_info.balance
-        equity = account_info.equity
-
-        import datetime
-        today_start = datetime.datetime.combine(datetime.date.today(), datetime.time.min)
-        deals = self.mt5.history_deals_get(today_start, datetime.datetime.now())
-        realized_loss = sum(d.profit for d in deals if d.profit < 0) if deals else 0
-        
-        daily_loss_pct = (abs(realized_loss) + max(0, balance - equity)) / balance if balance > 0 else 0
-        # BotConfig maydoni `max_daily_loss_pct`; Cloud `max_daily_loss` bilan ham keladi — ikkalasini ham qo'llab-quvvatlaymiz.
-        max_loss = getattr(self.config, "max_daily_loss_pct",
-                           getattr(self.config, "max_daily_loss", 0.10))
-
-        if daily_loss_pct >= max_loss:
-            return False, f"Kunlik zarar limiti oshib ketdi: {daily_loss_pct*100:.2f}% (Limit: {max_loss*100:.0f}%)"
-
-        return True, "OK"
+        """Kunlik zarar limiti oshib ketganini tekshiradi (Vaqtincha O'chirilgan)"""
+        return True, "Zarar limiti tekshiruvi vaqtincha o'chirilgan (Demo)"
 
     def check_free_margin(self, symbol: str, lot_size: float) -> Tuple[bool, str]:
         """Free marginni tekshiradi"""

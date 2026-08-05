@@ -3,25 +3,31 @@ import numpy as np
 
 def calculate_zigzag(df: pd.DataFrame, window: int = 5) -> pd.Series:
     """
-    Translates the ZigZag logic with N-bar pivot detection.
+    Translates the ZigZag logic using vectorized numpy approach for speed.
     """
+    if df.empty or len(df) < window * 2:
+        return pd.Series(dtype=float)
+        
     highs = df['high'].values
     lows = df['low'].values
+    n = len(df)
+    
+    # 1. Vectorized rolling max/min
+    high_rolls = df['high'].rolling(window=window*2 + 1, center=True, min_periods=1).max().values
+    low_rolls = df['low'].rolling(window=window*2 + 1, center=True, min_periods=1).min().values
+    
+    # 2. Find raw pivots
+    is_peak = (highs == high_rolls)
+    is_trough = (lows == low_rolls)
+    
     pivots = pd.Series(index=df.index, dtype=float)
     pivots[:] = np.nan
+    pivots[is_peak] = highs[is_peak]
+    pivots[is_trough] = lows[is_trough]
     
-    for i in range(window, len(df) - window):
-        # Check if it's a swing high
-        if highs[i] == max(highs[i-window:i+window+1]):
-            pivots.iloc[i] = highs[i]
-        # Check if it's a swing low  
-        elif lows[i] == min(lows[i-window:i+window+1]):
-            pivots.iloc[i] = lows[i]
-    
-    # Remove consecutive same-direction pivots
     result = pivots.dropna()
     
-    # Keep alternating highs and lows
+    # Keep alternating highs and lows (vectorized-like filter)
     if not result.empty:
         filtered_idx = []
         last_type = None

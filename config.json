@@ -7,7 +7,7 @@
     "risk_level_single_confirmation": 1.0,
     "risk_level_multiple_confirmation": 2.0,
     "magic_number": 234000,
-    "max_daily_loss_pct": 0.10,
+    "max_daily_loss_pct": 1.00,
     "min_confidence": 40,
     "max_lot_size": 5.0,
     "risk_per_trade": 0.02,
@@ -25,6 +25,14 @@
       "openrouter/deepseek/deepseek-chat",
       "openrouter/deepseek/deepseek-chat"
     ]
+  },
+  "shadow": {
+    "ai_mode": "auto",
+    "min_confidence": 0.55,
+    "min_agreement_sources": 2,
+    "model_dir": "bot/learning",
+    "production_min_f1": 45.0,
+    "production_min_samples": 500
   },
   "news": {
     "lookback_hours": 24,

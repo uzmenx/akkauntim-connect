@@ -1235,6 +1235,54 @@ class PredictorEngine:
         dist = dataset.get_class_distribution()
         return dist
 
+    def evaluate_production_readiness(self, symbol=None) -> dict:
+        """
+        Model production uchun tayyorligini tekshirish.
+        Returns: {"ready": bool, "reasons": [...], "metrics": {...}}
+        """
+        reasons = []
+        metrics = {}
+        
+        target_symbol = symbol or self.symbol
+        dataset = ShadowDataset(self.db_path, seq_length=getattr(self, 'seq_length', 10), split='all', symbol=target_symbol)
+        total = len(dataset)
+        metrics["total_samples"] = total
+        
+        min_samples = 500
+        if total < min_samples:
+            reasons.append(f"Kam dataset: {total}/{min_samples}")
+            
+        dist = dataset.get_class_distribution()
+        for cls, count in dist.get("class_counts", {}).items():
+            if count < total * 0.1:
+                reasons.append(f"Class {cls} juda kam: {count} ({count/total*100:.0f}%)")
+                
+        if self.use_ensemble:
+            for i in range(self.ensemble_size):
+                p = self.model_path.replace('.pth', f'_ens_{i}.pth')
+                if not os.path.exists(p):
+                    reasons.append(f"Ensemble model {i} topilmadi: {p}")
+        elif not os.path.exists(self.model_path):
+            reasons.append(f"Model topilmadi: {self.model_path}")
+            
+        if self.model or getattr(self, 'ensemble_models', None):
+            try:
+                ab_result = self.compare_models_ab(target_symbol=target_symbol)
+                macro_f1 = ab_result.get("model_b_new", {}).get("macro_f1", 0)
+                metrics["macro_f1"] = macro_f1
+                if macro_f1 < 45.0:
+                    reasons.append(f"Macro F1 past: {macro_f1}% (min 45%)")
+            except Exception:
+                reasons.append("F1 hisoblashda xato, A/B taqqoslash o'tmadi")
+        else:
+            reasons.append("Model yuklanmagan")
+            
+        return {
+            "ready": len(reasons) == 0,
+            "reasons": reasons,
+            "metrics": metrics
+        }
+
     def predict(self, recent_candles: list) -> dict:
         """
         Oxirgi shamlarni (masalan, 10 ta) olib, 12 xususiyat asosida keyingi harakatni bashorat qilish.

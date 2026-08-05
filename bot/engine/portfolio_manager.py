@@ -31,11 +31,11 @@ class PortfolioManager:
     
     # Qaysi strategiya qaysi rejimda faol va ishonchli ishlashini belgilovchi xarita
     REGIME_STRATEGY_MAP = {
-        "TREND": ["SMC", "Wyckoff", "Pattern", "Swift"],
-        "RANGE": ["SR_Volume", "Pattern", "Wyckoff", "Swift"],
-        "VOLATILE": ["News", "Auto_Pattern", "Pattern", "Swift"],
-        "BLACK_SWAN": [], # Barcha strategiyalar to'xtatiladi, faqat himoya
-        "UNKNOWN": ["SMC", "News"]
+        "TREND": ["SMC", "Wyckoff", "Pattern", "Swift", "SR_Volume", "Auto_Pattern"],
+        "RANGE": ["SR_Volume", "Pattern", "Wyckoff", "Swift", "Auto_Pattern", "SMC"],
+        "VOLATILE": ["News", "Auto_Pattern", "Pattern", "Swift", "SMC", "Wyckoff"],
+        "BLACK_SWAN": [],
+        "UNKNOWN": ["SMC", "Pattern", "News", "Wyckoff", "SR_Volume", "Auto_Pattern", "Swift"],
     }
 
     def __init__(self, config):

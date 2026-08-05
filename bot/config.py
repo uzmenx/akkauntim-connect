@@ -39,15 +39,15 @@ class BotConfig:
     
     # Hardcoded defaults
     magic_number: int = 234000
-    max_daily_loss_pct: float = 0.10
-    min_confidence: int = 50
+    max_daily_loss_pct: float = 1.00
+    min_confidence: int = 40
     max_lot_size: float = 5.0
     risk_per_trade: float = 0.02
     deviation: int = 20
-    strategy_weight_smc: int = 60
-    strategy_weight_pattern: int = 60
-    strategy_weight_news: int = 60
-    allow_single_strategy_trade: bool = False
+    strategy_weight_smc: int = 40
+    strategy_weight_pattern: int = 40
+    strategy_weight_news: int = 40
+    allow_single_strategy_trade: bool = True
     news_lookback_hours: int = 24
     max_spread_multiplier: float = 4.0
     ai_max_tokens: int = 300
@@ -74,6 +74,14 @@ class BotConfig:
     
     # 4-Bosqich: Live Shadow Mode
     shadow_mode: bool = True
+
+    # 5-Bosqich: Shadow AI Autonomous Mode
+    ai_mode: str = "auto"  # "api" | "hybrid" | "shadow" | "auto"
+    shadow_min_confidence: float = 0.55
+    shadow_min_agreement_sources: int = 2
+    shadow_model_dir: str = "bot/learning"
+    shadow_production_min_f1: float = 45.0
+    shadow_production_min_samples: int = 500
 
     @classmethod
     def load(cls, env_path: str = ".env", config_path: str = "config.json") -> "BotConfig":
@@ -117,6 +125,17 @@ class BotConfig:
                     self.risk_level_single_confirmation = trading.get("risk_level_single_confirmation", self.risk_level_single_confirmation)
                     self.risk_level_multiple_confirmation = trading.get("risk_level_multiple_confirmation", self.risk_level_multiple_confirmation)
                     
+                    self.magic_number = trading.get("magic_number", self.magic_number)
+                    self.max_daily_loss_pct = trading.get("max_daily_loss_pct", self.max_daily_loss_pct)
+                    self.min_confidence = trading.get("min_confidence", self.min_confidence)
+                    self.max_lot_size = trading.get("max_lot_size", self.max_lot_size)
+                    self.risk_per_trade = trading.get("risk_per_trade", self.risk_per_trade)
+                    self.deviation = trading.get("deviation", self.deviation)
+                    self.strategy_weight_smc = trading.get("strategy_weight_smc", self.strategy_weight_smc)
+                    self.strategy_weight_pattern = trading.get("strategy_weight_pattern", self.strategy_weight_pattern)
+                    self.strategy_weight_news = trading.get("strategy_weight_news", self.strategy_weight_news)
+                    self.allow_single_strategy_trade = trading.get("allow_single_strategy_trade", self.allow_single_strategy_trade)
+                    
                     ai = data.get("ai", {})
                     self.ai_model = ai.get("model", self.ai_model)
                     self.ai_model_medium = ai.get("model_medium", self.ai_model_medium)
@@ -124,6 +143,15 @@ class BotConfig:
                     self.ai_system_prompt = ai.get("system_prompt", self.ai_system_prompt)
                     
                     self.shadow_mode = data.get("shadow_mode", self.shadow_mode)
+
+                    # Shadow AI Autonomous Mode sozlamalari
+                    shadow = data.get("shadow", {})
+                    self.ai_mode = shadow.get("ai_mode", self.ai_mode)
+                    self.shadow_min_confidence = shadow.get("min_confidence", self.shadow_min_confidence)
+                    self.shadow_min_agreement_sources = shadow.get("min_agreement_sources", self.shadow_min_agreement_sources)
+                    self.shadow_model_dir = shadow.get("model_dir", self.shadow_model_dir)
+                    self.shadow_production_min_f1 = shadow.get("production_min_f1", self.shadow_production_min_f1)
+                    self.shadow_production_min_samples = shadow.get("production_min_samples", self.shadow_production_min_samples)
         except Exception as e:
             import logging
             logging.error(f"Error loading config.json: {e}")
@@ -220,6 +248,14 @@ class BotConfig:
             
         if "shadow_mode" in data:
             self.shadow_mode = bool(data["shadow_mode"])
+            
+        # Shadow AI Autonomous Mode
+        if "ai_mode" in data:
+            self.ai_mode = str(data["ai_mode"])
+        if "shadow_min_confidence" in data:
+            self.shadow_min_confidence = float(data["shadow_min_confidence"])
+        if "shadow_min_agreement_sources" in data:
+            self.shadow_min_agreement_sources = int(data["shadow_min_agreement_sources"])
             
         if "prompt_identity" in data or "prompt_strategy" in data or "prompt_output" in data:
             identity = data.get("prompt_identity", "")

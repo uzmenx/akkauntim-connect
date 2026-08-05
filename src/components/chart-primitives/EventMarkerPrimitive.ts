@@ -17,33 +17,32 @@ export class EventMarkerPrimitive {
     events: EventMarkerData[],
     seriesData: any[] // to snap to closest candle
   ) {
-    const markers: SeriesMarker<Time>[] = events.map(ev => {
-      let ts: number;
-      if (typeof ev.time === 'string') {
-        ts = new Date(ev.time).getTime() / 1000;
-      } else {
-        ts = ev.time;
+    const safeParseTime = (t: any): number => {
+      if (!t) return 0;
+      if (typeof t === 'number') return t > 2000000000 ? Math.floor(t / 1000) : t;
+      if (typeof t === 'string') {
+        const ms = new Date(t).getTime();
+        return isNaN(ms) ? 0 : Math.floor(ms / 1000);
       }
+      return 0;
+    };
+
+    const markers: SeriesMarker<Time>[] = events.map(ev => {
+      const ts = safeParseTime(ev.time);
       
       // snap to closest candle
-      let closestTime: Time | null = null;
-      if (seriesData.length > 0) {
+      let finalTime: Time = ts as Time;
+      if (seriesData.length > 0 && ts > 0) {
         let minDiff = Infinity;
         for (const candle of seriesData) {
-          const cTime = (typeof candle.time === 'object') 
-             ? new Date(candle.time.year + '-' + candle.time.month + '-' + candle.time.day).getTime()/1000 
-             : typeof candle.time === 'string' 
-                ? new Date(candle.time).getTime() / 1000 
-                : Number(candle.time);
+          const cTime = typeof candle.time === 'number' ? candle.time : safeParseTime(candle.time);
           const diff = Math.abs(cTime - ts);
           if (diff < minDiff) {
             minDiff = diff;
-            closestTime = candle.time as Time;
+            finalTime = candle.time as Time;
           }
         }
       }
-      
-      let finalTime = closestTime !== null ? closestTime : (ts as Time);
       
       const defaultColor = ev.type === 'buy' ? '#10b981' : ev.type === 'sell' ? '#f43f5e' : '#3b82f6';
       const defaultPosition = ev.type === 'buy' ? 'belowBar' : ev.type === 'sell' ? 'aboveBar' : 'inBar';

@@ -22,6 +22,14 @@ interface TradingChartModalProps {
 
 type Timeframe = "M1" | "M5" | "M15" | "H1" | "H4" | "D1";
 
+const parseTimeToSec = (t: any) => {
+  if (!t) return 0;
+  if (typeof t === "number") {
+    return t > 2000000000 ? Math.floor(t / 1000) : t;
+  }
+  return Math.floor(new Date(t).getTime() / 1000);
+};
+
 const getAlpha = (confidence: number | undefined, maxAlpha: number, minAlpha: number) => {
   if (confidence === undefined || confidence === null) return maxAlpha;
   const ratio = Math.max(0, Math.min(100, confidence)) / 100;
@@ -154,7 +162,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
 
   const availableSymbolsObj = (statusData?.available_symbols as Record<string, string[]>) || {};
   const allSymbols = Object.values(availableSymbolsObj).flat();
-  const filteredSymbols = allSymbols.filter(s => s.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredSymbols = allSymbols.filter(s => (s || "").toLowerCase().includes((searchQuery || "").toLowerCase()));
   const loadedSymbols = (settingsData?.symbols as string[]) || [];
 
   const handleSymbolSelect = (sym: string) => {
@@ -197,35 +205,39 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       const cacheKey = `chartData_${activeSymbol}_${timeframe}`;
       
       try {
-        // Try to load cached data for offline support
+        // 1. Avval IndexedDB keshdan o'qiymiz (oflayn tezkor yuklanish)
         const cached = await get(cacheKey).catch(() => null);
         if (cached && isMounted) {
-          if (cached.candles && cached.candles.length > 0) setCandlesData(cached.candles);
-          if (cached.smc && showSMC) setSmcZonesData(cached.smc);
-          if (cached.harmonic && showHarmonic) setHarmonicData(cached.harmonic);
-          if (cached.wyckoff && showWyckoff) setWyckoffData(cached.wyckoff);
-          if (cached.srVolume && showSRVolume) setSrVolumeData(cached.srVolume);
-          if (cached.autoPattern && showAutoPattern) setAutoPatternData(cached.autoPattern);
+          if (cached.candles?.length > 0) setCandlesData(cached.candles);
+          // MUHIM: Toggle holatidan qat'iy nazar BARCHA strategiya datalarini state ga yozamiz.
+          // Aks holda foydalanuvchi SMC tugmasini bosganda data bo'sh bo'ladi.
+          if (cached.smc) setSmcZonesData(cached.smc);
+          if (cached.harmonic) setHarmonicData(cached.harmonic);
+          if (cached.wyckoff) setWyckoffData(cached.wyckoff);
+          if (cached.srVolume) setSrVolumeData(cached.srVolume);
+          if (cached.autoPattern) setAutoPatternData(cached.autoPattern);
           
-          if (cached.candles && cached.candles.length > 0) {
-             setIsLoading(false); // Stop loading early if we have cache
+          if (cached.candles?.length > 0) {
+             setIsLoading(false);
           }
         }
         
-        let newSmc = showSMC ? [] : cached?.smc || [];
-        let newHarmonic = showHarmonic ? [] : cached?.harmonic || [];
-        let newWyckoff = showWyckoff ? [] : cached?.wyckoff || [];
-        let newSrVolume = showSRVolume ? [] : cached?.srVolume || [];
-        let newAutoPattern = showAutoPattern ? [] : cached?.autoPattern || [];
-
-        // Fetch fresh candles
-        const { data: candles, error: candlesError } = await supabase
-          .from("candles")
-          .select("*")
-          .eq("symbol", activeSymbol)
-          .eq("timeframe", timeframe)
-          .order("time", { ascending: false })
-          .limit(300);
+        // 2. Supabase'dan yangi kandel va BARCHA strategiya ma'lumotlarini tortamiz
+        const [
+          { data: candles, error: candlesError },
+          { data: zones },
+          { data: harmonics },
+          { data: wyckoffs },
+          { data: sr },
+          { data: ap }
+        ] = await Promise.all([
+          supabase.from("candles").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).order("time", { ascending: false }).limit(300),
+          supabase.from("smc_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
+          (supabase as any).from("harmonic_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
+          (supabase as any).from("wyckoff_events").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
+          (supabase as any).from("sr_volume_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh"),
+          (supabase as any).from("auto_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh")
+        ]);
 
         if (candlesError) throw candlesError;
 
@@ -243,45 +255,55 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
           volume: c.volume ? Number(c.volume) : 0,
         }));
 
-        if (isMounted) setCandlesData(formattedCandles);
-
-        if (showSMC) {
-          const { data: zones } = await supabase.from("smc_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
-          if (zones) { newSmc = zones; if (isMounted) setSmcZonesData(zones); }
-        }
-
-        if (showHarmonic) {
-          const { data: harmonics } = await (supabase as any).from("harmonic_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
-          if (harmonics) { newHarmonic = harmonics; if (isMounted) setHarmonicData(harmonics); }
-        }
-
-        if (showWyckoff) {
-          const { data: wyckoffs } = await (supabase as any).from("wyckoff_events").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
-          if (wyckoffs) { newWyckoff = wyckoffs; if (isMounted) setWyckoffData(wyckoffs); }
-        }
-
-        if (showSRVolume) {
-          const { data: sr } = await (supabase as any).from("sr_volume_zones").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
-          if (sr) { newSrVolume = sr; if (isMounted) setSrVolumeData(sr); }
-        }
-
-        if (showAutoPattern) {
-          const { data: ap } = await (supabase as any).from("auto_patterns").select("*").eq("symbol", activeSymbol).eq("timeframe", timeframe).eq("status", "fresh");
-          if (ap) { newAutoPattern = ap; if (isMounted) setAutoPatternData(ap); }
+        if (isMounted) {
+          setCandlesData(formattedCandles);
+          setSmcZonesData(zones || []);
+          setHarmonicData(harmonics || []);
+          setWyckoffData(wyckoffs || []);
+          setSrVolumeData(sr || []);
+          setAutoPatternData(ap || []);
         }
         
-        // Cache the fresh data
+        // Keshga saqlash
         await set(cacheKey, {
           candles: formattedCandles,
-          smc: newSmc,
-          harmonic: newHarmonic,
-          wyckoff: newWyckoff,
-          srVolume: newSrVolume,
-          autoPattern: newAutoPattern
+          smc: zones || [],
+          harmonic: harmonics || [],
+          wyckoff: wyckoffs || [],
+          srVolume: sr || [],
+          autoPattern: ap || []
         }).catch(() => null);
 
       } catch (err: any) {
-        // If we have cached data, silently fail
+        console.warn("Supabase fetch failed, trying local fallback:", err);
+        try {
+           // Oflayn/Fallback: Python bot saqlagan lokal JSON fayldan o'qish
+           const res = await fetch(`/data/chart_${activeSymbol}_${timeframe}.json`);
+           if (res.ok) {
+              const localData = await res.json();
+              if (localData.candles && isMounted) {
+                 setCandlesData(localData.candles);
+                 setSmcZonesData(localData.strategy_overlays?.smc || []);
+                 setHarmonicData(localData.strategy_overlays?.harmonic || []);
+                 setWyckoffData(localData.strategy_overlays?.wyckoff || []);
+                 setSrVolumeData(localData.strategy_overlays?.sr_volume || []);
+                 setAutoPatternData(localData.strategy_overlays?.auto_patterns || []);
+                 
+                 await set(cacheKey, {
+                    candles: localData.candles,
+                    smc: localData.strategy_overlays?.smc || [],
+                    harmonic: localData.strategy_overlays?.harmonic || [],
+                    wyckoff: localData.strategy_overlays?.wyckoff || [],
+                    srVolume: localData.strategy_overlays?.sr_volume || [],
+                    autoPattern: localData.strategy_overlays?.auto_patterns || []
+                 }).catch(() => null);
+                 return;
+              }
+           }
+        } catch (localErr) {
+           console.warn("Local fallback failed:", localErr);
+        }
+        
         const cached = await get(cacheKey).catch(() => null);
         if (!cached?.candles?.length && isMounted) {
            setError(err.message || "Ma'lumotlarni yuklashda xatolik yuz berdi");
@@ -294,7 +316,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     fetchChartData();
 
     return () => { isMounted = false; };
-  }, [isOpen, activeSymbol, timeframe, showSMC, showFan, fanData, showHarmonic, showWyckoff, showSRVolume, showAutoPattern]);
+  }, [isOpen, activeSymbol, timeframe]);
 
   useEffect(() => {
     if (!isOpen || !chartContainerRef.current || isEmpty || isLoading || error || candlesData.length === 0) return;
@@ -333,9 +355,19 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     chartRef.current = chart;
 
     let candlestickSeries: ISeriesApi<"Candlestick">;
-    const isJpy = activeSymbol.includes("JPY");
-    const precision = isJpy ? 3 : 5;
-    const minMove = isJpy ? 0.001 : 0.00001;
+    let precision = 5;
+    let minMove = 0.00001;
+    
+    // Asset-Agnostic Y-Scale
+    if (candlesData.length > 0) {
+       const avgPrice = candlesData[0].close;
+       if (avgPrice > 5000) { precision = 2; minMove = 0.01; } // BTC, US30, NAS100
+       else if (avgPrice > 1000) { precision = 2; minMove = 0.01; } // XAU, ETH
+       else if (avgPrice > 50) { precision = 3; minMove = 0.001; } // JPY pairs, WTI
+       else if (avgPrice > 2) { precision = 4; minMove = 0.0001; } // Some altcoins
+       else if (avgPrice < 0.01) { precision = 7; minMove = 0.0000001; } // SHIB, PEPE
+       else { precision = 5; minMove = 0.00001; } // Major forex EURUSD, GBPUSD
+    }
 
     const candleOptions = {
       upColor: "#10b981",
@@ -586,7 +618,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     if (showSRVolume && srVolumeData && srVolumeData.length > 0) {
       srVolumeData.forEach(z => {
         const margin = Number(z.price) * 0.001; // 0.1% margin for thickness
-        const isSupport = z.type.toLowerCase().includes('support') || z.type.toLowerCase().includes('demand');
+        const isSupport = (z.type || '').toLowerCase().includes('support') || (z.type || '').toLowerCase().includes('demand');
         aggregatedZones.push({
           top: Number(z.price) + margin,
           bottom: Number(z.price) - margin,
@@ -626,12 +658,28 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     }
 
     if (showWyckoff && wyckoffData && wyckoffData.length > 0 && candlesData.length > 0) {
-      const events: EventMarkerData[] = wyckoffData.map(w => ({
-        time: w.formed_at || w.time,
-        text: w.phase,
+      const events: EventMarkerData[] = wyckoffData.map(w => {
+        const rawTime = w.formed_at || w.time || w.event_time;
+        const evTimeSec = parseTimeToSec(rawTime);
+        let snapTime = evTimeSec;
+        
+        // Volume kabi bar_index orqali bog'lash
+        const bIdx = w.event_bar_index ?? w.bar_index;
+        if (bIdx !== undefined && bIdx !== null && bIdx >= 0 && bIdx < candlesData.length) {
+            snapTime = candlesData[bIdx].time;
+        } else if (candlesData.length > 0) {
+           const closest = candlesData.reduce((prev, curr) => Math.abs(curr.time - evTimeSec) < Math.abs(prev.time - evTimeSec) ? curr : prev);
+           if (Math.abs(closest.time - evTimeSec) < 86400 * 2) {
+               snapTime = closest.time;
+           }
+        }
+        return {
+        time: snapTime,
+        text: w.phase || w.event_type || 'Event',
         type: 'neutral', // use neutral so we can customize color
         color: `rgba(59, 130, 246, ${getAlpha(w.confidence, 1, 0.3)})`,
-      }));
+        };
+      });
 
       eventMarkerRef.current = new EventMarkerPrimitive(series, events, candlesData);
     }
@@ -663,17 +711,37 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     // Check if auto patterns have lines data in their JSON (Orange)
     if (showAutoPattern && autoPatternData && autoPatternData.length > 0) {
       autoPatternData.forEach(a => {
-        if (a.lines && Array.isArray(a.lines)) {
-           a.lines.forEach((l: any) => {
-              aggregatedLines.push({
-                ...l,
-                color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`
-              });
-           });
-        } else if (a.points && Array.isArray(a.points)) {
+        let pts: any[] = [];
+        if (a.pivots && Array.isArray(a.pivots) && a.pivots.length > 0) {
+           // Map pivots directly
+           const snap = (t: number) => {
+              if (candlesData.length === 0) return t;
+              return candlesData.reduce((prev, curr) => Math.abs(curr.time - t) < Math.abs(prev.time - t) ? curr : prev).time;
+           };
+           pts = a.pivots.map((p: any) => ({
+              time: snap(parseTimeToSec(p.time || p.date)),
+              price: Number(p.price || p.val)
+           }));
+        } else if (a.pattern_points) {
+           // For simple cases where points are given in a dict
+           const snap = (t: number) => {
+              if (candlesData.length === 0) return t;
+              return candlesData.reduce((prev, curr) => Math.abs(curr.time - t) < Math.abs(prev.time - t) ? curr : prev).time;
+           };
+           const keys = Object.keys(a.pattern_points).sort(); // Sort keys like A, B, C or 0, 1, 2
+           pts = keys.map(k => {
+               const p = a.pattern_points[k];
+               return {
+                  time: snap(parseTimeToSec(p.time || p.date)),
+                  price: Number(p.price || p.val)
+               };
+           }).filter(p => !isNaN(p.price));
+        }
+
+        if (pts.length > 1) {
            aggregatedLines.push({
-             points: a.points,
-             color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.3)})`,
+             points: pts,
+             color: `rgba(249, 115, 22, ${getAlpha(a.confidence, 1, 0.4)})`,
              lineWidth: 2
            });
         }
@@ -683,12 +751,41 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
     // Check if harmonic patterns have points/lines (Gold/Yellow)
     if (showHarmonic && harmonicData && harmonicData.length > 0) {
       harmonicData.forEach(h => {
+        let pts: any[] = [];
         if (h.points && Array.isArray(h.points)) {
+            pts = h.points;
+        } else if (h.x_time && h.x_price) {
+            // Reconstruct points array from x, a, b, c, d columns
+            const tX = parseTimeToSec(h.x_time);
+            const tA = parseTimeToSec(h.a_time);
+            const tB = parseTimeToSec(h.b_time);
+            const tC = parseTimeToSec(h.c_time);
+            const tD = parseTimeToSec(h.d_time);
+            
+            // Map to closest candle time for snapping or use exact bar_index
+            const snap = (t: number, bIdx?: number) => {
+               if (bIdx !== undefined && bIdx !== null && bIdx >= 0 && bIdx < candlesData.length) {
+                   return candlesData[bIdx].time;
+               }
+               if (candlesData.length === 0) return t;
+               return candlesData.reduce((prev, curr) => Math.abs(curr.time - t) < Math.abs(prev.time - t) ? curr : prev).time;
+            };
+            
+            pts = [
+                { time: snap(tX, h.x_bar_index), price: Number(h.x_price) },
+                { time: snap(tA, h.a_bar_index), price: Number(h.a_price) },
+                { time: snap(tB, h.b_bar_index), price: Number(h.b_price) },
+                { time: snap(tC, h.c_bar_index), price: Number(h.c_price) },
+                { time: snap(tD, h.d_bar_index), price: Number(h.d_price) }
+            ];
+        }
+        
+        if (pts.length > 0) {
           aggregatedLines.push({
-             points: h.points,
-             color: `rgba(234, 179, 8, ${getAlpha(h.confidence, 1, 0.3)})`,
+             points: pts,
+             color: `rgba(234, 179, 8, ${getAlpha(h.confidence, 1, 0.5)})`,
              lineWidth: 2,
-             fillColor: `rgba(234, 179, 8, ${getAlpha(h.confidence, 0.2, 0.05)})`
+             fillColor: `rgba(234, 179, 8, ${getAlpha(h.confidence, 0.2, 0.1)})`
           });
         }
       });
@@ -734,14 +831,6 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       const hoverTimeSec = typeof param.time === "number" 
         ? param.time 
         : (param.time as any).value || new Date(param.time).getTime() / 1000;
-      
-      const parseTimeToSec = (t: any) => {
-        if (!t) return 0;
-        if (typeof t === "number") {
-          return t > 2000000000 ? Math.floor(t / 1000) : t;
-        }
-        return Math.floor(new Date(t).getTime() / 1000);
-      };
 
       const matchedIndicators: any[] = [];
 
@@ -772,7 +861,7 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
           const margin = zPrice * 0.005; // 0.5% tolerance
           const isPriceClose = Math.abs(hoveredPrice - zPrice) <= margin;
           if (isPriceClose && hoverTimeSec >= zTimeSec - 3600) {
-            const isSupport = z.type.toLowerCase().includes("support") || z.type.toLowerCase().includes("demand");
+            const isSupport = (z.type || "").toLowerCase().includes("support") || (z.type || "").toLowerCase().includes("demand");
             matchedIndicators.push({
               strategy: "Support & Resistance (Volume)",
               signalType: z.type.toUpperCase(),
@@ -1186,8 +1275,8 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
                   {showSRVolume && srVolumeData.map((s) => (
                     <div key={s.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
                       <span className="text-white/60 capitalize text-[9px] font-medium flex items-center justify-between">SR Volume {s.confidence && <span className="text-[8px] bg-white/10 px-1 rounded">{s.confidence}%</span>}</span>
-                      <span className={`font-bold ${s.type.toLowerCase().includes("support") || s.type.toLowerCase().includes("demand") ? "text-emerald-400" : "text-rose-400"}`}>
-                        {s.type.toUpperCase()} @ {fmtNum(Number(s.price), 5)}
+                      <span className={`font-bold ${(s.type || "").toLowerCase().includes("support") || (s.type || "").toLowerCase().includes("demand") ? "text-emerald-400" : "text-rose-400"}`}>
+                        {(s.type || "").toUpperCase()} @ {fmtNum(Number(s.price), 5)}
                       </span>
                     </div>
                   ))}
