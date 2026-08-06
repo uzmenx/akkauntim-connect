@@ -170,20 +170,20 @@ class AIStrategist:
         insights_saved = 0
 
         for i, chunk in enumerate(chunks):
-            prompt = f"""Siz professional trading strategiyasi tahlilchisisiz.
-Quyidagi matnni tahlil qiling va unda qandaydir trading strategiyasi (entry/exit/risk) bormi shuni aniqlang.
+            prompt = f"""Siz 'Institutional Quantitative Trading' tahlilchisisiz (Hedge Fund darajasida).
+Quyidagi xom ma'lumotlarni chuqur tahlil qiling va undan algoritmik savdo strategiyasi (entry, exit, risk, invalidation) parametrlarini ajratib oling.
 
 Matn qismi {i+1}/{len(chunks)}:
 {chunk}
 
-Faqat va faqat JSON formatida javob qaytaring (boshqa gap qo'shmang):
+Faqat va faqat JSON formatida javob qaytaring (hech qanday qo'shimcha matn yozmang):
 {{
   "has_strategy": true yoki false,
-  "market_condition": "trend" yoki "range" yoki "volatile" yoki "all",
-  "setup_type": "Qisqacha qanday setup ekani (masalan, 'breakout', 'order_block')",
-  "insight": "Strategiya qoidasining 2-3 gaplik aniq ta'rifi"
+  "market_condition": "trend / range / volatile / macro_shift",
+  "setup_type": "Qanday model ekani (Liquidity Sweep, FVG, Macro Catalyst, Volatility Breakout va hk.)",
+  "insight": "INSTITUTIONAL RULES:\\n1. Entry Criteria (Kirish shartlari): ...\\n2. Invalidation / SL (Qachon bekor qilinadi): ...\\n3. Profit Target (Foyda nuqtasi): ...\\n4. Volume / Macro Confirmation: ..."
 }}
-Agar matnda aniq strategiya yo'q bo'lsa, "has_strategy": false qaytaring.
+Agar matnda algoritmik bot uchun aniq logikaga aylanadigan qoidalar bo'lmasa, "has_strategy": false qaytaring.
 """
             response_text = self.llm_call(prompt)
             
