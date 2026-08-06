@@ -31,6 +31,8 @@ export type BotSettings = {
   strategy_weight_sr_volume?: number;
   strategy_weight_auto_pattern?: number;
   loop_interval_minutes?: number;
+  loop_interval_seconds?: number;
+  realtime_enabled?: boolean;
   updated_at: string;
 };
 
