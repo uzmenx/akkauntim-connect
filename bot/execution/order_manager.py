@@ -11,6 +11,14 @@ class OrderManager:
     COOLDOWN_SECONDS = 60           # yopilgandan keyin 1 daqiqa
     PENDING_TTL_SECONDS = 6 * 3600  # 6 soat
     TP1_PORTION = 0.70              # umumiy hajmning 70% TP1'ga ketadi
+    
+    PENDING_TTL_BY_TIMEFRAME = {
+        "M1": 2 * 3600,       # 2 soat
+        "M5": 6 * 3600,       # 6 soat
+        "M15": 48 * 3600,     # 48 soat
+        "H1": 10 * 24 * 3600, # 10 kun
+        "H4": 30 * 24 * 3600  # 30 kun
+    }
 
     def __init__(self, mt5_client: Any, state_manager: Any, config: Any):
         self.mt5 = mt5_client
@@ -56,7 +64,7 @@ class OrderManager:
             
         import datetime
         # tick.time broker server vaqti hisoblanadi (Epoch formatida)
-        broker_time = datetime.datetime.utcfromtimestamp(tick.time)
+        broker_time = datetime.datetime.fromtimestamp(tick.time, datetime.timezone.utc)
         
         # Forexda odatda broker soati bo'yicha 23:59 da rollover bo'ladi.
         # Demak broker soati bo'yicha 22:00 va 23:59 oralig'ida trade ochishni bloklaymiz.
@@ -64,6 +72,58 @@ class OrderManager:
             return True
             
         return False
+
+    def _is_in_blackout_window(self, tick_time: Optional[float] = None) -> Tuple[bool, str]:
+        """
+        Sessiyalar o'zgarishi, rollover hamda spred kengayishi (illiquid windows) atrofida 
+        yangi order joylashtirishni taqiqlovchi Session-Blackout tekshiruvi.
+        
+        Default UTC oynalari:
+        - 21:45 - 22:15 UTC (NY Close / Daily Rollover & Swap spike)
+        - 23:55 - 00:15 UTC (Sydney Open / Date boundary reset)
+        - 07:55 - 08:05 UTC (London Open volatility surge)
+        """
+        if not getattr(self.config, "session_blackout_enabled", True):
+            return False, ""
+            
+        default_windows = [
+            {"start": "21:45", "end": "22:15", "name": "NY_Close_Rollover"},
+            {"start": "23:55", "end": "00:15", "name": "Sydney_Open_Reset"},
+            {"start": "07:55", "end": "08:05", "name": "London_Open_Vol"}
+        ]
+        windows = getattr(self.config, "session_blackout_windows", default_windows)
+        if not windows:
+            return False, ""
+            
+        import datetime
+        if tick_time and tick_time > 0:
+            dt = datetime.datetime.fromtimestamp(tick_time, datetime.timezone.utc)
+        else:
+            dt = datetime.datetime.now(datetime.timezone.utc)
+            
+        current_min = dt.hour * 60 + dt.minute
+        
+        for window in windows:
+            try:
+                start_h, start_m = map(int, window["start"].split(":"))
+                end_h, end_m = map(int, window["end"].split(":"))
+                
+                start_min = start_h * 60 + start_m
+                end_min = end_h * 60 + end_m
+                
+                name = window.get("name", f"{window['start']}-{window['end']}")
+                
+                if start_min <= end_min:
+                    if start_min <= current_min <= end_min:
+                        return True, f"Session blackout active ({name}: {window['start']}-{window['end']} UTC)"
+                else:
+                    # Midnight crossing (e.g. 23:55 to 00:15)
+                    if current_min >= start_min or current_min <= end_min:
+                        return True, f"Session blackout active ({name}: {window['start']}-{window['end']} UTC)"
+            except (ValueError, KeyError, AttributeError):
+                continue
+                
+        return False, ""
 
 
     def _get_filling_mode(self, symbol: str) -> int:
@@ -90,7 +150,41 @@ class OrderManager:
             return FILLING_IOC
         return FILLING_RETURN
 
-    def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None, take_profit_1_pips: Optional[float] = None) -> Tuple[bool, str, Optional[dict]]:
+    def _check_spread_ok(self, symbol: str, current_spread_points: int) -> Tuple[bool, str]:
+        """
+        Dinamik spread filtri: M15 dagi so'nggi 50 ta candle spreadining Median va MAD 
+        (Median Absolute Deviation) qiymatini hisoblab, joriy spread anomal emasligini tekshiradi.
+        """
+        rates = self.mt5.copy_rates_from_pos(symbol, self.mt5.TIMEFRAME_M15, 1, 50)
+        if rates is None or len(rates) == 0:
+            return True, ""
+            
+        spreads = [r['spread'] for r in rates if r['spread'] > 0]
+        if not spreads:
+            return True, ""
+            
+        import statistics
+        median_spread = statistics.median(spreads)
+        
+        abs_deviations = [abs(s - median_spread) for s in spreads]
+        mad = statistics.median(abs_deviations)
+        
+        if mad == 0:
+            mad = max(median_spread * 0.1, 1.0)
+            
+        max_multiplier = getattr(self.config, "max_spread_multiplier", 4.0)
+        max_allowed_spread = median_spread + (max_multiplier * mad)
+        
+        if max_allowed_spread < median_spread * 1.5:
+            max_allowed_spread = median_spread * 1.5
+            
+        if current_spread_points > max_allowed_spread:
+            msg = f"Spread anomal: {current_spread_points} pt (Limit: {max_allowed_spread:.1f}, Median: {median_spread}, MAD: {mad:.1f})"
+            return False, msg
+            
+        return True, ""
+
+    def place_order(self, symbol: str, signal: str, lot_size: float, stop_loss_pips: float, take_profit_pips: float, entry_price: Optional[float] = None, take_profit_1_pips: Optional[float] = None, signal_timeframe: Optional[str] = None) -> Tuple[bool, str, Optional[dict]]:
         """
         Tasdiqlangan signal asosida MT5'ga order (Market yoki Pending) yuboradi.
         Agar `take_profit_1_pips` berilsa, hajm 70/30 ga bo'lib 2 ta alohida order joylashtiriladi (TP1 broker tomonida).
@@ -102,6 +196,11 @@ class OrderManager:
             return False, f"[{symbol}] {self.MAX_POSITIONS_PER_SYMBOL} pozitsiya limiti to'ldi", None
         if self._is_near_market_close(symbol):
             return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli bitim rad etildi", None
+
+        is_blackout, blackout_reason = self._is_in_blackout_window()
+        if is_blackout:
+            logger.warning(f"[{symbol}] Trade aborted due to Session Blackout: {blackout_reason}")
+            return False, f"[{symbol}] {blackout_reason}", None
 
         symbol_info = self.mt5.symbol_info(symbol)
         if symbol_info is None:
@@ -115,6 +214,11 @@ class OrderManager:
         tick = self.mt5.symbol_info_tick(symbol)
         if tick is None:
             return False, "Narx ma'lumotini olib bo'lmadi", None
+
+        is_blackout, blackout_reason = self._is_in_blackout_window(tick.time)
+        if is_blackout:
+            logger.warning(f"[{symbol}] Trade aborted due to Session Blackout (tick timestamp): {blackout_reason}")
+            return False, f"[{symbol}] {blackout_reason}", None
 
         point = symbol_info.point
         digits = symbol_info.digits
@@ -131,17 +235,10 @@ class OrderManager:
 
         # --- SPREAD FILTER ---
         current_spread_points = round((tick.ask - tick.bid) / point)
-        max_multiplier = getattr(self.config, "max_spread_multiplier", 4.0)
         
-        # Get spread from the last 10 M15 candles from MT5
-        rates = self.mt5.copy_rates_from_pos(symbol, self.mt5.TIMEFRAME_M15, 1, 10)
-        if rates is not None and len(rates) > 0:
-            avg_spread_points = sum(r['spread'] for r in rates) / len(rates)
-            if avg_spread_points > 0:
-                max_allowed_spread_points = avg_spread_points * max_multiplier
-                if current_spread_points > max_allowed_spread_points:
-                    logger.warning(f"[{symbol}] Spread filter triggered: Current spread ({current_spread_points} points) is {max_multiplier}x larger than average ({avg_spread_points:.1f} points). Trade aborted.")
-                    return False, f"Spread is too high ({current_spread_points} points)", None
+        is_ok, msg = self._check_spread_ok(symbol, current_spread_points)
+        if not is_ok:
+            return False, msg, None
         # ---------------------
 
         # trade_stops_level broker tomonidan POINT birlikda beriladi — pip'ga o'girish uchun pip_mul ga bo'lamiz.
@@ -294,6 +391,9 @@ class OrderManager:
                 first_result = result
 
             one_r_dist = stop_loss_pips * pip_size
+            
+            pending_ttl = self.PENDING_TTL_BY_TIMEFRAME.get(signal_timeframe, 24*3600) if signal_timeframe else 24*3600
+            
             self.state_manager.set_trade_info(result.order, {
                 "status": "OPEN",
                 "1r_dist": one_r_dist,
@@ -303,6 +403,8 @@ class OrderManager:
                 "trailing_mode": None,
                 "current_sl_level": 0,
                 "virtual_sl": virtual_sl,
+                "signal_timeframe": signal_timeframe,
+                "pending_expires_at": time.time() + pending_ttl
             })
 
         order_info = {
@@ -507,7 +609,20 @@ class OrderManager:
                     # Kelajakda M5 tuzilishi asosida suriladi, hozircha STEP kabi ishlaydi
                     pass
 
-    def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "Pending Order", expiration_minutes: Optional[int] = None) -> Tuple[bool, str, Optional[dict]]:
+    def place_pending_order(self, symbol: str, order_type_str: str, price: float, lot_size: float, stop_loss_pips: float, take_profit_pips: float, magic: int = 234000, comment: str = "Pending Order", expiration_minutes: Optional[int] = None, signal_timeframe: Optional[str] = None) -> Tuple[bool, str, Optional[dict]]:
+        # --- Portfolio guardlari ---
+        if self._in_cooldown(symbol):
+            return False, f"[{symbol}] cooldown ({self.COOLDOWN_SECONDS}s) ichida", None
+        if self._open_count(symbol) >= self.MAX_POSITIONS_PER_SYMBOL:
+            return False, f"[{symbol}] {self.MAX_POSITIONS_PER_SYMBOL} pozitsiya limiti to'ldi", None
+        if self._is_near_market_close(symbol):
+            return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli pending order rad etildi", None
+
+        is_blackout, blackout_reason = self._is_in_blackout_window()
+        if is_blackout:
+            logger.warning(f"[{symbol}] Pending trade aborted due to Session Blackout: {blackout_reason}")
+            return False, f"[{symbol}] {blackout_reason}", None
+
         symbol_info = self.mt5.symbol_info(symbol)
         if symbol_info is None:
             return False, f"{symbol} topilmadi", None
@@ -516,8 +631,14 @@ class OrderManager:
             if not self.mt5.symbol_select(symbol, True):
                 return False, f"{symbol} tanlab bo'lmadi", None
                 
-        if self._is_near_market_close(symbol):
-            return False, f"[{symbol}] Bozor yopilishiga (rollover) 2 soatdan kam qolganligi sababli pending order rad etildi", None
+        tick = self.mt5.symbol_info_tick(symbol)
+        if tick is None:
+            return False, "Narx ma'lumotini olib bo'lmadi", None
+
+        is_blackout, blackout_reason = self._is_in_blackout_window(tick.time)
+        if is_blackout:
+            logger.warning(f"[{symbol}] Pending trade aborted due to Session Blackout (tick timestamp): {blackout_reason}")
+            return False, f"[{symbol}] {blackout_reason}", None
 
         point = symbol_info.point
         digits = symbol_info.digits
@@ -529,6 +650,14 @@ class OrderManager:
             pip_size = point
 
         pip_mul = pip_size / point if point > 0 else 10
+
+        # --- SPREAD FILTER ---
+        current_spread_points = round((tick.ask - tick.bid) / point)
+        
+        is_ok, msg = self._check_spread_ok(symbol, current_spread_points)
+        if not is_ok:
+            return False, msg, None
+        # ---------------------
         stop_level_pips = symbol_info.trade_stops_level / pip_mul if pip_mul > 0 else 0
         if stop_loss_pips < stop_level_pips:
             stop_loss_pips = stop_level_pips
@@ -599,6 +728,8 @@ class OrderManager:
             "1r_dist": stop_loss_pips * pip_size
         }
 
+        pending_ttl = self.PENDING_TTL_BY_TIMEFRAME.get(signal_timeframe, 24*3600) if signal_timeframe else 24*3600
+        
         self.state_manager.set_trade_info(result.order, {
             "status": "PENDING", 
             "1r_dist": stop_loss_pips * pip_size,
@@ -608,7 +739,9 @@ class OrderManager:
             "trailing_mode": None,
             "current_sl_level": 0,
             "is_straddle": True,
-            "virtual_sl": virtual_sl
+            "virtual_sl": virtual_sl,
+            "signal_timeframe": signal_timeframe,
+            "pending_expires_at": time.time() + pending_ttl
         })
 
         return True, "Pending order muvaffaqiyatli qo'yildi", order_info
@@ -629,23 +762,22 @@ class OrderManager:
         """
         Pending (Limit/Stop) orderlarni tekshirish va yaroqsiz bo'lsa o'chirish.
         1. Narx limit_entry ga bormasdan oldin stop_loss gacha yetib borsa, setup invalid bo'ladi.
-        2. Order 24 soatdan oshib qolsa, eskirgan hisoblanib o'chiriladi.
+        2. Order o'ziga belgilangan TF-based TTL dan oshib qolsa, eskirgan hisoblanib o'chiriladi.
         """
         orders = self.mt5.orders_get()
         if not orders:
             return
 
-        import datetime
-        now = datetime.datetime.now()
+        import time
+        now_ts = time.time()
 
         for order in orders:
             ticket = order.ticket
             symbol = order.symbol
             order_type = order.type
-            time_setup = order.time_setup
             sl = order.sl
             
-            # Faqat limit orderlarni tekshiramiz
+            # Faqat limit/stop orderlarni tekshiramiz
             if order_type not in [self.mt5.ORDER_TYPE_BUY_LIMIT, self.mt5.ORDER_TYPE_SELL_LIMIT, self.mt5.ORDER_TYPE_BUY_STOP, self.mt5.ORDER_TYPE_SELL_STOP]:
                 continue
                 
@@ -653,31 +785,38 @@ class OrderManager:
             if not tick:
                 continue
                 
-            # Setup vaqti (24 soat = 86400 sek)
-            setup_time_dt = datetime.datetime.fromtimestamp(time_setup)
-            if (now - setup_time_dt).total_seconds() > 86400:
-                logger.info(f"[{symbol}] Pending order #{ticket} eskirgan (24 soat). O'chirilmoqda...")
+            trade_info = self.state_manager.get_trade_info(ticket)
+            expires_at = trade_info.get("pending_expires_at") if trade_info else None
+            
+            # Agar expires_at topilmasa, fallback 24 soat
+            if not expires_at:
+                expires_at = order.time_setup + 86400
+
+            if now_ts > expires_at:
+                tf_label = trade_info.get("signal_timeframe", "Noma'lum") if trade_info else "Noma'lum"
+                logger.info(f"[{symbol}] Pending order #{ticket} (TF: {tf_label}) eskirgan (TTL tugadi). O'chirilmoqda...")
                 self.delete_pending_order(ticket)
                 continue
                 
-            # Invalidation tekshiruvi
-            if sl > 0:
+            # Invalidation tekshiruvi (Virtual SL or Broker SL)
+            virtual_sl = trade_info.get("virtual_sl") if trade_info else 0
+            check_sl = sl if sl > 0 else virtual_sl
+            
+            if check_sl > 0:
                 if order_type == self.mt5.ORDER_TYPE_BUY_LIMIT:
-                    if tick.ask <= sl:
+                    if tick.ask <= check_sl:
                         logger.info(f"[{symbol}] Buy Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 elif order_type == self.mt5.ORDER_TYPE_SELL_LIMIT:
-                    if tick.bid >= sl:
+                    if tick.bid >= check_sl:
                         logger.info(f"[{symbol}] Sell Limit #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 elif order_type == self.mt5.ORDER_TYPE_BUY_STOP:
-                    # BUY_STOP: narx uning SL ga yetsa, setup bekor bo'ladi
-                    if tick.bid <= sl:
+                    if tick.bid <= check_sl:
                         logger.info(f"[{symbol}] Buy Stop #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 elif order_type == self.mt5.ORDER_TYPE_SELL_STOP:
-                    # SELL_STOP: narx uning SL ga yetsa, setup bekor bo'ladi
-                    if tick.ask >= sl:
+                    if tick.ask >= check_sl:
                         logger.info(f"[{symbol}] Sell Stop #{ticket} uchun narx SL ni urib o'tdi (setup invalid). O'chirilmoqda...")
                         self.delete_pending_order(ticket)
                 
@@ -839,16 +978,9 @@ class OrderManager:
             point = symbol_info.point
             current_spread_points = round((tick.ask - tick.bid) / point) if point > 0 else 0
             
-            # O'rtacha spredni olish (M15 oxirgi 10 sham)
-            max_multiplier = getattr(self.config, "max_spread_multiplier", 4.0)
-            rates = self.mt5.copy_rates_from_pos(symbol, self.mt5.TIMEFRAME_M15, 1, 10)
-            is_spread_high = False
-            
-            if rates is not None and len(rates) > 0:
-                avg_spread_points = sum(r['spread'] for r in rates) / len(rates)
-                if avg_spread_points > 0:
-                    if current_spread_points > (avg_spread_points * max_multiplier):
-                        is_spread_high = True
+            # Dinamik spread tekshiruvi
+            is_spread_ok, _ = self._check_spread_ok(symbol, current_spread_points)
+            is_spread_high = not is_spread_ok
 
             # Narx SL ga yetdimi?
             sl_hit = False

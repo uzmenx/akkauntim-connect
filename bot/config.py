@@ -50,7 +50,20 @@ class BotConfig:
     allow_single_strategy_trade: bool = True
     news_lookback_hours: int = 24
     max_spread_multiplier: float = 4.0
+    symbol_spread_multipliers: Dict[str, float] = field(default_factory=lambda: {
+        "JPY": 5.0,
+        "XAU": 3.0,
+        "XAG": 3.0
+    })
     ai_max_tokens: int = 300
+    
+    # Session Blackout (Illiquidity / Rollover / Session Open protection)
+    session_blackout_enabled: bool = True
+    session_blackout_windows: List[Dict[str, str]] = field(default_factory=lambda: [
+        {"start": "21:45", "end": "22:15", "name": "NY_Close_Rollover"},
+        {"start": "23:55", "end": "00:15", "name": "Sydney_Open_Reset"},
+        {"start": "07:55", "end": "08:05", "name": "London_Open_Vol"}
+    ])
     
     # News Breakout Grid Strategy
     news_breakout_grid_enabled: bool = False
@@ -145,6 +158,12 @@ class BotConfig:
                     self.strategy_weight_pattern = trading.get("strategy_weight_pattern", self.strategy_weight_pattern)
                     self.strategy_weight_news = trading.get("strategy_weight_news", self.strategy_weight_news)
                     self.allow_single_strategy_trade = trading.get("allow_single_strategy_trade", self.allow_single_strategy_trade)
+                    self.session_blackout_enabled = trading.get("session_blackout_enabled", self.session_blackout_enabled)
+                    if "session_blackout_windows" in trading and isinstance(trading["session_blackout_windows"], list):
+                        self.session_blackout_windows = trading["session_blackout_windows"]
+                    self.max_spread_multiplier = trading.get("max_spread_multiplier", self.max_spread_multiplier)
+                    if "symbol_spread_multipliers" in trading and isinstance(trading["symbol_spread_multipliers"], dict):
+                        self.symbol_spread_multipliers = trading["symbol_spread_multipliers"]
                     
                     ai = data.get("ai", {})
                     self.ai_model = ai.get("model", self.ai_model)
@@ -226,6 +245,12 @@ class BotConfig:
             
         if "max_spread_multiplier" in data:
             self.max_spread_multiplier = float(data["max_spread_multiplier"])
+            
+        if "session_blackout_enabled" in data:
+            self.session_blackout_enabled = bool(data["session_blackout_enabled"])
+            
+        if "session_blackout_windows" in data and isinstance(data["session_blackout_windows"], list):
+            self.session_blackout_windows = data["session_blackout_windows"]
             
         if "drawdown_threshold_pct" in data:
             self.drawdown_threshold_pct = float(data["drawdown_threshold_pct"])

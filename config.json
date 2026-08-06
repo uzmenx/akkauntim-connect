@@ -15,7 +15,19 @@
     "strategy_weight_smc": 40,
     "strategy_weight_pattern": 40,
     "strategy_weight_news": 40,
-    "allow_single_strategy_trade": true
+    "allow_single_strategy_trade": true,
+    "session_blackout_enabled": true,
+    "session_blackout_windows": [
+      {"start": "21:45", "end": "22:15", "name": "NY_Close_Rollover"},
+      {"start": "23:55", "end": "00:15", "name": "Sydney_Open_Reset"},
+      {"start": "07:55", "end": "08:05", "name": "London_Open_Vol"}
+    ],
+    "max_spread_multiplier": 4.0,
+    "symbol_spread_multipliers": {
+      "JPY": 5.0,
+      "XAU": 3.0,
+      "XAG": 3.0
+    }
   },
   "ai": {
     "model": "openrouter/deepseek/deepseek-chat",

@@ -698,34 +698,8 @@ class TradingBot:
             logger.info(f"[{symbol}] 🧠 DL Predictor Signali: {dl_prediction['prediction']} (Conf: {dl_prediction['confidence']}%)")
 
         # RL Agent Action (Jonli qaror)
-        with self.profiler.track("3.2_rl_agent_action"):
-            try:
-                position_status = 0.0
-                unrealized_profit_ratio = 0.0
-                if open_positions:
-                    for p in open_positions:
-                        position_status = 1.0 if p.type == self.mt5.ORDER_TYPE_BUY else -1.0
-                        unrealized_profit_ratio = (p.profit / balance) if balance > 0 else 0.0
-                        break
-                        
-                obs_data = [
-                    (balance / 1000.0) if balance > 0 else 1.0,
-                    float(df_major.iloc[-1]['open']),
-                    float(df_major.iloc[-1]['high']),
-                    float(df_major.iloc[-1]['low']),
-                    float(df_major.iloc[-1]['close']),
-                    float(df_major.iloc[-1]['tick_volume']),
-                    position_status,
-                    unrealized_profit_ratio
-                ]
-                rl_action = self.rl_agent.predict_action(obs_data)
-                if rl_action != "HOLD":
-                    logger.info(f"[{symbol}] 🤖 RL Agent Signali (Live Shadow): {rl_action}")
-            except Exception as e:
-                logger.debug(f"RL agent action olishda xatolik: {e}")
-                rl_action = "HOLD"
-
-        # RL Agent Action (Jonli qaror)
+        obs_data = []
+        rl_action = "HOLD"
         with self.profiler.track("3.2_rl_agent_action"):
             try:
                 position_status = 0.0
@@ -1079,7 +1053,6 @@ class TradingBot:
         # Buyurtmani yuborish
         with self.profiler.track("4.2_order_execution"):
             if "LIMIT" in order_signal or "STOP" in order_signal:
-                expiration_mins = ai_decision.get("expiration_minutes", 240) # default 4 hours
                 success, order_msg, order_info = self.orders.place_pending_order(
                     symbol=symbol,
                     order_type_str=order_signal,
@@ -1089,7 +1062,8 @@ class TradingBot:
                     take_profit_pips=tp_pips,
                     magic=self.config.magic_number,
                     comment="AI Limit",
-                    expiration_minutes=expiration_mins
+                    expiration_minutes=None, # TF-based TTL now handles this
+                    signal_timeframe=self.config.timeframe_major
                 )
             else:
                 success, order_msg, order_info = self.orders.place_order(
@@ -1098,7 +1072,8 @@ class TradingBot:
                     lot_size=lot,
                     stop_loss_pips=sl_pips,
                     take_profit_pips=tp_pips,
-                    entry_price=entry_price
+                    entry_price=entry_price,
+                    signal_timeframe=self.config.timeframe_major
                 )
 
         # Log to db (kitob bilimlaridan olingan insight ID larni ham saqlash)
@@ -1396,6 +1371,13 @@ class TradingBot:
                     # Ochiq pozitsiyalarni boshqarish
                     with self.profiler.track("0.5_manage_positions"):
                         self.manage_positions()
+                    
+                    # Pending orderlarni boshqarish (eskirganlarini o'chirish va invalidation)
+                    with self.profiler.track("0.5.1_manage_pending"):
+                        try:
+                            self.orders.manage_pending_orders()
+                        except Exception as e:
+                            logger.error(f"Pending orderlarni boshqarishda xatolik: {e}")
                     
                     # Virtual Stop Loss va Spread himoyasi
                     with self.profiler.track("0.6_virtual_sl_manage"):

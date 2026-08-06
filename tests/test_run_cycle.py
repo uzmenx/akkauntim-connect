@@ -48,7 +48,23 @@ class TestRunCycle(unittest.TestCase):
         })
         bot._fetch_data = MagicMock(return_value=dummy_df)
         
+        bot.portfolio_manager = MagicMock()
+        bot.portfolio_manager.analyze_all.return_value = {
+            "signal": "BUY",
+            "score": 80,
+            "details": {}
+        }
+        
+        bot.voting_engine = MagicMock()
+        bot.voting_engine.analyze.return_value = {"signal": "BUY", "score": 80}
+        
         bot.ai.get_decision.return_value = {
+            "decision": "HOLD",
+            "reasoning": "Market is too volatile, staying out."
+        }
+        bot.transition_manager = MagicMock()
+        bot.transition_manager.mode.value = "api"
+        bot.transition_manager.get_decision.return_value = {
             "decision": "HOLD",
             "reasoning": "Market is too volatile, staying out."
         }
@@ -56,7 +72,8 @@ class TestRunCycle(unittest.TestCase):
         bot.prompt_builder.build_context_summary.return_value = {}
         bot.prompt_builder.build_trading_prompt.return_value = "dummy test prompt"
         
-        bot.run_cycle("EURUSD")
+        with patch("bot.main.should_call_ai", return_value=(True, "Signal")):
+            bot.run_cycle("EURUSD")
         
         bot.sync.log_ai_signal.assert_called_once()
         

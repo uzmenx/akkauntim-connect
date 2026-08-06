@@ -14,11 +14,17 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 class JobListener:
     def __init__(self, config: BotConfig):
         self.config = config
-        self.supabase: Client = create_client(config.supabase_url, config.supabase_key)
+        if config.supabase_url and config.supabase_key:
+            self.supabase: Optional[Client] = create_client(config.supabase_url, config.supabase_key)
+        else:
+            self.supabase = None
         self._running = False
         self._thread = None
 
     def start(self):
+        if not self.supabase:
+            logger.warning("Supabase URL or Key not set. JobListener will not start.")
+            return
         self._running = True
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
         self._thread.start()
