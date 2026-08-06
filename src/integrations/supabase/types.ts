@@ -422,6 +422,39 @@ export type Database = {
         }
         Relationships: []
       }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          mt5_login: string
+          success: boolean
+          token_hash: string | null
+          used_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          mt5_login: string
+          success?: boolean
+          token_hash?: string | null
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          mt5_login?: string
+          success?: boolean
+          token_hash?: string | null
+          used_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pending_books: {
         Row: {
           created_at: string | null
