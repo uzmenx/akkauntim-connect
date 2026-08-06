@@ -183,17 +183,27 @@ export function AuthPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2.5 pt-0.5">
-            <input
-              type="checkbox"
-              id="rememberMe"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-              className="w-4 h-4 rounded-[5px] bg-black/40 border border-white/30 text-cyan-400 focus:ring-cyan-400 focus:ring-offset-0 cursor-pointer transition-all"
-            />
-            <label htmlFor="rememberMe" className="text-xs sm:text-sm font-semibold text-white cursor-pointer select-none">
-              Meni eslab qol
-            </label>
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <div className="flex items-center gap-2.5">
+              <input
+                type="checkbox"
+                id="rememberMe"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded-[5px] bg-black/40 border border-white/30 text-cyan-400 focus:ring-cyan-400 focus:ring-offset-0 cursor-pointer transition-all"
+              />
+              <label htmlFor="rememberMe" className="text-xs sm:text-sm font-semibold text-white cursor-pointer select-none">
+                Meni eslab qol
+              </label>
+            </div>
+            {mode === "signin" && (
+              <a
+                href="/reset-password"
+                className="text-[11px] sm:text-xs font-bold text-cyan-200/90 hover:text-white underline underline-offset-4 transition-colors"
+              >
+                Parolni unutdim?
+              </a>
+            )}
           </div>
 
           {err && (
