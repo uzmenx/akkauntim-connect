@@ -92,6 +92,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/auth" element={<AuthPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="*" element={<Navigate to="/auth" replace />} />
       </Routes>
     );
