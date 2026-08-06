@@ -45,3 +45,6 @@ Yangi edge function, ikki amalni bajaradi:
 
 ## Xavfsizlik haqida ogohlantirish
 MT5 login + server juftligi kuchli sir emas (login raqamini boshqa odam bilishi mumkin, serverlar esa ommaviy). Bu usul qulaylik uchun mos, lekin haqiqiy himoya uchun keyinchalik ixtiyoriy haqiqiy email yoki Telegram tasdiqlashini qo'shishni tavsiya qilaman.
+
+## Qo'shimcha: mavjud build xatosi
+`src/lib/types.ts` dagi `BotSettings` tipida `realtime_enabled` va `loop_interval_seconds` maydonlari yo'q, lekin `SettingsPage.tsx` ularni ishlatadi (bazada bu ustunlar bor). Ishni boshlashdan avval shu ikki maydon tipga qo'shiladi va build xatolari yo'qotiladi.
