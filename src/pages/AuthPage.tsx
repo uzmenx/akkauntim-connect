@@ -82,7 +82,15 @@ export function AuthPage() {
         localStorage.removeItem("mt5_saved_password");
       }
     } catch (e: any) {
-      setErr(e.message ?? "Xatolik yuz berdi");
+      let msg = e.message ?? "Xatolik yuz berdi";
+      if (msg.includes("Invalid login credentials")) {
+        msg = "Logingiz yoki parolingiz noto'g'ri. Agar yangi bo'lsangiz, avval 'Ro'yxatdan o'tish' qismini tanlang!";
+      } else if (msg.includes("Email not confirmed")) {
+        msg = "Tizimga kirish uchun Email tasdiqlanishi kerak (Supabase Dashboard'dan Email Confirmations ni o'chiring).";
+      } else if (msg.includes("already registered")) {
+        msg = "Bu login allaqachon band. Iltimos, boshqasini tanlang yoki Tizimga kiring.";
+      }
+      setErr(msg);
     } finally {
       setBusy(false);
     }
