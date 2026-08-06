@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/pages/AuthPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { PositionsPage } from "@/pages/PositionsPage";
 import { SignalsPage } from "@/pages/SignalsPage";
