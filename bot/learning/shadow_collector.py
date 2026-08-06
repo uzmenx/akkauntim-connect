@@ -50,11 +50,17 @@ class ShadowStateCollector:
                 )
             ''')
             
-            # f12_features ustunini eski bazalarga ham qo'shish
-            try:
-                cursor.execute('ALTER TABLE shadow_states ADD COLUMN f12_features TEXT')
-            except Exception:
-                pass
+            # Yangi ustunlarni eski bazalarga ham qo'shish
+            for col_def in [
+                ('f12_features', 'TEXT'),
+                ('outcome_label', 'TEXT'),     # WIN / LOSS / BREAKEVEN
+                ('outcome_pnl', 'REAL'),        # Foyda/zarar qiymati
+                ('labeled_at', 'TEXT'),          # Qachon belgilangani
+            ]:
+                try:
+                    cursor.execute(f'ALTER TABLE shadow_states ADD COLUMN {col_def[0]} {col_def[1]}')
+                except Exception:
+                    pass
             
             # Kelajakda bashorat (label) bilan solishtirish uchun index
             cursor.execute('CREATE INDEX IF NOT EXISTS idx_shadow_symbol_time ON shadow_states(symbol, timestamp)')
@@ -251,6 +257,129 @@ class ShadowStateCollector:
                 
         except Exception as e:
             logger.error(f"Shadow stats eksportida xatolik: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def label_past_states(self, symbol: str, timeframe: str, direction: str, 
+                          pnl: float, trade_open_time: str, trade_close_time: str):
+        """
+        Savdo yopilganda, o'sha savdo davridagi shadow_states qatorlarini belgilash.
+        Bu LSTM uchun supervised learning label'lari bo'ladi.
+        
+        Args:
+            symbol: Valyuta juftligi (EURUSD)
+            timeframe: Vaqt oynasi (H1)
+            direction: Savdo yo'nalishi (BUY/SELL)
+            pnl: Foyda/zarar ($)
+            trade_open_time: Savdo ochilgan vaqt (ISO format)
+            trade_close_time: Savdo yopilgan vaqt (ISO format)
+        """
+        try:
+            # Outcome label aniqlash
+            if pnl > 0:
+                outcome = "WIN"
+            elif pnl < 0:
+                outcome = "LOSS"
+            else:
+                outcome = "BREAKEVEN"
+            
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            now_iso = datetime.now().isoformat()
+            
+            # Savdo ochilishidan oldingi N ta shamni ham label'laymiz
+            # (chunki qaror shu shamlar asosida qilingan)
+            cursor.execute('''
+                UPDATE shadow_states 
+                SET outcome_label = ?, outcome_pnl = ?, labeled_at = ?
+                WHERE symbol = ? AND timeframe = ? 
+                AND timestamp >= ? AND timestamp <= ?
+                AND outcome_label IS NULL
+            ''', (outcome, pnl, now_iso, symbol, timeframe, 
+                  trade_open_time, trade_close_time))
+            
+            updated = cursor.rowcount
+            
+            # Agar savdo ochilish vaqtidagi shamlar topilmasa,
+            # eng yaqin 5 ta shamni belgilaymiz
+            if updated == 0:
+                cursor.execute('''
+                    UPDATE shadow_states 
+                    SET outcome_label = ?, outcome_pnl = ?, labeled_at = ?
+                    WHERE id IN (
+                        SELECT id FROM shadow_states 
+                        WHERE symbol = ? AND timeframe = ? 
+                        AND outcome_label IS NULL
+                        AND timestamp <= ?
+                        ORDER BY timestamp DESC LIMIT 5
+                    )
+                ''', (outcome, pnl, now_iso, symbol, timeframe, trade_close_time))
+                updated = cursor.rowcount
+            
+            conn.commit()
+            logger.info(f"Shadow states labeled: {updated} rows → {outcome} ({pnl:.2f}) [{symbol} {timeframe}]")
+            
+        except Exception as e:
+            logger.error(f"Shadow states label qilishda xatolik: {e}")
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def get_labeled_count(self, symbol: Optional[str] = None) -> int:
+        """
+        Labeled (outcome_label != NULL) bo'lgan shadow_states qatorlari sonini qaytaradi.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            if symbol:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM shadow_states WHERE outcome_label IS NOT NULL AND symbol = ?",
+                    (symbol,)
+                )
+            else:
+                cursor.execute("SELECT COUNT(*) FROM shadow_states WHERE outcome_label IS NOT NULL")
+            count = cursor.fetchone()[0]
+            return count
+        except Exception as e:
+            logger.error(f"Labeled count olishda xatolik: {e}")
+            return 0
+        finally:
+            if 'conn' in locals():
+                conn.close()
+
+    def get_label_stats(self) -> Dict[str, Any]:
+        """
+        Labeled ma'lumotlar statistikasini qaytaradi.
+        """
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            cursor.execute("SELECT COUNT(*) FROM shadow_states")
+            total = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM shadow_states WHERE outcome_label IS NOT NULL")
+            labeled = cursor.fetchone()[0]
+            
+            cursor.execute(
+                "SELECT outcome_label, COUNT(*) FROM shadow_states "
+                "WHERE outcome_label IS NOT NULL GROUP BY outcome_label"
+            )
+            by_label = dict(cursor.fetchall())
+            
+            return {
+                "total_states": total,
+                "labeled_states": labeled,
+                "unlabeled_states": total - labeled,
+                "label_ratio": round(labeled / max(total, 1), 3),
+                "by_label": by_label
+            }
+        except Exception as e:
+            logger.error(f"Label stats olishda xatolik: {e}")
+            return {}
         finally:
             if 'conn' in locals():
                 conn.close()

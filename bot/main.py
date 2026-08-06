@@ -42,6 +42,11 @@ from bot.engine.merger_tracker import ShadowMergerTracker
 from bot.sync.job_listener import JobListener
 from bot.utils.profiler import LoopProfiler
 
+try:
+    from bot.learning.web_knowledge_fetcher import WebKnowledgeFetcher
+except ImportError:
+    WebKnowledgeFetcher = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -142,6 +147,14 @@ class TradingBot:
         
         # Reviewer ichidagi ai_memory ni ham cloud ga ulaymiz
         self.reviewer.ai_memory.sync_client = self.sync
+        
+        # Web Knowledge Fetcher
+        self.web_fetcher = None
+        if WebKnowledgeFetcher is not None:
+            self.web_fetcher = WebKnowledgeFetcher(
+                ai_strategist=self.reviewer.ai_strategist,
+                ai_memory=self.ai_memory
+            )
         
         # Inyect dependencies into AIClient
         self.ai.sync = self.sync
@@ -1111,13 +1124,24 @@ class TradingBot:
                 f"Signal: {order_signal} | SL: {sl_pips:.1f} pip | TP: {tp_pips:.1f} pip | "
                 f"Risk: {risk_pct:.1%}"
             )
+            
+            # Haqiqiy ishonchni olish (ai_decision.get("confidence") float bo'ladi, masalan 0.75)
+            conf_val = ai_decision.get("confidence", 0.8)
+            conf_pct = int(conf_val * 100) if isinstance(conf_val, float) and conf_val <= 1.0 else int(conf_val)
+            
+            # Kirish narxi order_info yoki ai_decision'dan
+            entry_price = order_info.get("price") or ai_decision.get("entry_price")
+            if not entry_price and order_info.get("request"):
+                entry_price = order_info["request"].get("price")
+                
             self.telegram.send_signal(
                 symbol=symbol,
                 signal=order_signal,
-                confidence=80,
+                confidence=conf_pct,
                 sl=sl_pips,
                 tp=tp_pips,
-                reasoning=ai_decision.get("reasoning", "")
+                reasoning=ai_decision.get("reasoning", ""),
+                entry_price=entry_price
             )
         else:
             logger.error(f"❌ [{symbol}] Order xatolik: {order_msg}")
@@ -1265,8 +1289,24 @@ class TradingBot:
                 # Har 60 soniyada tekshirish
                 time.sleep(60)
 
+        # Web Auto-Learning (DuckDuckGo + RSS)
+        def periodic_web_learning():
+            import time
+            while self._running:
+                try:
+                    if self.web_fetcher:
+                        result = self.web_fetcher.scheduled_fetch()
+                        if result and result.get("status") == "success":
+                            logger.info(f"🌐 Web Auto-Learning: {result.get('new_content')} yangi maqola, {result.get('insights_saved')} xulosa saqlandi. ({result.get('topic')})")
+                except Exception as e:
+                    logger.error(f"Web Auto-Learning xatosi: {e}")
+                
+                # Check every 10 minutes (actual rate-limit is handled inside scheduled_fetch -> 2 hours)
+                time.sleep(600)
+
         threading.Thread(target=periodic_retrain, daemon=True).start()
         threading.Thread(target=periodic_book_processor, daemon=True).start()
+        threading.Thread(target=periodic_web_learning, daemon=True).start()
 
         try:
             while self._running:

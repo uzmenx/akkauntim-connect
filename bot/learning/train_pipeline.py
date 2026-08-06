@@ -8,8 +8,10 @@ import os
 import json
 import logging
 import traceback
+import shutil
 from datetime import datetime
 from collections import Counter
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,8 @@ class TrainPipeline:
             os.makedirs(self.model_dir, exist_ok=True)
         except Exception as e:
             logger.error(f"Failed to create model directory {self.model_dir}: {e}")
+            
+        self._init_training_metadata()
 
     def run_full_training(self, epochs=30, train_ratio=0.8, ensemble_size=3):
         """
@@ -352,3 +356,220 @@ class TrainPipeline:
                 json.dump(history, f, indent=4)
         except Exception as e:
             logger.error(f"Failed to save history for {name}: {e}")
+
+    def _init_training_metadata(self):
+        """Initialize the training_metadata table."""
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS training_metadata (
+                    id INTEGER PRIMARY KEY,
+                    last_trained_sample_count INTEGER DEFAULT 0,
+                    last_trained_timestamp TEXT,
+                    last_val_f1 REAL DEFAULT 0.0,
+                    model_version INTEGER DEFAULT 0
+                )
+            ''')
+            # Insert default row if empty
+            cursor.execute('SELECT COUNT(*) FROM training_metadata')
+            if cursor.fetchone()[0] == 0:
+                cursor.execute('''
+                    INSERT INTO training_metadata 
+                    (last_trained_sample_count, last_trained_timestamp, last_val_f1, model_version)
+                    VALUES (0, ?, 0.0, 0)
+                ''', (datetime.now().isoformat(),))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"Failed to init training_metadata: {e}")
+
+    def _should_retrain(self, min_new_samples=50) -> Tuple[bool, int]:
+        """
+        Check if enough new labeled samples exist for incremental training.
+        Returns (should_train: bool, new_sample_count: int)
+        """
+        try:
+            import sqlite3
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            # Count labeled states
+            cursor.execute('SELECT COUNT(*) FROM shadow_states WHERE outcome_label IS NOT NULL')
+            row = cursor.fetchone()
+            labeled_count = row[0] if row else 0
+            
+            # Get last trained count
+            cursor.execute('SELECT last_trained_sample_count FROM training_metadata ORDER BY id DESC LIMIT 1')
+            row = cursor.fetchone()
+            last_trained_count = row[0] if row else 0
+            
+            conn.close()
+            
+            diff = labeled_count - last_trained_count
+            should_train = diff >= min_new_samples
+            return should_train, diff
+        except Exception as e:
+            logger.error(f"Error in _should_retrain: {e}")
+            return False, 0
+
+    def run_incremental_update(self, min_new_samples=50, epochs=15):
+        """
+        Incremental fine-tuning: loads existing best model weights, trains only on recent data.
+        Saves new model only if val_f1 improves. Backs up old model.
+        """
+        report = {
+            "status": "failed",
+            "message": "",
+            "metrics": {},
+            "timestamp": datetime.now().isoformat(),
+            "model_version": 0
+        }
+        
+        if not TORCH_AVAILABLE or not NUMPY_AVAILABLE:
+            report["message"] = "PyTorch or NumPy not available."
+            return report
+            
+        try:
+            should_train, diff = self._should_retrain(min_new_samples)
+            if not should_train:
+                report["status"] = "skipped"
+                report["message"] = f"Not enough new samples ({diff} < {min_new_samples})."
+                return report
+                
+            logger.info(f"Starting incremental update with {diff} new samples.")
+            
+            import sqlite3
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute('SELECT last_val_f1, model_version, last_trained_sample_count FROM training_metadata ORDER BY id DESC LIMIT 1')
+            meta = cursor.fetchone()
+            last_val_f1 = meta[0] if meta else 0.0
+            model_version = meta[1] if meta else 0
+            last_trained_count = meta[2] if meta else 0
+            conn.close()
+
+            dataset_train = ShadowDataset(self.db_path, seq_length=10, split='train', train_ratio=0.8, symbol=self.symbol)
+            dataset_val = ShadowDataset(self.db_path, seq_length=10, split='val', train_ratio=0.8, symbol=self.symbol)
+            
+            total_train = len(dataset_train)
+            total_val = len(dataset_val)
+            total_samples = total_train + total_val
+
+            num_classes = 3
+            train_loader = DataLoader(dataset_train, batch_size=64, shuffle=True, drop_last=False)
+            val_loader = DataLoader(dataset_val, batch_size=64, shuffle=False, drop_last=False)
+
+            labels = [dataset_train[i][1].item() for i in range(total_train)]
+            class_counts = Counter(labels)
+            weights = []
+            for i in range(num_classes):
+                count = class_counts.get(i, 0)
+                weights.append(total_train / (num_classes * count) if count > 0 else 1.0)
+                
+            tensor_weights = torch.FloatTensor(weights)
+            criterion = nn.CrossEntropyLoss(weight=tensor_weights)
+
+            ensemble_size = 3
+            hidden_size = 32
+            use_attention = True if total_samples > 2000 else False
+            
+            best_models_f1 = []
+            improved = False
+            
+            for idx in range(ensemble_size):
+                model_path = os.path.join(self.model_dir, f"ensemble_model_{idx}.pth")
+                model = MarketPredictorLSTM(
+                    input_size=12,
+                    hidden_size=hidden_size,
+                    num_layers=2,
+                    num_classes=num_classes,
+                    dropout=0.3,
+                    use_attention=use_attention,
+                    bidirectional=False
+                )
+                
+                if os.path.exists(model_path):
+                    try:
+                        model.load_state_dict(torch.load(model_path))
+                        logger.info(f"Loaded existing weights for model {idx}")
+                    except Exception as e:
+                        logger.warning(f"Could not load weights for model {idx}: {e}")
+                
+                optimizer = optim.AdamW(model.parameters(), lr=0.0003, weight_decay=1e-4)
+                
+                best_val_f1_current = 0.0
+                best_model_state = None
+                
+                for epoch in range(epochs):
+                    model.train()
+                    for X_batch, y_batch in train_loader:
+                        optimizer.zero_grad()
+                        outputs = model(X_batch)
+                        loss = criterion(outputs, y_batch)
+                        loss.backward()
+                        optimizer.step()
+                        
+                    model.eval()
+                    val_preds, val_targets = [], []
+                    with torch.no_grad():
+                        for X_batch, y_batch in val_loader:
+                            outputs = model(X_batch)
+                            _, predicted = torch.max(outputs.data, 1)
+                            val_preds.extend(predicted.cpu().numpy())
+                            val_targets.extend(y_batch.cpu().numpy())
+                            
+                    val_macro_f1 = f1_score(val_targets, val_preds, average='macro', zero_division=0)
+                    
+                    if val_macro_f1 > best_val_f1_current:
+                        best_val_f1_current = val_macro_f1
+                        best_model_state = model.state_dict().copy()
+
+                best_models_f1.append(best_val_f1_current)
+                
+                if best_model_state:
+                    model.load_state_dict(best_model_state)
+                    
+                if best_val_f1_current > last_val_f1:
+                    improved = True
+                    if os.path.exists(model_path):
+                        shutil.copy2(model_path, f"{model_path}.backup")
+                    torch.save(model.state_dict(), model_path)
+            
+            avg_f1 = sum(best_models_f1) / len(best_models_f1) if best_models_f1 else 0
+            
+            if improved or avg_f1 > last_val_f1:
+                new_version = model_version + 1
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO training_metadata 
+                    (last_trained_sample_count, last_trained_timestamp, last_val_f1, model_version)
+                    VALUES (?, ?, ?, ?)
+                ''', (last_trained_count + diff, datetime.now().isoformat(), avg_f1, new_version))
+                conn.commit()
+                conn.close()
+                
+                report["status"] = "success"
+                report["message"] = f"Incremental update improved val F1 from {last_val_f1:.4f} to {avg_f1:.4f}"
+                report["model_version"] = new_version
+            else:
+                report["status"] = "discarded"
+                report["message"] = f"Incremental update did not improve F1 ({avg_f1:.4f} <= {last_val_f1:.4f}). Discarded."
+                report["model_version"] = model_version
+                
+            report["metrics"] = {
+                "val_macro_f1_avg": avg_f1,
+                "model_f1s": best_models_f1,
+                "new_samples": diff
+            }
+            
+            self._save_history("incremental_training", report)
+            return report
+            
+        except Exception as e:
+            logger.error(f"Error in run_incremental_update: {e}")
+            logger.debug(traceback.format_exc())
+            report["message"] = str(e)
+            return report

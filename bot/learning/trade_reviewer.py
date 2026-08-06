@@ -8,6 +8,21 @@ import os
 from bot.learning.ai_strategist import AIStrategist
 from bot.learning.ai_memory import AIMemory
 
+try:
+    from bot.learning.shadow_collector import ShadowStateCollector
+except ImportError:
+    ShadowStateCollector = None
+
+try:
+    from bot.prediction.adaptive_weights import AdaptiveWeightManager
+except ImportError:
+    AdaptiveWeightManager = None
+
+try:
+    from bot.learning.pattern_memory import PatternMemoryBank
+except ImportError:
+    PatternMemoryBank = None
+
 logger = logging.getLogger(__name__)
 
 class TradeReviewer:
@@ -45,6 +60,28 @@ class TradeReviewer:
         self.ai_memory = AIMemory(
             db_path=os.path.join(root_dir, 'ai_memory.db')
         )
+        
+        # Shadow Learning Pipeline integratsiyasi
+        self.shadow_collector = None
+        if ShadowStateCollector is not None:
+            try:
+                self.shadow_collector = ShadowStateCollector(db_path='bot_learning.db')
+            except Exception as e:
+                logger.warning(f"ShadowStateCollector init failed: {e}")
+        
+        self.adaptive_weights = None
+        if AdaptiveWeightManager is not None:
+            try:
+                self.adaptive_weights = AdaptiveWeightManager(db_path='bot_learning.db')
+            except Exception as e:
+                logger.warning(f"AdaptiveWeightManager init failed: {e}")
+
+        self.pattern_memory = None
+        if PatternMemoryBank is not None:
+            try:
+                self.pattern_memory = PatternMemoryBank(db_path='bot_learning.db')
+            except Exception as e:
+                logger.warning(f"PatternMemoryBank init failed: {e}")
         
         self.init_schema()
 
@@ -151,6 +188,13 @@ class TradeReviewer:
                         for row in rows:
                             dummy = DummyDeal(row[1], row[2], row[4])
                             trade_deals.append(dummy)
+                            
+                            # Shadow Learning: label past states
+                            self._label_shadow_states(
+                                symbol=row[1], pnl=row[2], 
+                                trade_close_time=row[4]
+                            )
+                            
                         conn.close()
                 except Exception as shadow_e:
                     logger.error(f"Error getting shadow deals: {shadow_e}")
@@ -159,6 +203,31 @@ class TradeReviewer:
         except Exception as e:
             logger.error(f"Error getting MT5/Shadow deals: {e}")
             return []
+
+    def _label_shadow_states(self, symbol: str, pnl: float, 
+                              trade_close_time: str, timeframe: str = "H1"):
+        """
+        Savdo yopilganda shadow_states qatorlarini label qilish (Qadam 1 integratsiyasi).
+        """
+        if not self.shadow_collector:
+            return
+        try:
+            # Trade ochilish vaqtini taxminiy aniqlash (yopilishdan 24 soat oldin)
+            close_dt = datetime.fromisoformat(trade_close_time)
+            open_dt = close_dt - timedelta(hours=24)
+            
+            direction = "BUY" if pnl > 0 else "SELL"  # taxminiy
+            
+            self.shadow_collector.label_past_states(
+                symbol=symbol,
+                timeframe=timeframe,
+                direction=direction,
+                pnl=pnl,
+                trade_open_time=open_dt.isoformat(),
+                trade_close_time=trade_close_time
+            )
+        except Exception as e:
+            logger.debug(f"Shadow states label qilishda xatolik: {e}")
 
     def get_ai_decisions_for_deals(self, deals: List[Any]) -> List[Dict]:
         """Matches closed deals with their AI decisions from decisions_log.db"""
@@ -203,10 +272,13 @@ class TradeReviewer:
                     except:
                         pass
                         
-                    # AI sababini olish
+                    # Pattern data ni olish
                     try:
                         resp = json.loads(row[2])
                         ai_reasoning = resp.get("reasoning", "")[:150] # qisqacha
+                        
+                        audit = resp.get("_audit", {})
+                        pattern_data = audit.get("pattern_data_for_reviewer")
                     except:
                         pass
                 
@@ -217,7 +289,8 @@ class TradeReviewer:
                     "deal_time": deal_time.isoformat(),
                     "ai_action_taken": ai_decision,
                     "market_conditions_at_entry": market_context,
-                    "ai_original_reasoning": ai_reasoning
+                    "ai_original_reasoning": ai_reasoning,
+                    "pattern_data": pattern_data
                 })
         except Exception as e:
             logger.error(f"Error fetching AI decisions for review: {e}")
@@ -246,6 +319,28 @@ class TradeReviewer:
         avg_rr = avg_profit / avg_loss if avg_loss > 0 else 0
         
         matched_data = self.get_ai_decisions_for_deals(deals)
+
+        # Record patterns to PatternMemoryBank
+        if self.pattern_memory:
+            for m in matched_data:
+                pdata = m.get("pattern_data")
+                if pdata and pdata.get("recent_candles"):
+                    direction = m.get("ai_action_taken")
+                    if direction in ("BUY", "SELL"):
+                        outcome = "WIN" if m.get("profit", 0) > 0 else "LOSS"
+                        try:
+                            self.pattern_memory.record_pattern(
+                                symbol=m["symbol"],
+                                timeframe="H1",  # Yoki m.get dan olamiz, asosan H1
+                                direction=direction,
+                                candles=pdata["recent_candles"],
+                                atr=pdata.get("atr", 0.0),
+                                smc_zone_type=pdata.get("smc_zone_type"),
+                                outcome=outcome,
+                                pnl=m.get("profit", 0)
+                            )
+                        except Exception as e:
+                            logger.error(f"Error recording pattern: {e}")
         
         prompt = f"""Sen ilg'or Trading AI Reviewersan.
 Quyida botning oxirgi {len(deals)} ta savdo natijalari keltirilgan.

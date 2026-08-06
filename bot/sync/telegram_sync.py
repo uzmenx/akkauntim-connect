@@ -43,7 +43,7 @@ class TelegramSync:
         except Exception as e:
             logger.error(f"Telegram bilan aloqada xatolik: {e}")
 
-    def send_signal(self, symbol: str, signal: str, confidence: int, sl: float, tp: float, reasoning: str):
+    def send_signal(self, symbol: str, signal: str, confidence: int, sl: float, tp: float, reasoning: str, entry_price: float = None):
         if not self.enabled:
             return
 
@@ -59,12 +59,18 @@ class TelegramSync:
             sl = round(sl, 2)
         if isinstance(tp, float):
             tp = round(tp, 2)
-
+            
         # Xabar matnini tayyorlash
         text = (
             f"🚀 <b>YANGI SIGNAL</b> 🚀\n\n"
             f"💎 <b>Juftlik:</b> #{symbol}\n"
             f"📊 <b>Signal:</b> {signal_emoji}\n"
+        )
+        
+        if entry_price is not None:
+            text += f"💵 <b>Kirish Narxi:</b> {round(entry_price, 5)}\n"
+
+        text += (
             f"🎯 <b>Ishonchlilik:</b> {confidence}%\n"
             f"🛡 <b>Stop Loss:</b> {sl} pips\n"
             f"💰 <b>Take Profit:</b> {tp} pips\n\n"
