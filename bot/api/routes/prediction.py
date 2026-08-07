@@ -135,3 +135,22 @@ async def get_prediction_fan(symbol: str, timeframe: str = "M5"):
         },
     }
 
+@router.delete("/api/orders/pending/{ticket}")
+async def cancel_pending_order(ticket: int):
+    try:
+        import MetaTrader5 as mt5
+        if not mt5.initialize():
+            return {"status": "ERROR", "message": f"MT5 initialize failed: {mt5.last_error()}"}
+        request = {
+            "action": mt5.TRADE_ACTION_REMOVE,
+            "order": ticket
+        }
+        result = mt5.order_send(request)
+        if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+            err = mt5.last_error()
+            return {"status": "ERROR", "message": f"MT5 order_send error: {err}"}
+        return {"status": "SUCCESS", "message": "Order cancelled in MT5 successfully"}
+    except Exception as e:
+        logger.error(f"Cancel order route error: {e}")
+        return {"status": "ERROR", "message": str(e)}
+

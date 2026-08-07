@@ -955,7 +955,7 @@ export function ShadowLearningPage() {
               </h3>
               <div className="grid grid-cols-2 min-[360px]:grid-cols-3 gap-1.5">
                 {(stratPerf.data && stratPerf.data.length > 0 
-                  ? stratPerf.data.map(sp => ({ name: sp.strategy_name, weight: Math.round(sp.recommended_weight * 50) }))
+                  ? stratPerf.data.map(sp => ({ name: sp.strategy_name, weight: Math.round(Number(sp.recommended_weight) * 100) }))
                   : [
                       {name: "SMC", weight: 60}, {name: "PATTERN", weight: 60}, {name: "NEWS", weight: 60},
                       {name: "WYCKOFF", weight: 50}, {name: "SR_VOLUME", weight: 50}, {name: "AUTO_PATTERN", weight: 50}

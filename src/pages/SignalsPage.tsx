@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/Card";
 import { fmtNum, timeAgo } from "@/lib/utils";
 import type { AISignal, PendingOrder } from "@/lib/types";
-import { Brain, Check, X, Loader2, CircleMinus, Clock, Lock, Sparkles, CandlestickChart } from "lucide-react";
+import { Brain, Check, X, Loader2, CircleMinus, Clock, Lock, Sparkles, CandlestickChart, Search, Calendar } from "lucide-react";
 import { EmptyLine } from "./DashboardPage";
 import { useAuth } from "@/hooks/useAuth";
 import { PaywallModal } from "@/components/PaywallModal";
@@ -19,8 +19,13 @@ export function SignalsPage() {
   const [currentUnlockingId, setCurrentUnlockingId] = useState<string | null>(null);
   const [selectedChartSymbol, setSelectedChartSymbol] = useState<string | null>(null);
 
-  const { data: signals, isLoading: loadingSignals } = useQuery({
-    queryKey: ["ai_signals", user?.id],
+  // Filter states
+  const [searchSymbol, setSearchSymbol] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
+  const { data: allSignals, isLoading: loadingSignals } = useQuery({
+    queryKey: ["ai_signals_raw", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("ai_signals")
@@ -31,8 +36,8 @@ export function SignalsPage() {
     refetchInterval: 8000,
   });
 
-  const { data: pending, isLoading: loadingPending } = useQuery({
-    queryKey: ["pending_orders", user?.id],
+  const { data: allPending, isLoading: loadingPending } = useQuery({
+    queryKey: ["pending_orders_raw", user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from("pending_orders")
@@ -47,16 +52,41 @@ export function SignalsPage() {
     return <img src={pubgLoader} className="mx-auto my-10 w-32 h-32 opacity-80" alt="Yuklanmoqda..." />;
   }
 
-  const hasSignals = signals && signals.length > 0;
-  const hasPending = pending && pending.length > 0;
+  // Filter logic
+  const signals = (allSignals ?? []).filter((s) => {
+    if (searchSymbol && !s.symbol.toLowerCase().includes(searchSymbol.toLowerCase())) {
+      return false;
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      if (new Date(s.created_at) < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (new Date(s.created_at) > end) return false;
+    }
+    return true;
+  });
 
-  if (!hasSignals && !hasPending) {
-    return (
-      <Card>
-        <EmptyLine text="AI hali signal chiqarmadi va kutilayotgan limit qarorlari yo'q." />
-      </Card>
-    );
-  }
+  const pending = (allPending ?? []).filter((p) => {
+    if (searchSymbol && !p.symbol.toLowerCase().includes(searchSymbol.toLowerCase())) {
+      return false;
+    }
+    if (startDate) {
+      const start = new Date(startDate);
+      if (new Date(p.created_at) < start) return false;
+    }
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      if (new Date(p.created_at) > end) return false;
+    }
+    return true;
+  });
+
+  const hasSignals = signals.length > 0;
+  const hasPending = pending.length > 0;
 
   const handleUnlockClick = (id: string) => {
     setCurrentUnlockingId(id);
@@ -69,8 +99,7 @@ export function SignalsPage() {
       setUnlockedIds((prev) => [...prev, currentUnlockingId]);
       setCurrentUnlockingId(null);
     } else {
-      // Auto-open close: unlock first signal
-      if (signals && signals.length > 0) {
+      if (signals.length > 0) {
         setUnlockedIds((prev) => [...prev, signals[0].id]);
       }
     }
@@ -79,44 +108,104 @@ export function SignalsPage() {
   return (
     <>
       <div className="space-y-6 relative pb-10">
-        {hasPending && (
-          <div>
-            <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">Kutilayotgan Qarorlar (Limit)</h3>
-            <div className="space-y-3">
-              {pending.map((p) => {
-                const isLocked = isGuest && !unlockedIds.includes(p.id);
-                return (
-                  <PendingCard 
-                    key={p.id} 
-                    p={p} 
-                    isGuest={isLocked} 
-                    onUnlock={() => handleUnlockClick(p.id)}
-                    onOpenChart={() => setSelectedChartSymbol(p.symbol)}
-                  />
-                );
-              })}
-            </div>
+        {/* Filters Bar */}
+        <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-3 flex flex-wrap items-center gap-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)] backdrop-blur-md">
+          {/* Symbol Search */}
+          <div className="relative flex-1 min-w-[150px]">
+            <Search size={14} className="absolute left-3 top-2.5 text-white/30" />
+            <input
+              type="text"
+              placeholder="Simvol orqali qidirish..."
+              value={searchSymbol}
+              onChange={(e) => setSearchSymbol(e.target.value)}
+              className="w-full bg-black/20 border border-white/5 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/40 transition-colors"
+            />
           </div>
-        )}
 
-        {hasSignals && (
-          <div>
-            <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">AI Signallar</h3>
-            <div className="space-y-3">
-              {signals.map((s) => {
-                const isLocked = isGuest && !unlockedIds.includes(s.id);
-                return (
-                  <SignalCard 
-                    key={s.id} 
-                    s={s} 
-                    isGuest={isLocked} 
-                    onUnlock={() => handleUnlockClick(s.id)}
-                    onOpenChart={() => setSelectedChartSymbol(s.symbol)}
-                  />
-                );
-              })}
-            </div>
+          {/* Start Date */}
+          <div className="relative flex-1 min-w-[150px]">
+            <span className="absolute left-3 top-2 text-[10px] text-white/30 pointer-events-none uppercase font-bold">Dan:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full bg-black/20 border border-white/5 rounded-xl pl-12 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/40 transition-colors cursor-pointer scheme-dark"
+            />
           </div>
+
+          {/* End Date */}
+          <div className="relative flex-1 min-w-[150px]">
+            <span className="absolute left-3 top-2 text-[10px] text-white/30 pointer-events-none uppercase font-bold">Gacha:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full bg-black/20 border border-white/5 rounded-xl pl-16 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500/40 transition-colors cursor-pointer scheme-dark"
+            />
+          </div>
+
+          {/* Clear Filters */}
+          {(searchSymbol || startDate || endDate) && (
+            <button
+              onClick={() => {
+                setSearchSymbol("");
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white/60 hover:text-white bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 transition-all cursor-pointer"
+            >
+              <X size={12} />
+              Tozalash
+            </button>
+          )}
+        </div>
+
+        {!hasSignals && !hasPending ? (
+          <Card>
+            <EmptyLine text="Mos keluvchi signallar yoki limit qarorlari topilmadi." />
+          </Card>
+        ) : (
+          <>
+            {hasPending && (
+              <div>
+                <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">Kutilayotgan Qarorlar (Limit)</h3>
+                <div className="space-y-3">
+                  {pending.map((p) => {
+                    const isLocked = isGuest && !unlockedIds.includes(p.id);
+                    return (
+                      <PendingCard 
+                        key={p.id} 
+                        p={p} 
+                        isGuest={isLocked} 
+                        onUnlock={() => handleUnlockClick(p.id)}
+                        onOpenChart={() => setSelectedChartSymbol(p.symbol)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {hasSignals && (
+              <div>
+                <h3 className="mb-3 text-xs font-bold text-fg-muted ml-1 uppercase tracking-wider">AI Signallar</h3>
+                <div className="space-y-3">
+                  {signals.map((s) => {
+                    const isLocked = isGuest && !unlockedIds.includes(s.id);
+                    return (
+                      <SignalCard 
+                        key={s.id} 
+                        s={s} 
+                        isGuest={isLocked} 
+                        onUnlock={() => handleUnlockClick(s.id)}
+                        onOpenChart={() => setSelectedChartSymbol(s.symbol)}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <PaywallModal isOpen={paywallOpen} onClose={handlePaywallClose} />

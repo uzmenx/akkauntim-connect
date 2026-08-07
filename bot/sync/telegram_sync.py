@@ -1,6 +1,7 @@
 import logging
 import requests
 import time
+import html
 from bot.config import BotConfig
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,7 @@ class TelegramSync:
             f"🛡 <b>Stop Loss:</b> {sl} pips\n"
             f"💰 <b>Take Profit:</b> {tp} pips\n\n"
             f"📝 <b>Sabab:</b>\n"
-            f"<i>{reasoning[:300]}</i>"
+            f"<i>{html.escape(reasoning[:300])}</i>"
         )
 
         self.send_message(text)

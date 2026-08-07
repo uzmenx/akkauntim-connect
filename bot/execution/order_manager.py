@@ -664,6 +664,18 @@ class OrderManager:
         if take_profit_pips < stop_level_pips:
             take_profit_pips = stop_level_pips
 
+        # Auto-flip LIMIT<->STOP based on CURRENT market price (prevents 10015 Invalid Price)
+        is_buy = "BUY" in order_type_str
+        current_market_price = tick.ask if is_buy else tick.bid
+        wants_limit = "LIMIT" in order_type_str
+        price_below = price < current_market_price
+        correct_limit = (is_buy and price_below) or (not is_buy and not price_below)
+        
+        if wants_limit != correct_limit:
+            new_type = order_type_str.replace("LIMIT", "STOP") if wants_limit else order_type_str.replace("STOP", "LIMIT")
+            logger.info(f"[{symbol}] pending_order auto-flip {order_type_str} -> {new_type} (entry={price}, market={current_market_price})")
+            order_type_str = new_type
+
         if order_type_str == "BUY_STOP":
             order_type = self.mt5.ORDER_TYPE_BUY_STOP
             virtual_sl = round(price - stop_loss_pips * pip_size, digits)

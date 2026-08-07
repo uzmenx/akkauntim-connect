@@ -5,7 +5,7 @@ import { X, TrendingUp, TrendingDown, Layers, Activity, Eye, RefreshCw, BarChart
 import pubgLoader from "@/assets/pubg-loader.svg";
 import { useQuery } from "@tanstack/react-query";
 import { fmtMoney, fmtNum } from "@/lib/utils";
-import type { Position } from "@/lib/types";
+import type { Position, TradeHistory, AISignal } from "@/lib/types";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { ZoneRectanglePrimitive, ZoneData } from "./chart-primitives/ZoneRectanglePrimitive";
@@ -13,12 +13,14 @@ import { ConnectedLinePrimitive, LineData } from "./chart-primitives/ConnectedLi
 import { EventMarkerPrimitive, EventMarkerData } from "./chart-primitives/EventMarkerPrimitive";
 
 import { guestMock } from "@/lib/guestMock";
+import logo from "@/assets/akcume-logo.png";
 
 interface TradingChartModalProps {
   isOpen: boolean;
   onClose: () => void;
   symbol: string;
   position?: Position | null;
+  historyTrade?: TradeHistory | null;
 }
 
 type Timeframe = "M1" | "M5" | "M15" | "H1" | "H4" | "D1";
@@ -57,7 +59,7 @@ const calculatePL = (entry: number, target: number, vol: number, sym: string, cu
   return pl;
 };
 
-export function TradingChartModal({ isOpen, onClose, symbol, position }: TradingChartModalProps) {
+export function TradingChartModal({ isOpen, onClose, symbol, position, historyTrade }: TradingChartModalProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const zonePrimitiveRef = useRef<ZoneRectanglePrimitive | null>(null);
   const linePrimitiveRef = useRef<ConnectedLinePrimitive | null>(null);
@@ -175,7 +177,24 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       setShowSymbolList(false);
       setSearchQuery("");
     }
-  }, [symbol, position, isOpen]);
+  }, [symbol, position, isOpen, historyTrade]);
+
+  const { data: historyAiSignal } = useQuery({
+    queryKey: ["history_ai_signal", historyTrade?.symbol, historyTrade?.opened_at],
+    queryFn: async () => {
+      if (!historyTrade || isGuest) return null;
+      const { data } = await supabase
+        .from("ai_signals")
+        .select("*")
+        .eq("symbol", historyTrade.symbol)
+        .lte("created_at", historyTrade.opened_at)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data as AISignal | null;
+    },
+    enabled: !!historyTrade && isOpen,
+  });
 
   const { data: statusData } = useQuery({
     queryKey: ["bot_status_symbols", user?.id],
@@ -560,7 +579,61 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
       });
     }
 
-    chart.timeScale().fitContent();
+    if (historyTrade) {
+       const markers: any[] = [];
+       const entryTimeSec = Math.floor(new Date(historyTrade.opened_at).getTime() / 1000);
+       const exitTimeSec = Math.floor(new Date(historyTrade.closed_at).getTime() / 1000);
+       const historyIsBuy = historyTrade.side.toUpperCase() === "BUY";
+       
+       markers.push({
+         time: entryTimeSec,
+         position: 'inBar',
+         color: historyIsBuy ? '#3b82f6' : '#f43f5e',
+         shape: historyIsBuy ? 'arrowUp' : 'arrowDown',
+         text: `Entry`
+       });
+       markers.push({
+         time: exitTimeSec,
+         position: 'inBar',
+         color: historyIsBuy ? '#f43f5e' : '#3b82f6',
+         shape: historyIsBuy ? 'arrowDown' : 'arrowUp',
+         text: `Exit`
+       });
+       markers.sort((a, b) => a.time - b.time);
+       try { candlestickSeries.setMarkers(markers); } catch(e) { console.warn("Marker error", e); }
+
+       let historyLineSeries: ISeriesApi<"Line">;
+       const lineOptions = {
+         color: historyIsBuy ? 'rgba(59, 130, 246, 0.8)' : 'rgba(244, 63, 94, 0.8)',
+         lineWidth: 2,
+         lineStyle: LineStyle.Dashed,
+         crosshairMarkerVisible: false,
+         priceLineVisible: false,
+         lastValueVisible: false,
+       };
+       if (typeof (chart as any).addLineSeries === "function") {
+         historyLineSeries = (chart as any).addLineSeries(lineOptions);
+       } else {
+         historyLineSeries = (chart as any).addSeries(LineSeries, lineOptions);
+       }
+       
+       const lineData = [
+         { time: entryTimeSec, value: historyTrade.open_price },
+         { time: exitTimeSec, value: historyTrade.close_price }
+       ].sort((a, b) => a.time - b.time);
+       
+       try { historyLineSeries.setData(lineData as any); } catch(e) { console.warn("Line data error", e); }
+       
+       // Center to the trade time
+       setTimeout(() => {
+          chart.timeScale().setVisibleRange({
+             from: entryTimeSec - 86400 * 2, // 2 days before
+             to: exitTimeSec + 86400 * 2 // 2 days after
+          });
+       }, 500);
+    } else {
+      chart.timeScale().fitContent();
+    }
 
     const handleResize = () => {
       if (container && chartRef.current) {
@@ -1236,6 +1309,22 @@ export function TradingChartModal({ isOpen, onClose, symbol, position }: Trading
           ) : (
             <>
               <div ref={chartContainerRef} className="w-full h-full absolute inset-0 z-0" />
+
+              {/* History AI Signal Display */}
+              {historyAiSignal && (
+                <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none rounded-2xl border border-white/10 bg-[#090d16]/85 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.5)] text-[11px] min-w-[280px] max-w-[450px]">
+                  <div className="flex items-center gap-2 border-b border-white/10 pb-2 mb-2">
+                    <img src={logo} alt="AKCUME" className="w-5 h-5 object-contain rounded-md drop-shadow-[0_0_8px_rgba(120,80,255,0.4)]" />
+                    <div className="font-extrabold text-white text-xs">AKCUME AI: {historyAiSignal.signal}</div>
+                    <div className="ml-auto flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md text-emerald-400 font-bold border border-white/5 shadow-inner">
+                      Ishonch: {historyAiSignal.confidence}%
+                    </div>
+                  </div>
+                  <div className="text-white/70 leading-relaxed font-sans italic text-[10px] break-words">
+                    "{historyAiSignal.reasoning}"
+                  </div>
+                </div>
+              )}
 
               {/* Floating Detailed Tooltip */}
               {hoveredTooltip && (

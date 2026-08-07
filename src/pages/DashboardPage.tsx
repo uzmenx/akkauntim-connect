@@ -6,7 +6,7 @@ import type { BotStatus, Position, TradeHistory, PendingOrder, BotSettings } fro
 import { Icon } from "@iconify/react";
 import {
   Play, Pause, Settings, ChevronRight, TrendingUp, TrendingDown,
-  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot, CandlestickChart, Globe, BookOpen, FileText, Activity
+  ArrowDownLeft, ArrowUpRight, Crown, LogOut, UserPlus, Clock, FlaskConical, Sparkles, Brain, Bot, CandlestickChart, Globe, BookOpen, FileText, Activity, Search, X
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useMemo, useState, useRef, useEffect } from "react";
@@ -24,12 +24,12 @@ const polarToCartesian = (centerX: number, centerY: number, radius: number, angl
 };
 
 const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
-  const start = polarToCartesian(x, y, radius, endAngle);
-  const end = polarToCartesian(x, y, radius, startAngle);
+  const start = polarToCartesian(x, y, radius, startAngle);
+  const end = polarToCartesian(x, y, radius, endAngle);
   const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
   return [
     "M", start.x, start.y, 
-    "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+    "A", radius, radius, 0, largeArcFlag, 1, end.x, end.y
   ].join(" ");
 };
 
@@ -52,7 +52,7 @@ export function DashboardPage() {
   const { user, logout } = useAuth();
   const isGuest = user?.id === "guest";
 
-  const [activeChart, setActiveChart] = useState<{ symbol: string; position?: Position | null } | null>(null);
+  const [activeChart, setActiveChart] = useState<{ symbol: string; position?: Position | null; historyTrade?: TradeHistory | null } | null>(null);
 
 
 
@@ -167,6 +167,31 @@ export function DashboardPage() {
     status.refetch();
     settings.refetch();
   }
+
+  const [limitsSearch, setLimitsSearch] = useState("");
+  const [limitsAssetType, setLimitsAssetType] = useState<"all" | "forex" | "metals" | "indices" | "crypto">("all");
+
+  const filteredPending = useMemo(() => {
+    const all = pending.data ?? [];
+    return all.filter((o) => {
+      if (limitsSearch && !o.symbol.toLowerCase().includes(limitsSearch.toLowerCase())) {
+        return false;
+      }
+      if (limitsAssetType !== "all") {
+        const sym = (o.symbol || "").toUpperCase();
+        let type: "forex" | "metals" | "indices" | "crypto" = "forex";
+        if (sym.includes("XAU") || sym.includes("XAG") || sym.includes("XPT") || sym.includes("XPD") || sym.includes("GOLD") || sym.includes("SILVER")) {
+          type = "metals";
+        } else if (sym.includes("BTC") || sym.includes("ETH") || sym.includes("SOL") || sym.includes("XRP") || sym.includes("ADA") || sym.includes("DOGE") || sym.includes("DOT") || sym.includes("LTC")) {
+          type = "crypto";
+        } else if (sym.includes("DE40") || sym.includes("US30") || sym.includes("USTEC") || sym.includes("SPX") || sym.includes("HK50") || sym.includes("UK100") || sym.includes("NAS100") || sym.includes("US500") || sym.includes("GER30") || sym.includes("EU50")) {
+          type = "indices";
+        }
+        if (type !== limitsAssetType) return false;
+      }
+      return true;
+    });
+  }, [pending.data, limitsSearch, limitsAssetType]);
 
   const [filterMode, setFilterMode] = useState<"all" | "profit" | "loss">("all");
   const [activeTab, setActiveTab] = useState<"positions" | "limits" | "history">("positions");
@@ -384,7 +409,7 @@ export function DashboardPage() {
                 className="w-5.5 h-5.5 min-[340px]:w-6.5 min-[340px]:h-6.5 rounded-full bg-[#1a1d29] shadow-[inset_0_1px_1px_rgba(255,255,255,0.05),0_4px_10px_rgba(0,0,0,0.3)] border border-white/5 flex items-center justify-center text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer active:scale-95 shrink-0 relative"
                 title="System Monitoring & Diagnostika"
               >
-                <Icon icon="twemoji:heart-suit" width="12" height="12" />
+                <Icon icon="twemoji:heart-suit" width="12" height="12" className="animate-heartbeat" />
                 <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
               </Link>
 
@@ -447,6 +472,25 @@ export function DashboardPage() {
                 className="relative w-[95px] h-[95px] min-[340px]:w-[108px] min-[340px]:h-[108px] min-[375px]:w-[122px] min-[375px]:h-[122px] flex items-center justify-center rounded-full cursor-pointer active:scale-95 transition-all duration-300 group shrink-0"
               >
                 
+                {/* Hover Play/Pause Overlay */}
+                <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 backdrop-blur-[2px] transition-all duration-300 flex flex-col items-center justify-center z-20 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)] border border-white/5">
+                  {running ? (
+                     <div className="text-white text-[9px] font-black tracking-widest flex flex-col items-center drop-shadow-md">
+                        <span className="w-6 h-6 rounded-full bg-rose-500/80 mb-1 flex items-center justify-center shadow-[0_0_15px_rgba(244,63,94,0.6)] backdrop-blur-md">
+                           <span className="w-2.5 h-2.5 bg-white rounded-[1px]"></span>
+                        </span>
+                        BOTNI TO'XTATISH
+                     </div>
+                  ) : (
+                     <div className="text-white text-[9px] font-black tracking-widest flex flex-col items-center drop-shadow-md">
+                        <span className="w-6 h-6 rounded-full bg-emerald-500/80 mb-1 flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.6)] pl-0.5 backdrop-blur-md">
+                           <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M5 3l14 9-14 9V3z"/></svg>
+                        </span>
+                        BOTNI ISHGA TUSHIRISH
+                     </div>
+                  )}
+                </div>
+
                 {/* SVG circular track, glowing progress rings, sentiment, and AI weights */}
                 <svg viewBox="0 0 120 120" className="absolute inset-0 w-full h-full overflow-visible pointer-events-none">
                   <defs>
@@ -703,18 +747,64 @@ export function DashboardPage() {
 
             {activeTab === "limits" && (
               <div className="space-y-2">
+                {/* Search & Category Filter Bar */}
+                <div className="bg-[#10192e]/40 border border-white/5 rounded-xl p-2 space-y-2 mb-2">
+                  <div className="relative">
+                    <Search size={12} className="absolute left-2.5 top-2 text-white/30" />
+                    <input
+                      type="text"
+                      placeholder="Simvol orqali qidirish..."
+                      value={limitsSearch}
+                      onChange={(e) => setLimitsSearch(e.target.value)}
+                      className="w-full bg-black/30 border border-white/5 rounded-lg pl-8 pr-2 py-1 text-[11px] text-white placeholder:text-white/20 focus:outline-none focus:border-blue-500/40"
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {(["all", "forex", "metals", "indices", "crypto"] as const).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => setLimitsAssetType(type)}
+                        className={cn(
+                          "px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer capitalize",
+                          limitsAssetType === type
+                            ? "bg-blue-600/20 text-blue-400 border-blue-500/30"
+                            : "bg-transparent text-white/40 border-white/5 hover:text-white/60"
+                        )}
+                      >
+                        {type === "all" ? "Barchasi" : type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {pending.isLoading ? (
                   <SkeletonRows count={2} />
-                ) : pending.data && pending.data.length > 0 ? (
-                  pending.data.map((o) => (
+                ) : filteredPending && filteredPending.length > 0 ? (
+                  filteredPending.map((o) => (
                     <PendingRow
                       key={o.id}
                       o={o}
                       onClick={() => setActiveChart({ symbol: o.symbol })}
+                      onCancel={async () => {
+                        if (isGuest) {
+                          // mock cancel in guest mode
+                          qc.invalidateQueries({ queryKey: ["pending_orders"] });
+                        } else {
+                          try {
+                            if (o.ticket) {
+                              await fetch(`/api/orders/pending/${o.ticket}`, { method: "DELETE" });
+                            }
+                            await supabase.from("pending_orders").delete().eq("id", o.id);
+                            qc.invalidateQueries({ queryKey: ["pending_orders"] });
+                          } catch (e) {
+                            console.error("Bekor qilishda xatolik:", e);
+                          }
+                        }
+                      }}
                     />
                   ))
                 ) : (
-                  <EmptyBox text="Hozircha kutilayotgan order yo'q" />
+                  <EmptyBox text="Mos keluvchi limit order yo'q" />
                 )}
               </div>
             )}
@@ -732,7 +822,7 @@ export function DashboardPage() {
                     <HistoryRow
                       key={t.id}
                       t={t}
-                      onClick={() => setActiveChart({ symbol: t.symbol })}
+                      onClick={() => setActiveChart({ symbol: t.symbol, historyTrade: t })}
                     />
                   ))
                 ) : (
@@ -820,6 +910,7 @@ export function DashboardPage() {
         onClose={() => setActiveChart(null)} 
         symbol={activeChart?.symbol ?? ""} 
         position={activeChart?.position} 
+        historyTrade={activeChart?.historyTrade}
       />
     </div>
   );
@@ -890,7 +981,7 @@ function PositionRow({ p, onClick }: { p: Position; onClick?: () => void }) {
   );
 }
 
-function PendingRow({ o, onClick }: { o: PendingOrder; onClick?: () => void }) {
+function PendingRow({ o, onClick, onCancel }: { o: PendingOrder; onClick?: () => void; onCancel?: () => void }) {
   const isBuy = (o.type || "").toLowerCase().startsWith("buy");
   return (
     <div
@@ -908,7 +999,21 @@ function PendingRow({ o, onClick }: { o: PendingOrder; onClick?: () => void }) {
           </span>
           <span className="text-[8.5px] text-white/40 shrink-0">{fmtNum(o.volume, 2)} lot &bull; {fmtDateShort(o.created_at)}</span>
         </div>
-        <Clock size={12} className="text-white/40" />
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onCancel && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCancel();
+              }}
+              className="p-1 rounded hover:bg-rose-500/10 text-white/40 hover:text-rose-400 transition-all cursor-pointer"
+              title="Bekor qilish"
+            >
+              <X size={11} />
+            </button>
+          )}
+          <Clock size={12} className="text-white/40" />
+        </div>
       </div>
       <div className="grid grid-cols-3 gap-1 text-[9px]">
         <MiniField label="Price" value={fmtNum(o.price, 5)} />

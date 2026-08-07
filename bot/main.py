@@ -1119,10 +1119,11 @@ class TradingBot:
         )
 
         if success:
+            display_risk = risk_pct if isinstance(risk_pct, (int, float)) else getattr(self.config, "risk_per_trade", 0.02)
             logger.info(
                 f"✅ [{symbol}] AI Order ochildi! Ticket: {order_info.get('ticket', 'N/A')} | "
                 f"Signal: {order_signal} | SL: {sl_pips:.1f} pip | TP: {tp_pips:.1f} pip | "
-                f"Risk: {risk_pct:.1%}"
+                f"Risk: {display_risk:.1%}"
             )
             
             # Haqiqiy ishonchni olish (ai_decision.get("confidence") float bo'ladi, masalan 0.75)
